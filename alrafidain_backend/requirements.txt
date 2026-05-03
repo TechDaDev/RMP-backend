@@ -1,0 +1,14 @@
+Django>=5.0
+djangorestframework
+djangorestframework-simplejwt
+drf-spectacular
+django-filter
+django-cors-headers
+python-decouple
+psycopg[binary]
+Pillow
+django-cleanup
+django-extensions
+pydot
+pypdf
+python-docx

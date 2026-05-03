@@ -1,0 +1,48 @@
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+
+# Django
+*.pyc
+db.sqlite3
+media/
+staticfiles/
+local_settings.py
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Qodo
+.qodo/
+
+# Logs
+*.log

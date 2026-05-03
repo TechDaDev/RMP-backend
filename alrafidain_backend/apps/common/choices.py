@@ -1,0 +1,296 @@
+from django.db import models
+
+
+class UserType(models.TextChoices):
+    PATIENT = "patient", "Patient"
+    DOCTOR = "doctor", "Doctor"
+    PHARMACIST = "pharmacist", "Pharmacist"
+    LABORATORIAN = "laboratorian", "Laboratorian"
+
+
+class Gender(models.TextChoices):
+    MALE = "male", "Male"
+    FEMALE = "female", "Female"
+
+
+class Governorate(models.TextChoices):
+    BAGHDAD = "baghdad", "Baghdad"
+    BASRA = "basra", "Basra"
+    NINEVEH = "nineveh", "Nineveh"
+    ERBIL = "erbil", "Erbil"
+    NAJAF = "najaf", "Najaf"
+    KARBALA = "karbala", "Karbala"
+    DHI_QAR = "dhi_qar", "Dhi Qar"
+    MAYSAN = "maysan", "Maysan"
+    WASIT = "wasit", "Wasit"
+    DIYALA = "diyala", "Diyala"
+    ANBAR = "anbar", "Anbar"
+    SALAH_AL_DIN = "salah_al_din", "Salah al-Din"
+    KIRKUK = "kirkuk", "Kirkuk"
+    SULAYMANIYAH = "sulaymaniyah", "Sulaymaniyah"
+    DOHUK = "dohuk", "Dohuk"
+    QADISIYYAH = "qadisiyyah", "Qadisiyyah"
+    MUTHANNA = "muthanna", "Muthanna"
+    BABYLON = "babylon", "Babylon"
+
+
+class VerificationStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    APPROVED = "approved", "Approved"
+    REJECTED = "rejected", "Rejected"
+    SUSPENDED = "suspended", "Suspended"
+
+
+class MedicalSpecialty(models.TextChoices):
+    GENERAL_MEDICINE = "general_medicine", "General Medicine"
+    INTERNAL_MEDICINE = "internal_medicine", "Internal Medicine"
+    CARDIOLOGY = "cardiology", "Cardiology"
+    DERMATOLOGY = "dermatology", "Dermatology"
+    PEDIATRICS = "pediatrics", "Pediatrics"
+    GYNECOLOGY = "gynecology", "Gynecology"
+    NEUROLOGY = "neurology", "Neurology"
+    ENT = "ent", "ENT"
+    OPHTHALMOLOGY = "ophthalmology", "Ophthalmology"
+    ORTHOPEDICS = "orthopedics", "Orthopedics"
+    UROLOGY = "urology", "Urology"
+    GASTROENTEROLOGY = "gastroenterology", "Gastroenterology"
+    PSYCHIATRY = "psychiatry", "Psychiatry"
+    EMERGENCY_MEDICINE = "emergency_medicine", "Emergency Medicine"
+    FAMILY_MEDICINE = "family_medicine", "Family Medicine"
+    DENTISTRY = "dentistry", "Dentistry"
+    ENDOCRINOLOGY = "endocrinology", "Endocrinology"
+    PULMONOLOGY = "pulmonology", "Pulmonology"
+    NEPHROLOGY = "nephrology", "Nephrology"
+    RHEUMATOLOGY = "rheumatology", "Rheumatology"
+    OTHER = "other", "Other"
+
+
+class ConsultationStatus(models.TextChoices):
+    SUBMITTED = "submitted", "Submitted"
+    ACCEPTED = "accepted", "Accepted"
+    DOCTOR_RESPONDED = "doctor_responded", "Doctor Responded"
+    CLOSED = "closed", "Closed"
+    CANCELLED = "cancelled", "Cancelled"
+    REJECTED = "rejected", "Rejected"
+
+
+class ConsultationDuration(models.TextChoices):
+    LESS_THAN_24_HOURS = "less_than_24_hours", "Less than 24 hours"
+    ONE_TO_THREE_DAYS = "one_to_three_days", "1-3 days"
+    FOUR_TO_SEVEN_DAYS = "four_to_seven_days", "4-7 days"
+    ONE_TO_TWO_WEEKS = "one_to_two_weeks", "1-2 weeks"
+    MORE_THAN_TWO_WEEKS = "more_than_two_weeks", "More than 2 weeks"
+    CHRONIC_RECURRING = "chronic_recurring", "Chronic / recurring"
+
+
+class SeverityLevel(models.TextChoices):
+    MILD = "mild", "Mild"
+    MODERATE = "moderate", "Moderate"
+    SEVERE = "severe", "Severe"
+    VERY_SEVERE = "very_severe", "Very severe"
+
+
+class DoctorRecommendationType(models.TextChoices):
+    GENERAL_ADVICE = "general_advice", "General Advice"
+    NEEDS_IN_PERSON_VISIT = "needs_in_person_visit", "Needs In-Person Visit"
+    NEEDS_EMERGENCY_CARE = "needs_emergency_care", "Needs Emergency Care"
+    NEEDS_LAB_TEST = "needs_lab_test", "Needs Lab Test"
+    FOLLOW_UP_REQUIRED = "follow_up_required", "Follow-Up Required"
+
+
+class MessageSenderRole(models.TextChoices):
+    PATIENT = "patient", "Patient"
+    DOCTOR = "doctor", "Doctor"
+
+
+class MessageType(models.TextChoices):
+    TEXT = "text", "Text"
+    ATTACHMENT = "attachment", "Attachment"
+    SYSTEM = "system", "System"
+
+
+class PrescriptionStatus(models.TextChoices):
+    ISSUED = "issued", "Issued"
+    PARTIALLY_DISPENSED = "partially_dispensed", "Partially Dispensed"
+    FULLY_DISPENSED = "fully_dispensed", "Fully Dispensed"
+    EXPIRED = "expired", "Expired"
+    CANCELLED = "cancelled", "Cancelled"
+
+
+class PrescriptionItemStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    DISPENSED = "dispensed", "Dispensed"
+    CANCELLED = "cancelled", "Cancelled"
+
+
+class DispensingAttemptStatus(models.TextChoices):
+    DISPENSED = "dispensed", "Dispensed"
+    UNAVAILABLE = "unavailable", "Unavailable"
+
+
+class MedicationRoute(models.TextChoices):
+    ORAL = "oral", "Oral"
+    TOPICAL = "topical", "Topical"
+    INHALATION = "inhalation", "Inhalation"
+    INJECTION = "injection", "Injection"
+    EYE = "eye", "Eye"
+    EAR = "ear", "Ear"
+    NASAL = "nasal", "Nasal"
+    RECTAL = "rectal", "Rectal"
+    OTHER = "other", "Other"
+
+
+class NotificationType(models.TextChoices):
+    ACCOUNT = "account", "Account"
+    PROFILE = "profile", "Profile"
+    MEDICAL_RECORD = "medical_record", "Medical Record"
+    LAB_ORDER = "lab_order", "Lab Order"
+    CONSULTATION = "consultation", "Consultation"
+    MESSAGE = "message", "Message"
+    PRESCRIPTION = "prescription", "Prescription"
+    DISPENSING = "dispensing", "Dispensing"
+    SYSTEM = "system", "System"
+
+
+class NotificationPriority(models.TextChoices):
+    LOW = "low", "Low"
+    NORMAL = "normal", "Normal"
+    HIGH = "high", "High"
+    URGENT = "urgent", "Urgent"
+
+
+class MedicalRecordCategory(models.TextChoices):
+    BLOOD_GROUP = "blood_group", "Blood Group"
+    ALLERGY = "allergy", "Allergy"
+    CHRONIC_CONDITION = "chronic_condition", "Chronic Condition"
+    CURRENT_MEDICATION = "current_medication", "Current Medication"
+    PAST_SURGERY = "past_surgery", "Past Surgery"
+    FAMILY_HISTORY = "family_history", "Family History"
+    SMOKING_STATUS = "smoking_status", "Smoking Status"
+    PREGNANCY_STATUS = "pregnancy_status", "Pregnancy Status"
+    GENERAL_NOTE = "general_note", "General Note"
+
+
+class MedicalRecordVerificationStatus(models.TextChoices):
+    SELF_REPORTED = "self_reported", "Self Reported"
+    DOCTOR_CONFIRMED = "doctor_confirmed", "Doctor Confirmed"
+    LABORATORY_CONFIRMED = "laboratory_confirmed", "Laboratory Confirmed"
+    REJECTED = "rejected", "Rejected"
+    UNKNOWN = "unknown", "Unknown"
+
+
+class MedicalRecordSourceRole(models.TextChoices):
+    PATIENT = "patient", "Patient"
+    DOCTOR = "doctor", "Doctor"
+    LABORATORIAN = "laboratorian", "Laboratorian"
+    SYSTEM = "system", "System"
+
+
+class BloodGroup(models.TextChoices):
+    A_POSITIVE = "a_positive", "A+"
+    A_NEGATIVE = "a_negative", "A-"
+    B_POSITIVE = "b_positive", "B+"
+    B_NEGATIVE = "b_negative", "B-"
+    AB_POSITIVE = "ab_positive", "AB+"
+    AB_NEGATIVE = "ab_negative", "AB-"
+    O_POSITIVE = "o_positive", "O+"
+    O_NEGATIVE = "o_negative", "O-"
+    UNKNOWN = "unknown", "Unknown"
+
+
+class KnowledgeDocumentType(models.TextChoices):
+    MEDICAL_BOOK = "medical_book", "Medical Book"
+    LABORATORY_BOOK = "laboratory_book", "Laboratory Book"
+    CLINICAL_GUIDELINE = "clinical_guideline", "Clinical Guideline"
+    DRUG_REFERENCE = "drug_reference", "Drug Reference"
+    PATIENT_EDUCATION = "patient_education", "Patient Education"
+    PLATFORM_POLICY = "platform_policy", "Platform Policy"
+    OTHER = "other", "Other"
+
+
+class KnowledgeApprovalStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    APPROVED = "approved", "Approved"
+    REJECTED = "rejected", "Rejected"
+    ARCHIVED = "archived", "Archived"
+
+
+class KnowledgeLanguage(models.TextChoices):
+    ENGLISH = "english", "English"
+    ARABIC = "arabic", "Arabic"
+    KURDISH = "kurdish", "Kurdish"
+    MIXED = "mixed", "Mixed"
+    OTHER = "other", "Other"
+
+
+class KnowledgeAudience(models.TextChoices):
+    DOCTOR = "doctor", "Doctor"
+    PHARMACIST = "pharmacist", "Pharmacist"
+    LABORATORIAN = "laboratorian", "Laboratorian"
+    PATIENT = "patient", "Patient"
+    ADMIN = "admin", "Admin"
+    MIXED = "mixed", "Mixed"
+
+
+class KnowledgeProcessingStatus(models.TextChoices):
+    UPLOADED = "uploaded", "Uploaded"
+    EXTRACTED = "extracted", "Extracted"
+    CHUNKED = "chunked", "Chunked"
+    FAILED = "failed", "Failed"
+
+
+class LabOrderStatus(models.TextChoices):
+    ISSUED = "issued", "Issued"
+    PARTIALLY_COMPLETED = "partially_completed", "Partially Completed"
+    FULLY_COMPLETED = "fully_completed", "Fully Completed"
+    EXPIRED = "expired", "Expired"
+    CANCELLED = "cancelled", "Cancelled"
+
+
+class LabOrderItemStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    COMPLETED = "completed", "Completed"
+    CANCELLED = "cancelled", "Cancelled"
+
+
+class LabCompletionAttemptStatus(models.TextChoices):
+    COMPLETED = "completed", "Completed"
+    UNAVAILABLE = "unavailable", "Unavailable"
+
+
+class LabTestCategory(models.TextChoices):
+    HEMATOLOGY = "hematology", "Hematology"
+    BIOCHEMISTRY = "biochemistry", "Biochemistry"
+    IMMUNOLOGY = "immunology", "Immunology"
+    MICROBIOLOGY = "microbiology", "Microbiology"
+    URINE_STOOL = "urine_stool", "Urine / Stool"
+    HORMONES = "hormones", "Hormones"
+    BLOOD_BANK = "blood_bank", "Blood Bank"
+    OTHER = "other", "Other"
+
+
+class LabResultStatus(models.TextChoices):
+    DRAFT = "draft", "Draft"
+    SUBMITTED = "submitted", "Submitted"
+    REVIEWED = "reviewed", "Reviewed"
+    RELEASED = "released", "Released"
+    CORRECTED = "corrected", "Corrected"
+    CANCELLED = "cancelled", "Cancelled"
+
+
+class LabResultValueType(models.TextChoices):
+    TEXT = "text", "Text"
+    NUMERIC = "numeric", "Numeric"
+    POSITIVE_NEGATIVE = "positive_negative", "Positive / Negative"
+    BLOOD_GROUP = "blood_group", "Blood Group"
+    FILE_ONLY = "file_only", "File Only"
+
+
+class LabResultFlag(models.TextChoices):
+    NORMAL = "normal", "Normal"
+    LOW = "low", "Low"
+    HIGH = "high", "High"
+    CRITICAL_LOW = "critical_low", "Critical Low"
+    CRITICAL_HIGH = "critical_high", "Critical High"
+    ABNORMAL = "abnormal", "Abnormal"
+    UNKNOWN = "unknown", "Unknown"
