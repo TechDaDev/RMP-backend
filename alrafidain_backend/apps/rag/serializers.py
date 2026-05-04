@@ -214,3 +214,39 @@ class RAGFeedbackReviewSerializer(serializers.Serializer):
 
     review_status = serializers.ChoiceField(choices=ALLOWED_STATUSES)
     review_notes = serializers.CharField(max_length=2000, required=False, allow_blank=True, default="")
+
+
+# ---------------------------------------------------------------------------
+# Phase 12E — Analytics and export serializers
+# ---------------------------------------------------------------------------
+
+
+class RAGAnalyticsSummarySerializer(serializers.Serializer):
+    """
+    Read-only serializer that wraps the analytics summary dict returned by
+    get_rag_analytics_summary().  Used only for schema documentation purposes.
+    """
+
+    feedback = serializers.DictField(read_only=True)
+    retrieval_quality = serializers.DictField(read_only=True)
+    usage = serializers.DictField(read_only=True)
+
+
+class RAGDatasetExportSerializer(serializers.Serializer):
+    """Input serializer for the admin dataset export endpoint."""
+
+    format = serializers.ChoiceField(choices=["json", "csv"], default="json")
+    include_text = serializers.BooleanField(
+        required=False,
+        default=False,
+        help_text=(
+            "Include query_text and response_text. "
+            "WARNING: may contain clinician-generated free text. "
+            "Off by default."
+        ),
+    )
+    anonymize = serializers.BooleanField(
+        required=False,
+        default=True,
+        help_text="Hash doctor/object IDs. On by default.",
+    )

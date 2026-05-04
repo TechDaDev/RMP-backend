@@ -1174,4 +1174,114 @@ Review (mark reviewed / dismissed / escalated) a RAG feedback item.
 - Prompt text and raw LLM response are not exposed via the feedback API.
 - RAG responses remain `patient_visible=false` regardless of feedback.
 
+---
+
+## Phase 12E — Analytics and Training Dataset Preparation
+
+### GET `/api/rag/admin/analytics/summary/`
+
+Returns aggregated RAG usage, feedback quality, and retrieval performance metrics.
+
+**Auth:** Staff or superuser JWT required.  
+**Response:** `200 OK`
+
+```json
+{
+  "feedback": {
+    "total_responses": 42,
+    "responses_with_feedback": 18,
+    "feedback_coverage_rate": 0.4286,
+    "ratings": {"helpful": 10, "partially_helpful": 5, "not_helpful": 2, "unsafe": 1},
+    "unsafe_count": 1,
+    "needs_admin_review_count": 2,
+    "review_status": {"pending": 12, "reviewed": 5, "dismissed": 1, "escalated": 0}
+  },
+  "retrieval_quality": {
+    "total_retrieved_chunks": 84,
+    "chunks_with_feedback": 30,
+    "source_relevance": {"relevant": 20, "partially_relevant": 7, "irrelevant": 3},
+    "average_score": 0.8421,
+    "average_rank_of_relevant_sources": 1.8
+  },
+  "usage": {
+    "total_queries": 42,
+    "by_service_context": {"general_doctor_query": 30, "consultation": 8, "lab_result": 4},
+    "by_status": {"completed": 38, "error": 4},
+    "total_token_input": 48000,
+    "total_token_output": 12000
+  }
+}
+```
+
+### POST `/api/rag/admin/exports/dataset/`
+
+Exports anonymized RAG evaluation data for model fine-tuning / research.
+
+**Auth:** Staff or superuser JWT required.  
+**Request body:**
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `format` | `"json"` \| `"csv"` | `"json"` | Export file format |
+| `include_text` | boolean | `false` | Include `query_text` / `response_text` in export |
+| `anonymize` | boolean | `true` | Hash doctor ID and object ID with SHA-256 |
+
+**Response (JSON):** `200 OK`
+
+```json
+{
+  "format": "json",
+  "record_count": 42,
+  "data": [
+    {
+      "rag_query_id": "<uuid>",
+      "service_context": "general_doctor_query",
+      "response_status": "completed",
+      "model_name": "deepseek-chat",
+      "provider": "deepseek",
+      "safety_level": "doctor_only",
+      "doctor_review_required": false,
+      "patient_visible": false,
+      "token_input": 1200,
+      "token_output": 320,
+      "doctor_id_hash": "<sha256-hex>",
+      "object_id_hash": null,
+      "created_date": "2025-01-15",
+      "feedback": {
+        "rating": "helpful",
+        "is_source_grounded": true,
+        "is_clinically_useful": true,
+        "is_safe": true,
+        "needs_admin_review": false,
+        "review_status": "pending"
+      },
+      "sources": [
+        {
+          "chunk_id": "<uuid>",
+          "document_id": "<uuid>",
+          "document_title": "Clinical Guideline — Hypertension",
+          "document_type": "clinical_guideline",
+          "rank": 1,
+          "score": 0.873214,
+          "source_relevance": "relevant"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Response (CSV):** `200 OK` with `Content-Type: text/csv` and `Content-Disposition: attachment; filename="rag_eval_dataset.csv"`.
+
+### Phase 12E Audit events
+
+- `rag_analytics_viewed` — staff views analytics summary
+- `rag_dataset_exported` — staff triggers a dataset export (format, record_count logged)
+
+### Phase 12E Privacy Guarantees
+
+- `doctor_id_hash` is a SHA-256 of `EXPORT_HASH_SALT + ":" + doctor_pk` — raw doctor PKs are never exported when `anonymize=true`.
+- Raw embeddings are never included in exports.
+- `query_text` and `response_text` are excluded by default (`include_text=false`).
+
 

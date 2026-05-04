@@ -1,6 +1,8 @@
 from django.urls import path
 
 from .views import (
+    AdminRAGAnalyticsSummaryView,
+    AdminRAGDatasetExportView,
     AdminRAGFeedbackListView,
     AdminRAGFeedbackReviewView,
     ConsultationRAGSupportView,
@@ -43,5 +45,16 @@ urlpatterns = [
         "admin/feedback/<uuid:feedback_id>/review/",
         AdminRAGFeedbackReviewView.as_view(),
         name="rag-admin-feedback-review",
+    ),
+    # Phase 12E — Analytics and export
+    path(
+        "admin/analytics/summary/",
+        AdminRAGAnalyticsSummaryView.as_view(),
+        name="rag-admin-analytics-summary",
+    ),
+    path(
+        "admin/exports/dataset/",
+        AdminRAGDatasetExportView.as_view(),
+        name="rag-admin-dataset-export",
     ),
 ]

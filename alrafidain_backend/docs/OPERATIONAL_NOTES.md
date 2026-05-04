@@ -298,3 +298,34 @@ POST /api/knowledge-base/documents/<id>/approve/
 GET /api/knowledge-base/chunks/search/?q=crp&document_type=laboratory_book
 ```
 
+---
+
+### Phase 12E — RAG Dataset Export (management command)
+
+Exports an anonymized RAG evaluation dataset to a file for offline use.
+
+```bash
+# Basic JSON export (anonymized, no text, output to ./rag_eval.json)
+python manage.py export_rag_dataset --output ./rag_eval.json
+
+# CSV export
+python manage.py export_rag_dataset --format csv --output ./rag_eval.csv
+
+# Include query + response text (handle with care — staff only)
+python manage.py export_rag_dataset --include-text --output ./rag_eval_with_text.json
+
+# Disable anonymization (use only in controlled environments)
+python manage.py export_rag_dataset --no-anonymize --output ./rag_raw.json
+```
+
+**Options:**
+
+| Flag | Default | Description |
+|---|---|---|
+| `--format` | `json` | `json` or `csv` |
+| `--output` | `./rag_eval_export.json` | Output file path (directory created if missing) |
+| `--include-text` | off | Include `query_text` + `response_text` |
+| `--no-anonymize` | off | Disable SHA-256 hashing of doctor IDs |
+
+Set `EXPORT_HASH_SALT` in your `.env` to a secret random value before exporting in production.
+

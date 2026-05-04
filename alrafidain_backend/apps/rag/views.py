@@ -12,6 +12,8 @@ from .serializers import (
     ConsultationRAGSupportSerializer,
     DoctorRAGQuerySerializer,
     LabResultRAGSupportSerializer,
+    RAGAnalyticsSummarySerializer,
+    RAGDatasetExportSerializer,
     RAGFeedbackReviewSerializer,
     RAGResponseFeedbackCreateSerializer,
     RAGResponseFeedbackSerializer,
@@ -290,3 +292,83 @@ class AdminRAGFeedbackReviewView(APIView):
             return Response({"detail": str(exc)}, status=400)
 
         return Response(RAGResponseFeedbackSerializer(updated).data, status=200)
+
+
+# ---------------------------------------------------------------------------
+# Phase 12E — Analytics and export views
+# ---------------------------------------------------------------------------
+
+
+class AdminRAGAnalyticsSummaryView(APIView):
+    """GET /api/rag/admin/analytics/summary/ — RAG analytics for staff."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not (request.user.is_staff or request.user.is_superuser):
+            return Response({"detail": "Staff only."}, status=403)
+
+        from apps.audit.services import create_audit_log
+        from .analytics import get_rag_analytics_summary
+
+        summary = get_rag_analytics_summary()
+
+        create_audit_log(
+            actor=request.user,
+            action="rag_analytics_viewed",
+            metadata={"requested_by": str(request.user.pk)},
+            request=request,
+        )
+
+        return Response(RAGAnalyticsSummarySerializer(summary).data, status=200)
+
+
+class AdminRAGDatasetExportView(APIView):
+    """POST /api/rag/admin/exports/dataset/ — export evaluation dataset."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        if not (request.user.is_staff or request.user.is_superuser):
+            return Response({"detail": "Staff only."}, status=403)
+
+        serializer = RAGDatasetExportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        d = serializer.validated_data
+
+        fmt: str = d["format"]
+        include_text: bool = d["include_text"]
+        anonymize: bool = d["anonymize"]
+
+        from apps.audit.services import create_audit_log
+        from .exporters import export_rag_evaluation_dataset
+
+        content = export_rag_evaluation_dataset(
+            format=fmt,
+            include_text=include_text,
+            anonymize=anonymize,
+        )
+
+        record_count = len(content) if fmt == "json" else max(0, content.count("\n") - 1)
+
+        create_audit_log(
+            actor=request.user,
+            action="rag_dataset_exported",
+            metadata={
+                "format": fmt,
+                "include_text": include_text,
+                "anonymize": anonymize,
+                "record_count": record_count,
+                "requested_by": str(request.user.pk),
+            },
+            request=request,
+        )
+
+        if fmt == "csv":
+            from django.http import HttpResponse
+
+            response = HttpResponse(content, content_type="text/csv; charset=utf-8")
+            response["Content-Disposition"] = 'attachment; filename="rag_eval_dataset.csv"'
+            return response
+
+        return Response({"format": fmt, "record_count": record_count, "data": content}, status=200)

@@ -89,3 +89,32 @@ This backend applies layered security using JWT authentication, role-based acces
 - Production audit retention policy.
 - External penetration testing.
 - Full OWASP API Security review.
+
+---
+
+## Phase 12E — Dataset Export Privacy & Security
+
+### Anonymization
+
+- Doctor PKs and consultation/lab object IDs are hashed with SHA-256 when `anonymize=True` (the default).
+- The hash input is `EXPORT_HASH_SALT + ":" + value` so that re-identification from the hash alone is infeasible without the salt.
+- Set `EXPORT_HASH_SALT` to a strong random value in production (not the `SECRET_KEY` default).
+
+### What is never exported
+
+- Patient names, emails, phone numbers, or national IDs.
+- Raw pgvector embeddings.
+- Raw doctor PKs (when `anonymize=True`).
+- Raw prescription or lab values tied to patient identity.
+
+### Access control
+
+- Analytics and export endpoints require `is_staff` or `is_superuser`.
+- All export actions are logged via `AuditLog` (`rag_dataset_exported`).
+- The management command (`export_rag_dataset`) should only be executed by trusted operators with server access.
+
+### Recommended production steps
+
+1. Generate a random `EXPORT_HASH_SALT` with `openssl rand -hex 32`.
+2. Store it in your secret manager and inject via environment.
+3. Rotate the salt if a previous salt is suspected to be compromised (hashes will change on next export).

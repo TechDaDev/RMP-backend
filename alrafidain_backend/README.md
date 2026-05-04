@@ -192,10 +192,26 @@ See [docs/RAG_PLAN.md](docs/RAG_PLAN.md) for the full AI roadmap.
 
 ---
 
+## RAG Analytics & Dataset Export (Phase 12E)
+
+Admin-only analytics dashboard and anonymized evaluation dataset export.
+
+**Features:**
+- `GET /api/rag/admin/analytics/summary/` — aggregated feedback, retrieval quality, and usage metrics
+- `POST /api/rag/admin/exports/dataset/` — export anonymized evaluation dataset (JSON or CSV)
+- Django management command `export_rag_dataset` for file-based exports
+- SHA-256 anonymization of doctor IDs with configurable salt (`EXPORT_HASH_SALT`)
+- Raw embeddings and patient-identifiable fields are never exported
+
+See [docs/RAG_EVALUATION_DATASET.md](docs/RAG_EVALUATION_DATASET.md) for dataset field reference and privacy notes.
+
+---
+
 ## Further Reading
 
 - [docs/API_REFERENCE.md](docs/API_REFERENCE.md) — Full endpoint reference
 - [docs/SEEDING.md](docs/SEEDING.md) — Seed commands and demo credentials
 - [docs/OPERATIONAL_NOTES.md](docs/OPERATIONAL_NOTES.md) — Setup, troubleshooting, diagram generation
 - [docs/RAG_PLAN.md](docs/RAG_PLAN.md) — AI/RAG roadmap
+- [docs/RAG_EVALUATION_DATASET.md](docs/RAG_EVALUATION_DATASET.md) — Dataset field reference and privacy notes
 - [docs/SECURITY_NOTES.md](docs/SECURITY_NOTES.md) — Security model, privacy boundaries, throttling, and MVP limitations

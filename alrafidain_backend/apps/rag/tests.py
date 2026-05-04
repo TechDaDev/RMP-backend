@@ -1228,3 +1228,324 @@ class AdminRAGFeedbackReviewViewTest(TestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, 404)
+
+
+# ===========================================================================
+# Phase 12E — Analytics and Training Dataset Preparation tests
+# ===========================================================================
+
+from .analytics import (  # noqa: E402
+    get_rag_analytics_summary,
+    get_rag_feedback_metrics,
+    get_rag_usage_metrics,
+    get_retrieval_quality_metrics,
+)
+from .exporters import export_rag_evaluation_dataset, hash_identifier  # noqa: E402
+
+
+def _create_staff():
+    user = User.objects.create_user(
+        email="phase12e_staff@example.com",
+        password="StrongPass1!",
+        first_name="Staff",
+        last_name="User",
+        user_type=UserType.DOCTOR,
+        is_active=True,
+        is_staff=True,
+    )
+    UserProfile.objects.create(user=user)
+    DoctorProfile.objects.create(
+        user=user,
+        specialty=MedicalSpecialty.GENERAL_MEDICINE,
+        verification_status=VerificationStatus.APPROVED,
+    )
+    return user
+
+
+# ---------------------------------------------------------------------------
+# Unit tests – analytics functions
+# ---------------------------------------------------------------------------
+
+class RAGAnalyticsFunctionsTest(TestCase):
+    def test_feedback_metrics_empty_db(self):
+        metrics = get_rag_feedback_metrics()
+        self.assertEqual(metrics["total_responses"], 0)
+        self.assertEqual(metrics["responses_with_feedback"], 0)
+        self.assertEqual(metrics["feedback_coverage_rate"], 0.0)
+
+    def test_feedback_metrics_with_data(self):
+        doctor = create_doctor(email="anl_fb_dr@example.com")
+        _, rag = _create_rag_response(doctor)
+        RAGResponseFeedback.objects.create(
+            rag_response=rag,
+            doctor=doctor,
+            rating=RAGFeedbackRating.HELPFUL,
+        )
+        metrics = get_rag_feedback_metrics()
+        self.assertEqual(metrics["responses_with_feedback"], 1)
+        self.assertGreater(metrics["feedback_coverage_rate"], 0.0)
+        self.assertIn(RAGFeedbackRating.HELPFUL, metrics["ratings"])
+        self.assertGreaterEqual(metrics["ratings"][RAGFeedbackRating.HELPFUL], 1)
+
+    def test_retrieval_quality_metrics_empty(self):
+        metrics = get_retrieval_quality_metrics()
+        self.assertEqual(metrics["total_retrieved_chunks"], 0)
+        self.assertIn("source_relevance", metrics)
+        self.assertIn("average_score", metrics)
+
+    def test_usage_metrics_by_service_context(self):
+        doctor = create_doctor(email="anl_usg_dr@example.com")
+        _create_rag_response(doctor)
+        metrics = get_rag_usage_metrics()
+        self.assertGreaterEqual(metrics["total_queries"], 1)
+        self.assertIn(RAGServiceContext.GENERAL_DOCTOR_QUERY, metrics["by_service_context"])
+
+    def test_analytics_summary_contains_all_sections(self):
+        summary = get_rag_analytics_summary()
+        self.assertIn("feedback", summary)
+        self.assertIn("retrieval_quality", summary)
+        self.assertIn("usage", summary)
+
+
+# ---------------------------------------------------------------------------
+# Unit tests – hash_identifier
+# ---------------------------------------------------------------------------
+
+class RAGExportHashTest(TestCase):
+    def test_hash_identifier_is_deterministic(self):
+        h1 = hash_identifier("abc-123", salt="test-salt")
+        h2 = hash_identifier("abc-123", salt="test-salt")
+        self.assertEqual(h1, h2)
+
+    def test_hash_identifier_is_salted(self):
+        h1 = hash_identifier("abc-123", salt="salt-A")
+        h2 = hash_identifier("abc-123", salt="salt-B")
+        self.assertNotEqual(h1, h2)
+
+    def test_hash_identifier_returns_hex_string(self):
+        h = hash_identifier("abc-123", salt="test")
+        self.assertEqual(len(h), 64)
+        int(h, 16)  # must be valid hex
+
+
+# ---------------------------------------------------------------------------
+# Unit tests – exporters
+# ---------------------------------------------------------------------------
+
+class RAGExporterTest(TestCase):
+    def setUp(self):
+        self.doctor = create_doctor(email="exporter_dr@example.com")
+        _, self.rag = _create_rag_response(self.doctor)
+
+    def test_json_export_returns_list(self):
+        records = export_rag_evaluation_dataset(format="json")
+        self.assertIsInstance(records, list)
+        self.assertGreaterEqual(len(records), 1)
+
+    def test_csv_export_returns_string(self):
+        result = export_rag_evaluation_dataset(format="csv")
+        self.assertIsInstance(result, str)
+        self.assertIn("rag_query_id", result)
+
+    def test_include_text_false_omits_text_fields(self):
+        records = export_rag_evaluation_dataset(format="json", include_text=False)
+        for rec in records:
+            self.assertNotIn("query_text", rec)
+            self.assertNotIn("response_text", rec)
+
+    def test_include_text_true_includes_text_fields(self):
+        records = export_rag_evaluation_dataset(format="json", include_text=True)
+        for rec in records:
+            self.assertIn("query_text", rec)
+            self.assertIn("response_text", rec)
+
+    def test_anonymize_true_hashes_doctor_id(self):
+        records = export_rag_evaluation_dataset(format="json", anonymize=True)
+        for rec in records:
+            self.assertEqual(len(rec["doctor_id_hash"]), 64)
+            # Must not be the raw UUID
+            raw_id = str(self.doctor.pk)
+            self.assertNotEqual(rec["doctor_id_hash"], raw_id)
+
+    def test_anonymize_false_exposes_raw_id(self):
+        records = export_rag_evaluation_dataset(format="json", anonymize=False)
+        for rec in records:
+            self.assertEqual(len(rec["doctor_id_hash"]), 36)  # UUID length
+
+    def test_export_includes_feedback_field(self):
+        RAGResponseFeedback.objects.create(
+            rag_response=self.rag,
+            doctor=self.doctor,
+            rating=RAGFeedbackRating.HELPFUL,
+        )
+        records = export_rag_evaluation_dataset(format="json")
+        found = [r for r in records if r["rag_query_id"] == str(self.rag.rag_query.pk)]
+        self.assertEqual(len(found), 1)
+        self.assertIsNotNone(found[0]["feedback"])
+        self.assertIn("rating", found[0]["feedback"])
+
+    def test_export_sources_have_no_embedding(self):
+        records = export_rag_evaluation_dataset(format="json")
+        for rec in records:
+            for source in rec.get("sources", []):
+                self.assertNotIn("embedding", source)
+
+    def test_export_invalid_format_raises_value_error(self):
+        with self.assertRaises(ValueError):
+            export_rag_evaluation_dataset(format="xml")
+
+    def test_no_feedback_record_is_none(self):
+        records = export_rag_evaluation_dataset(format="json")
+        found = [r for r in records if r["rag_query_id"] == str(self.rag.rag_query.pk)]
+        self.assertEqual(len(found), 1)
+        self.assertIsNone(found[0]["feedback"])
+
+
+# ---------------------------------------------------------------------------
+# View tests – AdminRAGAnalyticsSummaryView
+# ---------------------------------------------------------------------------
+
+class AdminRAGAnalyticsSummaryViewTest(TestCase):
+    def setUp(self):
+        self.staff = _create_staff()
+        self.regular = create_doctor(email="anl_reg_dr@example.com")
+
+    def test_staff_can_view_analytics(self):
+        client = auth_client(self.staff)
+        resp = client.get("/api/rag/admin/analytics/summary/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("feedback", resp.data)
+        self.assertIn("retrieval_quality", resp.data)
+        self.assertIn("usage", resp.data)
+
+    def test_non_staff_gets_403(self):
+        client = auth_client(self.regular)
+        resp = client.get("/api/rag/admin/analytics/summary/")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_unauthenticated_gets_401(self):
+        resp = self.client.get("/api/rag/admin/analytics/summary/")
+        self.assertEqual(resp.status_code, 401)
+
+    def test_analytics_creates_audit_log(self):
+        client = auth_client(self.staff)
+        client.get("/api/rag/admin/analytics/summary/")
+        self.assertTrue(AuditLog.objects.filter(action="rag_analytics_viewed").exists())
+
+
+# ---------------------------------------------------------------------------
+# View tests – AdminRAGDatasetExportView
+# ---------------------------------------------------------------------------
+
+class AdminRAGDatasetExportViewTest(TestCase):
+    def setUp(self):
+        self.staff = _create_staff()
+        self.regular = create_doctor(email="exp_reg_dr@example.com")
+        doctor = create_doctor(email="exp_data_dr@example.com")
+        _create_rag_response(doctor)
+
+    def test_staff_can_export_json(self):
+        client = auth_client(self.staff)
+        resp = client.post(
+            "/api/rag/admin/exports/dataset/",
+            {"format": "json"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("format", resp.data)
+        self.assertIn("record_count", resp.data)
+        self.assertIn("data", resp.data)
+        self.assertEqual(resp.data["format"], "json")
+
+    def test_staff_can_export_csv(self):
+        from django.http import HttpResponse
+        client = auth_client(self.staff)
+        resp = client.post(
+            "/api/rag/admin/exports/dataset/",
+            {"format": "csv"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("text/csv", resp["Content-Type"])
+
+    def test_non_staff_gets_403(self):
+        client = auth_client(self.regular)
+        resp = client.post(
+            "/api/rag/admin/exports/dataset/",
+            {"format": "json"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    def test_unauthenticated_gets_401(self):
+        resp = self.client.post(
+            "/api/rag/admin/exports/dataset/",
+            {"format": "json"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 401)
+
+    def test_export_creates_audit_log(self):
+        client = auth_client(self.staff)
+        client.post(
+            "/api/rag/admin/exports/dataset/",
+            {"format": "json"},
+            format="json",
+        )
+        self.assertTrue(AuditLog.objects.filter(action="rag_dataset_exported").exists())
+
+    def test_json_export_default_anonymized(self):
+        client = auth_client(self.staff)
+        resp = client.post(
+            "/api/rag/admin/exports/dataset/",
+            {"format": "json"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        for rec in resp.data["data"]:
+            # SHA-256 hex is 64 chars
+            self.assertEqual(len(rec["doctor_id_hash"]), 64)
+
+
+# ---------------------------------------------------------------------------
+# Management command tests
+# ---------------------------------------------------------------------------
+
+class ExportRagDatasetCommandTest(TestCase):
+    def setUp(self):
+        import tempfile
+        self.tmpdir = tempfile.mkdtemp()
+        doctor = create_doctor(email="cmd_dr@example.com")
+        _create_rag_response(doctor)
+
+    def test_command_creates_json_file(self):
+        import os
+        from django.core.management import call_command
+        output_path = os.path.join(self.tmpdir, "test_export.json")
+        call_command("export_rag_dataset", "--output", output_path, "--format", "json")
+        self.assertTrue(os.path.exists(output_path))
+        with open(output_path) as f:
+            data = __import__("json").load(f)
+        self.assertIsInstance(data, list)
+
+    def test_command_creates_csv_file(self):
+        import os
+        from django.core.management import call_command
+        output_path = os.path.join(self.tmpdir, "test_export.csv")
+        call_command("export_rag_dataset", "--output", output_path, "--format", "csv")
+        self.assertTrue(os.path.exists(output_path))
+        with open(output_path) as f:
+            content = f.read()
+        self.assertIn("rag_query_id", content)
+
+    def test_command_defaults_anonymize_true(self):
+        import os
+        import json
+        from django.core.management import call_command
+        output_path = os.path.join(self.tmpdir, "test_anon.json")
+        call_command("export_rag_dataset", "--output", output_path, "--format", "json")
+        with open(output_path) as f:
+            records = json.load(f)
+        for rec in records:
+            # anonymized → 64-char hex
+            self.assertEqual(len(rec["doctor_id_hash"]), 64)

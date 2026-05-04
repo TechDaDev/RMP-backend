@@ -164,3 +164,8 @@ DEEPSEEK_TIMEOUT_SECONDS = config("DEEPSEEK_TIMEOUT_SECONDS", default=60, cast=i
 
 RAG_DEFAULT_TOP_K = config("RAG_DEFAULT_TOP_K", default=6, cast=int)
 RAG_MAX_TOP_K = config("RAG_MAX_TOP_K", default=12, cast=int)
+
+# ── Phase 12E — Dataset export salt ────────────────────────────────────
+# Used to hash doctor/object IDs in exported datasets.
+# Set to a secret value in production. Falls back to SECRET_KEY if unset.
+EXPORT_HASH_SALT = config("EXPORT_HASH_SALT", default=SECRET_KEY)

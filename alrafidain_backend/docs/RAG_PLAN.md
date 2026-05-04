@@ -93,31 +93,35 @@ These principles apply across all RAG phases:
 
 ---
 
-## Phase 12D — AI Evaluation and Feedback
+## Phase 12D — AI Evaluation and Feedback ✅ Complete
 
 **Goal**: Collect doctor feedback on AI response quality for monitoring and improvement.
 
-**Planned work:**
+**Delivered:**
 
-- `AIQueryLog` model: stores question, retrieved chunks, generated answer, latency, token usage
-- `AIResponseFeedback` model: doctor rates each response (helpful/not helpful, optional comment)
-- Feedback API: `POST /api/ai/feedback/`
-- Admin dashboard for reviewing low-rated responses
-- Flagging: auto-flag responses with consistently low ratings for human review
+- `RAGResponseFeedback` model: doctor rates each response (helpful/partially_helpful/not_helpful/unsafe)
+- `RAGRetrievedChunkFeedback` model: source-level relevance ratings (relevant/partially_relevant/irrelevant)
+- Doctor feedback API: `POST /api/rag/feedback/`, `GET /api/rag/feedback/my/`
+- Admin review endpoints: `POST /api/rag/admin/feedback/<id>/review/`, `GET /api/rag/admin/feedback/`
+- Auto-flag for admin review when `is_safe=False` or `needs_admin_review=True`
+- Full audit logging (`rag_feedback_submitted`, `rag_feedback_reviewed`)
 
 ---
 
-## Phase 12E — Analytics and Training Dataset Preparation
+## Phase 12E — Analytics and Training Dataset Preparation ✅ Complete
 
-**Goal**: Prepare high-quality question-answer pairs for future model fine-tuning or evaluation datasets.
+**Goal**: Aggregate RAG performance metrics and export anonymized evaluation data for research.
 
-**Planned work:**
+**Delivered:**
 
-- Export approved Q&A pairs (question + top-rated AI response + source chunks) as JSONL
-- Management command: `export_rag_dataset --format jsonl`
-- Filtering: only include queries with positive doctor feedback
-- Anonymization: strip any user identifiers before export
-- Store exported datasets in versioned storage
+- `GET /api/rag/admin/analytics/summary/` — feedback coverage, ratings breakdown, retrieval quality, token usage
+- `POST /api/rag/admin/exports/dataset/` — anonymized JSON or CSV export of evaluation records
+- Django management command: `python manage.py export_rag_dataset --format json|csv --output PATH`
+- SHA-256 anonymization of doctor IDs via configurable `EXPORT_HASH_SALT` setting
+- Raw embeddings, patient names, and contact details excluded from all exports
+- `include_text=False` by default (query/response text opt-in)
+- Full audit logging (`rag_analytics_viewed`, `rag_dataset_exported`)
+- See [docs/RAG_EVALUATION_DATASET.md](RAG_EVALUATION_DATASET.md) for dataset field reference
 
 ---
 
