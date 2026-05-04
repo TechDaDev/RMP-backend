@@ -294,3 +294,25 @@ class LabResultFlag(models.TextChoices):
     CRITICAL_HIGH = "critical_high", "Critical High"
     ABNORMAL = "abnormal", "Abnormal"
     UNKNOWN = "unknown", "Unknown"
+
+
+class RAGServiceContext(models.TextChoices):
+    GENERAL_DOCTOR_QUERY = "general_doctor_query", "General Doctor Query"
+    CONSULTATION = "consultation", "Consultation"
+    LAB_RESULT = "lab_result", "Lab Result"
+    MEDICAL_RECORD = "medical_record", "Medical Record"
+    PRESCRIPTION = "prescription", "Prescription"
+    LAB_ORDER = "lab_order", "Lab Order"
+
+
+class RAGResponseStatus(models.TextChoices):
+    SUCCESS = "success", "Success"
+    FAILED = "failed", "Failed"
+    NO_CONTEXT = "no_context", "No Context"
+    BLOCKED = "blocked", "Blocked"
+
+
+class RAGSafetyLevel(models.TextChoices):
+    DOCTOR_ONLY = "doctor_only", "Doctor Only"
+    PATIENT_SAFE = "patient_safe", "Patient Safe"
+    UNSAFE = "unsafe", "Unsafe"

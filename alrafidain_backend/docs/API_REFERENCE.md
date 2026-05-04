@@ -911,3 +911,123 @@ Only approved, active documents with active chunks are eligible for future RAG r
 - Search is basic `icontains` text search only.
 - Processing is synchronous (no Celery yet).
 
+---
+
+## Phase 12C — RAG Doctor Support Endpoints
+
+Base prefix: `/api/rag/`
+
+All RAG endpoints require an authenticated, **approved doctor** (`user_type=doctor`, `verification_status=approved`).  
+Patients, pharmacists, laboratorians, and unapproved doctors receive **403 Forbidden**.
+
+### POST `/api/rag/doctor/query/`
+
+General RAG query — ask any approved medical knowledge base question.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `question` | string | yes | The doctor's question (max 2000 chars) |
+| `document_type` | string | no | Filter by document type |
+| `specialty` | string | no | Filter by medical specialty |
+| `language` | string | no | Filter by language |
+| `audience` | string | no | Filter by audience |
+| `top_k` | int | no | Number of chunks to retrieve (default: 6, max: 12) |
+
+**Response:** `RAGResponse` object (see schema below).
+
+---
+
+### POST `/api/rag/consultations/<consultation_id>/support/`
+
+RAG clinical support scoped to a specific consultation.  
+The requesting user must be the **assigned doctor** of that consultation.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `question` | string | no | Custom question (defaults to standard consultation summary prompt) |
+| `top_k` | int | no | Number of chunks to retrieve |
+
+**Response:** `RAGResponse` object.
+
+---
+
+### POST `/api/rag/lab-results/<lab_result_id>/support/`
+
+RAG clinical support scoped to a specific lab result.  
+The requesting user must be the **ordering doctor** (`lab_result.doctor`) for that result.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `question` | string | no | Custom question (defaults to standard lab result explanation prompt) |
+| `top_k` | int | no | Number of chunks to retrieve |
+
+**Response:** `RAGResponse` object.
+
+---
+
+### RAGResponse Schema
+
+```json
+{
+  "id": "uuid",
+  "query_id": "uuid",
+  "service_context": "general_doctor_query | consultation | lab_result | ...",
+  "object_id": "uuid | null",
+  "response_text": "AI-generated answer citing approved sources",
+  "status": "success | failed | no_context | blocked",
+  "safety_level": "doctor_only | patient_safe | unsafe",
+  "doctor_review_required": true,
+  "patient_visible": false,
+  "sources": [
+    {
+      "chunk_id": "uuid",
+      "document_id": "uuid",
+      "document_title": "string",
+      "document_type": "string",
+      "page_number": 1,
+      "section_title": "string",
+      "rank": 1,
+      "score": 0.87
+    }
+  ],
+  "model_name": "deepseek-chat",
+  "token_input": 100,
+  "token_output": 50,
+  "created_at": "2025-01-01T00:00:00Z"
+}
+```
+
+**Safety invariants (enforced in model.save()):**
+- `patient_visible` is **always** `false`.
+- `doctor_review_required` is **always** `true`.
+- `safety_level` defaults to `doctor_only`.
+- `prompt_text` and `raw_response` are **never** included in API responses.
+
+### RAG Status values
+
+| Status | Meaning |
+|---|---|
+| `success` | LLM returned a valid answer |
+| `failed` | LLM call failed (see error log) |
+| `no_context` | No approved knowledge chunks found; no LLM call made |
+| `blocked` | Query blocked by safety rules |
+
+### Audit Actions
+
+- `rag_query_performed` — every RAG query, with status and chunk count
+- `knowledge_semantic_search_performed` — every semantic search call
+
+### Phase 12C Limitations
+
+- No patient-facing RAG endpoints.
+- No Celery / async RAG processing.
+- DeepSeek is the only supported LLM provider.
+- Embeddings use `all-MiniLM-L6-v2` (384 dimensions via sentence-transformers).
+
+

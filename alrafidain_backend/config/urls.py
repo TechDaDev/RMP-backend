@@ -26,4 +26,5 @@ urlpatterns = [
     path("api/notifications/", include("apps.notifications.urls")),
     path("api/patient-records/", include("apps.patient_records.urls")),
     path("api/knowledge-base/", include("apps.knowledge_base.urls")),
+    path("api/rag/", include("apps.rag.urls")),
 ]

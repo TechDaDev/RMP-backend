@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     "apps.patient_records.apps.PatientRecordsConfig",
     "apps.lab_orders.apps.LabOrdersConfig",
     "apps.knowledge_base.apps.KnowledgeBaseConfig",
+    "apps.rag.apps.RagConfig",
 ]
 
 MIDDLEWARE = [
@@ -154,3 +155,12 @@ EMBEDDING_VECTOR_DIMENSION = config(
     default=384,
     cast=int,
 )
+
+# ── DeepSeek / RAG settings ────────────────────────────────────────────
+DEEPSEEK_API_KEY = config("DEEPSEEK_API_KEY", default="")
+DEEPSEEK_BASE_URL = config("DEEPSEEK_BASE_URL", default="https://api.deepseek.com")
+DEEPSEEK_MODEL = config("DEEPSEEK_MODEL", default="deepseek-chat")
+DEEPSEEK_TIMEOUT_SECONDS = config("DEEPSEEK_TIMEOUT_SECONDS", default=60, cast=int)
+
+RAG_DEFAULT_TOP_K = config("RAG_DEFAULT_TOP_K", default=6, cast=int)
+RAG_MAX_TOP_K = config("RAG_MAX_TOP_K", default=12, cast=int)
