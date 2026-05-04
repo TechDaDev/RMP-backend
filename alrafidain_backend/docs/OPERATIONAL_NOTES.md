@@ -7,7 +7,7 @@
 ### Prerequisites
 
 - Python 3.12+
-- Docker and Docker Compose (for PostgreSQL)
+- Docker and Docker Compose (for PostgreSQL and Redis)
 - pip (inside a virtual environment)
 
 ### 1. Clone and set up virtualenv
@@ -27,13 +27,15 @@ cp .env.example .env
 # Edit .env and set your SECRET_KEY, DB credentials, etc.
 ```
 
-### 3. Start PostgreSQL with Docker
+### 3. Start infrastructure with Docker
 
 ```bash
 docker compose up -d
 ```
 
-This starts a PostgreSQL container. By default, it listens on port **5432**.
+This starts:
+- PostgreSQL (default host port **5432**)
+- Redis for Django Channels (default host port **6379**)
 
 > If port 5432 is already occupied on your machine, edit `docker-compose.yml`  
 > and change the host port mapping to `5433:5432`. Then prefix your commands  
@@ -74,6 +76,8 @@ Key variables used by the project (set in `.env`):
 | `DB_PASSWORD` | PostgreSQL password | `postgres` |
 | `DB_HOST` | PostgreSQL host | `localhost` |
 | `DB_PORT` | PostgreSQL port | `5432` or `5433` |
+| `REDIS_HOST` | Redis host for channel layer | `127.0.0.1` |
+| `REDIS_PORT` | Redis port for channel layer | `6379` |
 
 ---
 
@@ -203,6 +207,16 @@ Security notes: [SECURITY_NOTES.md](SECURITY_NOTES.md)
 DB_PORT=5433 python manage.py runserver --settings=config.settings.local
 ```
 
+For WebSocket support in an ASGI process (recommended for local realtime testing), run Daphne:
+
+```bash
+DB_PORT=5433 daphne -b 0.0.0.0 -p 8000 config.asgi:application
+```
+
+WebSocket endpoints:
+- `/ws/user/?token=<access_token>`
+- `/ws/consultations/<consultation_id>/messages/?token=<access_token>`
+
 ---
 
 ## Common Troubleshooting
@@ -248,6 +262,21 @@ DB_PORT=5433 python manage.py migrate --settings=config.settings.local
 ### Tests fail with import errors
 
 Ensure you are in the `alrafidain_backend/` directory and your venv is activated.
+
+### Realtime events are not delivered
+
+Check Redis and channel layer settings:
+
+```bash
+docker compose ps
+redis-cli -h 127.0.0.1 -p 6379 ping
+```
+
+Expected Redis response: `PONG`.
+
+Also verify app settings include:
+- `ASGI_APPLICATION = "config.asgi.application"`
+- `CHANNEL_LAYERS` configured to Redis backend.
 
 ---
 

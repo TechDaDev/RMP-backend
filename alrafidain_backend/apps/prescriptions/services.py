@@ -77,6 +77,19 @@ def create_prescription(consultation, doctor, items_data, request=None):
         message="Your doctor has issued a prescription for your consultation.",
         data={"prescription_id": str(prescription.id), "consultation_id": str(consultation.id), "status": prescription.status},
     )
+    
+    # Broadcast realtime prescription event (Phase 14)
+    def broadcast_update():
+        from apps.realtime.services import broadcast_prescription_updated
+        try:
+            broadcast_prescription_updated(prescription)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to broadcast prescription.updated event: {e}")
+    
+    transaction.on_commit(broadcast_update)
+    
     return prescription
 
 
@@ -213,5 +226,17 @@ def dispense_prescription_items(prescription, pharmacist, items_payload, request
             message="All items in your prescription have been processed.",
             data={"prescription_id": str(prescription.id), "status": prescription.status},
         )
+    
+    # Broadcast realtime prescription update event (Phase 14)
+    def broadcast_update():
+        from apps.realtime.services import broadcast_prescription_updated
+        try:
+            broadcast_prescription_updated(prescription)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to broadcast prescription.updated event: {e}")
+    
+    transaction.on_commit(broadcast_update)
 
     return prescription

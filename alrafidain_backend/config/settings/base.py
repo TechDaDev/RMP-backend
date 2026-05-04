@@ -10,6 +10,7 @@ DEBUG = config("DEBUG", cast=bool, default=False)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", cast=Csv(), default="127.0.0.1,localhost")
 
 INSTALLED_APPS = [
+    "daphne",
     "django_cleanup.apps.CleanupConfig",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -23,6 +24,7 @@ INSTALLED_APPS = [
     "django_filters",
     "corsheaders",
     "django_extensions",
+    "channels",
     "apps.common",
     "apps.accounts.apps.AccountsConfig",
     "apps.profiles.apps.ProfilesConfig",
@@ -35,6 +37,7 @@ INSTALLED_APPS = [
     "apps.lab_orders.apps.LabOrdersConfig",
     "apps.knowledge_base.apps.KnowledgeBaseConfig",
     "apps.rag.apps.RagConfig",
+    "apps.realtime.apps.RealtimeConfig",
 ]
 
 MIDDLEWARE = [
@@ -169,3 +172,18 @@ RAG_MAX_TOP_K = config("RAG_MAX_TOP_K", default=12, cast=int)
 # Used to hash doctor/object IDs in exported datasets.
 # Set to a secret value in production. Falls back to SECRET_KEY if unset.
 EXPORT_HASH_SALT = config("EXPORT_HASH_SALT", default=SECRET_KEY)
+
+# ── Phase 14 — Django Channels & WebSocket ─────────────────────────────────
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [
+                (
+                    config("REDIS_HOST", default="127.0.0.1"),
+                    config("REDIS_PORT", default=6379, cast=int),
+                )
+            ],
+        },
+    },
+}

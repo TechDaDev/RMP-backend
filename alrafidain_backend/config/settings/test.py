@@ -24,3 +24,10 @@ REST_FRAMEWORK = {
         "password_reset": "100000/day",
     },
 }
+
+# Use in-memory channel layer for tests
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels.layers.InMemoryChannelLayer",
+    },
+}

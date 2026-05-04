@@ -16,3 +16,6 @@ pgvector
 sentence-transformers
 numpy
 httpx
+channels
+channels-redis
+daphne

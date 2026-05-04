@@ -205,6 +205,19 @@ class ConsultationAcceptView(APIView):
 			message="A doctor has accepted your consultation.",
 			data={"consultation_id": str(consultation.id), "doctor_id": str(request.user.id), "status": ConsultationStatus.ACCEPTED},
 		)
+		
+		# Broadcast consultation update event (Phase 14)
+		def broadcast_update():
+			from apps.realtime.services import broadcast_consultation_updated
+			try:
+				broadcast_consultation_updated(consultation)
+			except Exception as e:
+				import logging
+				logger = logging.getLogger(__name__)
+				logger.error(f"Failed to broadcast consultation.updated event: {e}")
+		
+		transaction.on_commit(broadcast_update)
+		
 		return success_response(message="Consultation accepted successfully.")
 
 
@@ -213,6 +226,7 @@ class ConsultationResponseCreateView(APIView):
 	permission_classes = [IsAuthenticated]
 
 	@extend_schema(summary="Create doctor response", request=ConsultationResponseCreateSerializer)
+	@transaction.atomic
 	def post(self, request, consultation_id):
 		consultation = get_object_or_404(Consultation, id=consultation_id)
 		serializer = ConsultationResponseCreateSerializer(
@@ -228,6 +242,21 @@ class ConsultationResponseCreateView(APIView):
 			message="Your doctor has added a response to your consultation.",
 			data={"consultation_id": str(consultation.id), "status": ConsultationStatus.DOCTOR_RESPONDED},
 		)
+		
+		# Broadcast consultation update event (Phase 14)
+		def broadcast_update():
+			from apps.realtime.services import broadcast_consultation_updated
+			try:
+				# Refresh consultation to get updated status
+				consultation.refresh_from_db()
+				broadcast_consultation_updated(consultation)
+			except Exception as e:
+				import logging
+				logger = logging.getLogger(__name__)
+				logger.error(f"Failed to broadcast consultation.updated event: {e}")
+		
+		transaction.on_commit(broadcast_update)
+		
 		return success_response(
 			message="Consultation response added.",
 			data=ConsultationResponseSerializer(response_obj).data,
@@ -240,6 +269,7 @@ class ConsultationCloseView(APIView):
 	permission_classes = [IsAuthenticated]
 
 	@extend_schema(summary="Close consultation")
+	@transaction.atomic
 	def post(self, request, consultation_id):
 		consultation = get_object_or_404(Consultation, id=consultation_id)
 
@@ -266,4 +296,17 @@ class ConsultationCloseView(APIView):
 			message="Your consultation has been closed.",
 			data={"consultation_id": str(consultation.id), "status": ConsultationStatus.CLOSED},
 		)
+		
+		# Broadcast consultation update event (Phase 14)
+		def broadcast_update():
+			from apps.realtime.services import broadcast_consultation_updated
+			try:
+				broadcast_consultation_updated(consultation)
+			except Exception as e:
+				import logging
+				logger = logging.getLogger(__name__)
+				logger.error(f"Failed to broadcast consultation.updated event: {e}")
+		
+		transaction.on_commit(broadcast_update)
+		
 		return success_response(message="Consultation closed successfully.")

@@ -22,9 +22,10 @@
 10. [Staff / Admin Integration Flow](#10-staff--admin-integration-flow)
 11. [Privacy Rules and Data Visibility](#11-privacy-rules-and-data-visibility)
 12. [Notifications](#12-notifications)
-13. [File Uploads](#13-file-uploads)
-14. [Pagination](#14-pagination)
-15. [Token Storage Recommendations](#15-token-storage-recommendations)
+13. [WebSocket Realtime Layer (Phase 14)](#13-websocket-realtime-layer-phase-14)
+14. [File Uploads](#14-file-uploads)
+15. [Pagination](#15-pagination)
+16. [Token Storage Recommendations](#16-token-storage-recommendations)
 
 ---
 
@@ -497,11 +498,161 @@ POST /api/notifications/read-all/               // Mark all as read
 
 **Notification categories**: `consultation_accepted`, `prescription_ready`, `lab_result_released`, `message_received`, `system`.
 
-Poll every 30s or implement WebSocket/SSE if available in a future release.
+For realtime notifications, use WebSocket (Phase 14, see below) to receive `notification.created` and `notification.unread_count` events.
 
 ---
 
-## 13. File Uploads
+## 13. WebSocket Realtime Layer (Phase 14)
+
+### Overview
+
+The backend broadcasts realtime events via WebSocket to keep clients synchronized without polling. **WebSocket is realtime delivery only—all data creation still happens via REST API.**
+
+### Endpoints
+
+```
+User Notifications:  ws://localhost:8000/ws/user/?token=<access_token>
+Consultation Chat:   ws://localhost:8000/ws/consultations/<id>/messages/?token=<access_token>
+```
+
+**Important:** Use `wss://` (secure WebSocket) in production, not `ws://`.
+
+### Event Types
+
+**User Socket Events:**
+- `notification.created` — New notification
+- `notification.unread_count` — Unread count updated
+- `consultation.updated` — Consultation status changed
+- `prescription.updated` — Prescription status changed
+- `lab_order.updated` — Lab order status changed
+- `lab_result.released` — Lab result released to patient
+
+**Consultation Socket Events:**
+- `chat.message.created` — New message in consultation
+- `chat.messages.read` — Messages marked as read
+- `consultation.updated` — Consultation status changed
+
+See [docs/WEBSOCKET_CONTRACT.md](WEBSOCKET_CONTRACT.md) for full payload schemas and integration examples.
+
+### Connection Example (JavaScript)
+
+```javascript
+const token = localStorage.getItem('access_token');
+const userWs = new WebSocket(`wss://api.example.com/ws/user/?token=${token}`);
+
+userWs.addEventListener('message', (event) => {
+  const data = JSON.parse(event.data);
+  
+  switch(data.type) {
+    case 'notification.created':
+      console.log('New notification:', data.notification);
+      addNotificationToUI(data.notification);
+      break;
+    case 'notification.unread_count':
+      updateBadge(data.unread_count);
+      break;
+    case 'lab_result.released':
+      showLabResultNotification(data.lab_result);
+      refreshResultsList();
+      break;
+  }
+});
+
+userWs.addEventListener('close', () => {
+  // Reconnect or fallback to polling
+  console.log('WebSocket disconnected');
+  setTimeout(() => reconnectWebSocket(), 3000);
+});
+```
+
+### REST + WebSocket Architecture
+
+```
+1. User takes action (send message, create prescription, etc.)
+         ↓
+2. POST to REST API endpoint
+         ↓
+3. Data validated and saved to database
+         ↓
+4. Service broadcasts WebSocket event
+         ↓
+5. Connected clients receive update in real-time
+```
+
+**Key Rules:**
+- ✅ Use REST API for all data creation/modification
+- ✅ Use WebSocket for realtime updates
+- ✅ Reconnect WebSocket if disconnected
+- ✅ Fallback to REST polling if WebSocket fails
+- ❌ Do NOT create messages/data over WebSocket in MVP
+- ❌ Do NOT rely only on WebSocket (use REST as source of truth)
+
+### Token Handling
+
+Tokens are passed in the WebSocket URL:
+```
+/ws/user/?token=<access_token>
+```
+
+When token expires:
+1. Fetch new access token via REST API refresh endpoint
+2. Disconnect old WebSocket
+3. Reconnect with new token
+
+### Automatic Reconnection
+
+Implement exponential backoff for reconnection:
+
+```javascript
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const BASE_DELAY = 1000; // 1 second
+
+function reconnectWebSocket() {
+  if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+    console.error('Max reconnect attempts reached. Switch to polling.');
+    switchToRestPolling();
+    return;
+  }
+
+  const delay = BASE_DELAY * Math.pow(2, reconnectAttempts);
+  reconnectAttempts++;
+
+  setTimeout(() => {
+    connectWebSocket();
+  }, delay);
+}
+```
+
+### Priority: REST First, WebSocket Enhancement
+
+Always:
+1. Load initial data via REST API (ensures you have latest data)
+2. Subscribe to WebSocket for realtime updates
+3. If WebSocket fails, use REST polling or refetch
+
+```javascript
+// 1. Load initial data
+const initialData = await fetch('/api/notifications/').then(r => r.json());
+updateUI(initialData.data.results);
+
+// 2. Connect to WebSocket for realtime
+connectWebSocket();
+
+// 3. Fallback to polling if WebSocket disconnects
+if (websocketFailed) {
+  startPolling('/api/notifications/', 30000); // Poll every 30s
+}
+```
+
+### See Also
+
+- Full contract: [docs/WEBSOCKET_CONTRACT.md](WEBSOCKET_CONTRACT.md)
+- Implementation notes: [apps/realtime/README.md](../apps/realtime/README.md) (internal)
+
+---
+
+## 14. File Uploads
 
 Endpoints accepting files use `multipart/form-data`:
 
@@ -513,7 +664,7 @@ Maximum file sizes are configured in Django settings (default: 10 MB). Always se
 
 ---
 
-## 14. Pagination
+## 15. Pagination
 
 List endpoints return paginated responses:
 
@@ -533,7 +684,7 @@ Use `?page=N` query param to navigate pages.
 
 ---
 
-## 15. Token Storage Recommendations
+## 16. Token Storage Recommendations
 
 | Platform | Recommendation |
 |---|---|

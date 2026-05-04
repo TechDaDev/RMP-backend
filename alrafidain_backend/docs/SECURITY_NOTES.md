@@ -5,9 +5,16 @@ This backend applies layered security using JWT authentication, role-based acces
 
 ## Authentication and JWT
 - Authentication uses JWT access tokens for API requests.
+- WebSocket authentication uses the same JWT validation path (SimpleJWT) via custom Channels middleware.
 - Login requires active accounts; inactive users cannot log in.
 - Account activation and password reset OTPs are time-bound and one-time use.
 - Regenerated OTPs invalidate older unused OTPs for the same purpose.
+
+## WebSocket Transport Security
+- Production must use `wss://` (TLS) for all realtime connections.
+- Do not expose authenticated WebSocket endpoints over plain `ws://` outside local development.
+- JWT tokens used in WebSocket connection setup should be short-lived access tokens.
+- On token refresh, clients should reconnect using a new access token.
 
 ## Role-Based Access Rules
 - Access is constrained by user role: patient, doctor, pharmacist, laboratorian.
@@ -23,6 +30,7 @@ This backend applies layered security using JWT authentication, role-based acces
 - Patients can access only their own consultations.
 - Doctors can access only consultations assigned to them.
 - Disease prediction fields are not exposed in patient consultation detail serializer.
+- Consultation chat sockets enforce the same boundaries: only consultation patient and assigned doctor can connect.
 
 ## Prescription QR Privacy
 - Prescription QR token is generated with `secrets.token_urlsafe(32)` and stored as a unique token.
@@ -59,6 +67,13 @@ This backend applies layered security using JWT authentication, role-based acces
 - Lab order notifications do not include test instructions/details.
 - Lab result release notifications do not include result values.
 
+## Realtime Event Privacy
+- WebSocket is delivery-only in this phase; data creation remains REST-only.
+- Realtime events are emitted after database commit (`transaction.on_commit`) to avoid inconsistent state exposure.
+- User socket events are scoped by `user_<id>` channel group.
+- Consultation socket events are scoped by `consultation_<id>` channel group.
+- Event payloads intentionally exclude sensitive clinical detail for patient-facing updates.
+
 ## Audit Logging
 - Sensitive actions are recorded in audit logs (authentication, consultation actions, scans, dispensing/completion, record updates).
 - Audit logs support traceability and incident investigation.
@@ -73,6 +88,8 @@ This backend applies layered security using JWT authentication, role-based acces
   - `password_reset`: `5/minute`
   - `qr_scan`: `30/minute`
 - Applied to login/OTP/password reset endpoints and QR scan endpoints.
+- WebSocket connection/message rate limiting is not yet enforced at Channels middleware/consumer level in MVP.
+- Recommended production hardening: connection caps per IP/user at reverse proxy (for example NGINX) and short idle timeouts.
 
 ## Known MVP Limitations
 - AI/RAG is not implemented yet.

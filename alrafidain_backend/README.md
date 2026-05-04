@@ -6,7 +6,7 @@ A production-oriented Django REST Framework backend for a medical platform servi
 
 ---
 
-## Implemented Modules (Phases 0–10)
+## Implemented Modules (Phases 0–14)
 
 | Module | Description |
 |---|---|
@@ -20,6 +20,28 @@ A production-oriented Django REST Framework backend for a medical platform servi
 | Patient Records | Medical record entries (self-reported, doctor-confirmed, laboratory-confirmed) + blood group |
 | Notifications | In-app notification system for all significant clinical events |
 | Audit Logs | Immutable action log for all sensitive operations |
+| **Realtime (Phase 14)** | **WebSocket layer for realtime event delivery via Django Channels + Redis** |
+
+---
+
+## Architecture
+
+- **REST API**: Source of truth for all data creation and modification
+- **WebSocket (Phase 14)**: Realtime event delivery to connected clients
+- **Database**: Permanent storage (PostgreSQL + pgvector)
+- **Redis**: Channel layer for WebSocket broadcasting
+
+### Data Flow
+
+```
+REST API creates/modifies data
+    ↓
+Database saved
+    ↓
+Service broadcasts WebSocket event
+    ↓
+Connected clients receive update
+```
 
 ---
 
@@ -28,6 +50,8 @@ A production-oriented Django REST Framework backend for a medical platform servi
 - Python 3.12+, Django 5+, Django REST Framework
 - PostgreSQL (via Docker Compose)
 - SimpleJWT (JWT authentication)
+- Django Channels + Daphne (WebSocket support)
+- Redis (channel layer for WebSocket)
 - drf-spectacular (OpenAPI / Swagger)
 - django-extensions + pydot (ER diagram generation)
 - django-filter, django-cors-headers, django-cleanup
@@ -38,7 +62,7 @@ A production-oriented Django REST Framework backend for a medical platform servi
 ## Quick Setup
 
 ```bash
-# 1. Start PostgreSQL
+# 1. Start PostgreSQL and Redis
 docker compose up -d
 
 # 2. Create and activate virtualenv

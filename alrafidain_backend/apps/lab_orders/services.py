@@ -82,6 +82,18 @@ def create_lab_order(consultation, doctor, items_data, request=None):
             "status": lab_order.status,
         },
     )
+    
+    # Broadcast realtime lab order event (Phase 14)
+    def broadcast_update():
+        from apps.realtime.services import broadcast_lab_order_updated
+        try:
+            broadcast_lab_order_updated(lab_order)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to broadcast lab_order.updated event: {e}")
+    
+    transaction.on_commit(broadcast_update)
 
     return lab_order
 
@@ -222,6 +234,18 @@ def complete_lab_order_items(lab_order, laboratorian, items_payload, request=Non
             message="Your lab order has been completed.",
             data={"lab_order_id": str(lab_order.id), "status": lab_order.status},
         )
+    
+    # Broadcast realtime lab order update event (Phase 14)
+    def broadcast_update():
+        from apps.realtime.services import broadcast_lab_order_updated
+        try:
+            broadcast_lab_order_updated(lab_order)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to broadcast lab_order.updated event: {e}")
+    
+    transaction.on_commit(broadcast_update)
 
     return lab_order
 
@@ -472,6 +496,18 @@ def release_lab_result_to_patient(lab_result, doctor, request=None):
             "lab_order_item_id": str(lab_result.lab_order_item_id),
         },
     )
+    
+    # Broadcast realtime lab result release event (Phase 14)
+    def broadcast_release():
+        from apps.realtime.services import broadcast_lab_result_released
+        try:
+            broadcast_lab_result_released(lab_result)
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to broadcast lab_result.released event: {e}")
+    
+    transaction.on_commit(broadcast_release)
 
     return lab_result
 
