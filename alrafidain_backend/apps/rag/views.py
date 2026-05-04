@@ -6,18 +6,24 @@ from rest_framework.views import APIView
 
 from apps.common.choices import RAGServiceContext
 
+from .models import RAGResponse, RAGResponseFeedback
 from .permissions import can_access_consultation_rag, can_access_lab_result_rag
 from .serializers import (
     ConsultationRAGSupportSerializer,
     DoctorRAGQuerySerializer,
     LabResultRAGSupportSerializer,
+    RAGFeedbackReviewSerializer,
+    RAGResponseFeedbackCreateSerializer,
+    RAGResponseFeedbackSerializer,
     RAGResponseSerializer,
 )
 from .services import (
     build_consultation_summary_for_rag,
     build_lab_result_summary_for_rag,
     doctor_can_use_rag,
+    review_rag_feedback,
     run_doctor_rag_query,
+    submit_rag_response_feedback,
 )
 
 _DEFAULT_CONSULTATION_QUESTION = (
@@ -143,3 +149,144 @@ class LabResultRAGSupportView(APIView):
         )
 
         return Response(RAGResponseSerializer(rag_response).data, status=200)
+
+
+# ---------------------------------------------------------------------------
+# Phase 12D — Feedback views
+# ---------------------------------------------------------------------------
+
+
+class RAGResponseFeedbackCreateView(APIView):
+    """POST /api/rag/responses/<uuid:rag_response_id>/feedback/ — submit feedback."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, rag_response_id):
+        if not doctor_can_use_rag(request.user):
+            return Response(
+                {"detail": "Only approved doctors may submit RAG feedback."},
+                status=403,
+            )
+
+        rag_response = get_object_or_404(RAGResponse, pk=rag_response_id)
+
+        if rag_response.rag_query.requested_by_id != request.user.pk:
+            return Response(
+                {"detail": "You can only submit feedback for your own RAG responses."},
+                status=403,
+            )
+
+        serializer = RAGResponseFeedbackCreateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        d = serializer.validated_data
+
+        try:
+            feedback = submit_rag_response_feedback(
+                rag_response=rag_response,
+                doctor=request.user,
+                rating=d["rating"],
+                comment=d.get("comment") or None,
+                is_source_grounded=d.get("is_source_grounded"),
+                is_clinically_useful=d.get("is_clinically_useful"),
+                is_safe=d.get("is_safe", True),
+                source_feedback=d.get("source_feedback") or [],
+                request=request,
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        except PermissionError as exc:
+            return Response({"detail": str(exc)}, status=403)
+
+        return Response(RAGResponseFeedbackSerializer(feedback).data, status=201)
+
+
+class MyRAGFeedbackListView(APIView):
+    """GET /api/rag/feedback/my/ — list own feedback."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not doctor_can_use_rag(request.user):
+            return Response(
+                {"detail": "Only approved doctors may view RAG feedback."},
+                status=403,
+            )
+
+        qs = (
+            RAGResponseFeedback.objects.filter(doctor=request.user)
+            .select_related("rag_response", "doctor", "reviewed_by")
+            .prefetch_related("source_feedback__retrieved_chunk")
+        )
+
+        rating = request.query_params.get("rating")
+        if rating:
+            qs = qs.filter(rating=rating)
+
+        needs_admin_review = request.query_params.get("needs_admin_review")
+        if needs_admin_review is not None:
+            qs = qs.filter(needs_admin_review=needs_admin_review.lower() == "true")
+
+        review_status = request.query_params.get("review_status")
+        if review_status:
+            qs = qs.filter(review_status=review_status)
+
+        return Response(RAGResponseFeedbackSerializer(qs, many=True).data, status=200)
+
+
+class AdminRAGFeedbackListView(APIView):
+    """GET /api/rag/admin/feedback/ — staff list all feedback."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not (request.user.is_staff or request.user.is_superuser):
+            return Response({"detail": "Staff only."}, status=403)
+
+        qs = (
+            RAGResponseFeedback.objects.all()
+            .select_related("rag_response", "doctor", "reviewed_by")
+            .prefetch_related("source_feedback__retrieved_chunk")
+        )
+
+        for field in ["rating", "review_status"]:
+            val = request.query_params.get(field)
+            if val is not None:
+                qs = qs.filter(**{field: val})
+
+        for bool_field in ["is_safe", "needs_admin_review"]:
+            val = request.query_params.get(bool_field)
+            if val is not None:
+                qs = qs.filter(**{bool_field: val.lower() == "true"})
+
+        return Response(RAGResponseFeedbackSerializer(qs, many=True).data, status=200)
+
+
+class AdminRAGFeedbackReviewView(APIView):
+    """POST /api/rag/admin/feedback/<uuid:feedback_id>/review/ — staff review action."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, feedback_id):
+        if not (request.user.is_staff or request.user.is_superuser):
+            return Response({"detail": "Staff only."}, status=403)
+
+        feedback = get_object_or_404(RAGResponseFeedback, pk=feedback_id)
+
+        serializer = RAGFeedbackReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        d = serializer.validated_data
+
+        try:
+            updated = review_rag_feedback(
+                feedback=feedback,
+                reviewer=request.user,
+                review_status=d["review_status"],
+                review_notes=d.get("review_notes") or None,
+                request=request,
+            )
+        except PermissionError as exc:
+            return Response({"detail": str(exc)}, status=403)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=400)
+
+        return Response(RAGResponseFeedbackSerializer(updated).data, status=200)

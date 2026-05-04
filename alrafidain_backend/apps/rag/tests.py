@@ -605,3 +605,626 @@ class RAGResponseSafetyInvariantsTest(TestCase):
             service_context=RAGServiceContext.GENERAL_DOCTOR_QUERY,
         )
         self.assertEqual(rag_response.safety_level, RAGSafetyLevel.DOCTOR_ONLY)
+
+
+# ===========================================================================
+# Phase 12D — AI Evaluation and Doctor Feedback tests
+# ===========================================================================
+
+from apps.common.choices import RAGFeedbackRating, RAGFeedbackReviewStatus, RAGSourceRelevance  # noqa: E402
+from .models import RAGResponseFeedback, RAGRetrievedChunkFeedback  # noqa: E402
+from .services import submit_rag_response_feedback, review_rag_feedback  # noqa: E402
+
+
+# ---------------------------------------------------------------------------
+# Helpers: create a RAGQuery + RAGResponse fixture for Phase 12D tests
+# ---------------------------------------------------------------------------
+
+def _create_rag_response(doctor):
+    """Create a minimal RAGQuery + RAGResponse pair using real DB objects."""
+    with patch("apps.knowledge_base.services.semantic_search_approved_chunks", return_value=[]):
+        rag_query, rag_response = run_doctor_rag_query(
+            doctor=doctor,
+            query_text="Phase 12D test query.",
+            service_context=RAGServiceContext.GENERAL_DOCTOR_QUERY,
+        )
+    return rag_query, rag_response
+
+
+def _create_rag_response_with_chunk(doctor):
+    """Create RAGQuery + RAGResponse + 1 RAGRetrievedChunk using a real chunk."""
+    real_hit = _create_real_chunk(doctor)
+    mock_client = MagicMock()
+    mock_client.chat.return_value = MOCK_LLM_RESPONSE
+    with patch("apps.knowledge_base.services.semantic_search_approved_chunks", return_value=[real_hit]):
+        rag_query, rag_response = run_doctor_rag_query(
+            doctor=doctor,
+            query_text="Phase 12D chunk feedback test.",
+            service_context=RAGServiceContext.GENERAL_DOCTOR_QUERY,
+            llm_client=mock_client,
+        )
+    return rag_query, rag_response
+
+
+# ---------------------------------------------------------------------------
+# Model tests
+# ---------------------------------------------------------------------------
+
+class RAGResponseFeedbackModelTest(TestCase):
+    def setUp(self):
+        self.doctor = create_doctor(email="model_fb@example.com")
+        _, self.rag_response = _create_rag_response(self.doctor)
+
+    def test_feedback_creation(self):
+        fb = RAGResponseFeedback.objects.create(
+            rag_response=self.rag_response,
+            doctor=self.doctor,
+            rating=RAGFeedbackRating.HELPFUL,
+        )
+        self.assertEqual(str(fb.rating), RAGFeedbackRating.HELPFUL)
+        self.assertTrue(fb.is_safe)
+        self.assertFalse(fb.needs_admin_review)
+        self.assertEqual(fb.review_status, RAGFeedbackReviewStatus.PENDING)
+
+    def test_unsafe_rating_sets_flags_on_save(self):
+        fb = RAGResponseFeedback.objects.create(
+            rag_response=self.rag_response,
+            doctor=self.doctor,
+            rating=RAGFeedbackRating.UNSAFE,
+        )
+        self.assertFalse(fb.is_safe)
+        self.assertTrue(fb.needs_admin_review)
+
+    def test_is_safe_false_sets_needs_admin_review(self):
+        fb = RAGResponseFeedback.objects.create(
+            rag_response=self.rag_response,
+            doctor=self.doctor,
+            rating=RAGFeedbackRating.NOT_HELPFUL,
+            is_safe=False,
+        )
+        self.assertTrue(fb.needs_admin_review)
+
+    def test_str_representation(self):
+        fb = RAGResponseFeedback.objects.create(
+            rag_response=self.rag_response,
+            doctor=self.doctor,
+            rating=RAGFeedbackRating.HELPFUL,
+        )
+        self.assertIn(str(fb.id), str(fb))
+        self.assertIn(RAGFeedbackRating.HELPFUL, str(fb))
+
+    def test_one_to_one_prevents_duplicate(self):
+        RAGResponseFeedback.objects.create(
+            rag_response=self.rag_response,
+            doctor=self.doctor,
+            rating=RAGFeedbackRating.HELPFUL,
+        )
+        from django.db import IntegrityError
+        with self.assertRaises(IntegrityError):
+            RAGResponseFeedback.objects.create(
+                rag_response=self.rag_response,
+                doctor=self.doctor,
+                rating=RAGFeedbackRating.PARTIALLY_HELPFUL,
+            )
+
+
+class RAGRetrievedChunkFeedbackModelTest(TestCase):
+    def setUp(self):
+        self.doctor = create_doctor(email="chunk_fb_model@example.com")
+        self.rag_query, self.rag_response = _create_rag_response_with_chunk(self.doctor)
+        self.retrieved_chunk = RAGRetrievedChunk.objects.filter(rag_query=self.rag_query).first()
+        self.feedback = RAGResponseFeedback.objects.create(
+            rag_response=self.rag_response,
+            doctor=self.doctor,
+            rating=RAGFeedbackRating.HELPFUL,
+        )
+
+    def test_chunk_feedback_creation(self):
+        cf = RAGRetrievedChunkFeedback.objects.create(
+            feedback=self.feedback,
+            retrieved_chunk=self.retrieved_chunk,
+            relevance=RAGSourceRelevance.RELEVANT,
+        )
+        self.assertEqual(cf.relevance, RAGSourceRelevance.RELEVANT)
+        self.assertIn(str(cf.retrieved_chunk_id), str(cf))
+
+    def test_unique_together_prevents_duplicate_chunk_feedback(self):
+        RAGRetrievedChunkFeedback.objects.create(
+            feedback=self.feedback,
+            retrieved_chunk=self.retrieved_chunk,
+            relevance=RAGSourceRelevance.RELEVANT,
+        )
+        from django.db import IntegrityError
+        with self.assertRaises(IntegrityError):
+            RAGRetrievedChunkFeedback.objects.create(
+                feedback=self.feedback,
+                retrieved_chunk=self.retrieved_chunk,
+                relevance=RAGSourceRelevance.NOT_RELEVANT,
+            )
+
+
+# ---------------------------------------------------------------------------
+# Service tests
+# ---------------------------------------------------------------------------
+
+class SubmitRagFeedbackServiceTest(TestCase):
+    def setUp(self):
+        self.doctor = create_doctor(email="svc_fb@example.com")
+        self.other_doctor = create_doctor(email="svc_other@example.com")
+        _, self.rag_response = _create_rag_response(self.doctor)
+
+    def test_submit_feedback_creates_record(self):
+        fb = submit_rag_response_feedback(
+            rag_response=self.rag_response,
+            doctor=self.doctor,
+            rating=RAGFeedbackRating.HELPFUL,
+            comment="Very useful answer.",
+        )
+        self.assertEqual(fb.rating, RAGFeedbackRating.HELPFUL)
+        self.assertEqual(fb.comment, "Very useful answer.")
+        self.assertEqual(fb.review_status, RAGFeedbackReviewStatus.PENDING)
+        self.assertEqual(RAGResponseFeedback.objects.count(), 1)
+
+    def test_submit_creates_audit_log(self):
+        submit_rag_response_feedback(
+            rag_response=self.rag_response,
+            doctor=self.doctor,
+            rating=RAGFeedbackRating.HELPFUL,
+        )
+        self.assertTrue(
+            AuditLog.objects.filter(action="rag_feedback_submitted").exists()
+        )
+
+    def test_other_doctor_cannot_submit_feedback(self):
+        with self.assertRaises(PermissionError):
+            submit_rag_response_feedback(
+                rag_response=self.rag_response,
+                doctor=self.other_doctor,
+                rating=RAGFeedbackRating.HELPFUL,
+            )
+
+    def test_duplicate_feedback_raises_value_error(self):
+        submit_rag_response_feedback(
+            rag_response=self.rag_response,
+            doctor=self.doctor,
+            rating=RAGFeedbackRating.HELPFUL,
+        )
+        with self.assertRaises(ValueError):
+            submit_rag_response_feedback(
+                rag_response=self.rag_response,
+                doctor=self.doctor,
+                rating=RAGFeedbackRating.PARTIALLY_HELPFUL,
+            )
+
+    def test_unsafe_rating_escalates_flags(self):
+        fb = submit_rag_response_feedback(
+            rag_response=self.rag_response,
+            doctor=self.doctor,
+            rating=RAGFeedbackRating.UNSAFE,
+        )
+        self.assertFalse(fb.is_safe)
+        self.assertTrue(fb.needs_admin_review)
+
+    def test_source_feedback_for_valid_chunk(self):
+        rag_query, rag_response = _create_rag_response_with_chunk(self.doctor)
+        chunk = RAGRetrievedChunk.objects.filter(rag_query=rag_query).first()
+        fb = submit_rag_response_feedback(
+            rag_response=rag_response,
+            doctor=self.doctor,
+            rating=RAGFeedbackRating.HELPFUL,
+            source_feedback=[
+                {
+                    "retrieved_chunk_id": str(chunk.pk),
+                    "relevance": RAGSourceRelevance.RELEVANT,
+                    "comment": "Very relevant",
+                }
+            ],
+        )
+        self.assertEqual(RAGRetrievedChunkFeedback.objects.filter(feedback=fb).count(), 1)
+        cf = RAGRetrievedChunkFeedback.objects.get(feedback=fb)
+        self.assertEqual(cf.relevance, RAGSourceRelevance.RELEVANT)
+
+    def test_source_feedback_for_unrelated_chunk_raises_error(self):
+        other_doctor = create_doctor(email="svc_other2@example.com")
+        other_query, other_response = _create_rag_response_with_chunk(other_doctor)
+        unrelated_chunk = RAGRetrievedChunk.objects.filter(rag_query=other_query).first()
+
+        _, rag_response = _create_rag_response(self.doctor)
+        with self.assertRaises(ValueError):
+            submit_rag_response_feedback(
+                rag_response=rag_response,
+                doctor=self.doctor,
+                rating=RAGFeedbackRating.HELPFUL,
+                source_feedback=[
+                    {
+                        "retrieved_chunk_id": str(unrelated_chunk.pk),
+                        "relevance": RAGSourceRelevance.NOT_RELEVANT,
+                    }
+                ],
+            )
+
+
+class ReviewRagFeedbackServiceTest(TestCase):
+    def setUp(self):
+        self.doctor = create_doctor(email="svc_review@example.com")
+        _, self.rag_response = _create_rag_response(self.doctor)
+        self.feedback = submit_rag_response_feedback(
+            rag_response=self.rag_response,
+            doctor=self.doctor,
+            rating=RAGFeedbackRating.NOT_HELPFUL,
+        )
+        self.staff = User.objects.create_user(
+            email="staff_svc@example.com",
+            password="StrongPass1!",
+            first_name="S",
+            last_name="T",
+            user_type=UserType.DOCTOR,
+            is_active=True,
+            is_staff=True,
+        )
+
+    def test_staff_can_review(self):
+        updated = review_rag_feedback(
+            feedback=self.feedback,
+            reviewer=self.staff,
+            review_status=RAGFeedbackReviewStatus.REVIEWED,
+            review_notes="Looks fine.",
+        )
+        updated.refresh_from_db()
+        self.assertEqual(updated.review_status, RAGFeedbackReviewStatus.REVIEWED)
+        self.assertEqual(updated.reviewed_by_id, self.staff.pk)
+        self.assertIsNotNone(updated.reviewed_at)
+
+    def test_non_staff_cannot_review(self):
+        with self.assertRaises(PermissionError):
+            review_rag_feedback(
+                feedback=self.feedback,
+                reviewer=self.doctor,
+                review_status=RAGFeedbackReviewStatus.REVIEWED,
+            )
+
+    def test_invalid_review_status_raises_error(self):
+        with self.assertRaises(ValueError):
+            review_rag_feedback(
+                feedback=self.feedback,
+                reviewer=self.staff,
+                review_status="pending",  # not allowed via this endpoint
+            )
+
+    def test_review_creates_audit_log(self):
+        review_rag_feedback(
+            feedback=self.feedback,
+            reviewer=self.staff,
+            review_status=RAGFeedbackReviewStatus.ESCALATED,
+        )
+        self.assertTrue(
+            AuditLog.objects.filter(action="rag_feedback_reviewed").exists()
+        )
+
+
+# ---------------------------------------------------------------------------
+# API view tests
+# ---------------------------------------------------------------------------
+
+class RAGResponseFeedbackCreateViewTest(TestCase):
+    def setUp(self):
+        self.doctor = create_doctor(email="view_fb@example.com")
+        self.other_doctor = create_doctor(email="view_other@example.com")
+        self.unapproved = create_doctor(email="view_unapp@example.com", approved=False)
+        self.patient = create_patient(email="view_pat@example.com")
+        _, self.rag_response = _create_rag_response(self.doctor)
+
+    def url(self):
+        return f"/api/rag/responses/{self.rag_response.pk}/feedback/"
+
+    def test_owner_doctor_can_submit_feedback_201(self):
+        client = auth_client(self.doctor)
+        resp = client.post(self.url(), {"rating": RAGFeedbackRating.HELPFUL}, format="json")
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(resp.data["rating"], RAGFeedbackRating.HELPFUL)
+        self.assertEqual(RAGResponseFeedback.objects.count(), 1)
+
+    def test_unapproved_doctor_gets_403(self):
+        client = auth_client(self.unapproved)
+        resp = client.post(self.url(), {"rating": RAGFeedbackRating.HELPFUL}, format="json")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_other_doctor_gets_403(self):
+        client = auth_client(self.other_doctor)
+        resp = client.post(self.url(), {"rating": RAGFeedbackRating.HELPFUL}, format="json")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_patient_gets_403(self):
+        client = auth_client(self.patient)
+        resp = client.post(self.url(), {"rating": RAGFeedbackRating.HELPFUL}, format="json")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_unauthenticated_gets_401(self):
+        resp = self.client.post(self.url(), {"rating": RAGFeedbackRating.HELPFUL}, format="json")
+        self.assertEqual(resp.status_code, 401)
+
+    def test_missing_rating_returns_400(self):
+        client = auth_client(self.doctor)
+        resp = client.post(self.url(), {}, format="json")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_invalid_rag_response_id_returns_404(self):
+        import uuid
+        client = auth_client(self.doctor)
+        resp = client.post(
+            f"/api/rag/responses/{uuid.uuid4()}/feedback/",
+            {"rating": RAGFeedbackRating.HELPFUL},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 404)
+
+    def test_duplicate_feedback_returns_400(self):
+        client = auth_client(self.doctor)
+        client.post(self.url(), {"rating": RAGFeedbackRating.HELPFUL}, format="json")
+        resp = client.post(self.url(), {"rating": RAGFeedbackRating.PARTIALLY_HELPFUL}, format="json")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_unsafe_feedback_sets_is_safe_false(self):
+        client = auth_client(self.doctor)
+        resp = client.post(self.url(), {"rating": RAGFeedbackRating.UNSAFE}, format="json")
+        self.assertEqual(resp.status_code, 201)
+        self.assertFalse(resp.data["is_safe"])
+        self.assertTrue(resp.data["needs_admin_review"])
+
+    def test_response_still_patient_visible_false_after_feedback(self):
+        client = auth_client(self.doctor)
+        client.post(self.url(), {"rating": RAGFeedbackRating.HELPFUL}, format="json")
+        self.rag_response.refresh_from_db()
+        self.assertFalse(self.rag_response.patient_visible)
+
+    def test_feedback_with_source_feedback_201(self):
+        rag_query, rag_response = _create_rag_response_with_chunk(self.doctor)
+        chunk = RAGRetrievedChunk.objects.filter(rag_query=rag_query).first()
+        client = auth_client(self.doctor)
+        resp = client.post(
+            f"/api/rag/responses/{rag_response.pk}/feedback/",
+            {
+                "rating": RAGFeedbackRating.HELPFUL,
+                "source_feedback": [
+                    {
+                        "retrieved_chunk_id": str(chunk.pk),
+                        "relevance": RAGSourceRelevance.RELEVANT,
+                        "comment": "Very useful",
+                    }
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 201)
+        self.assertEqual(len(resp.data["source_feedback"]), 1)
+        self.assertEqual(resp.data["source_feedback"][0]["relevance"], RAGSourceRelevance.RELEVANT)
+
+    def test_source_feedback_for_unrelated_chunk_returns_400(self):
+        other = create_doctor(email="view_unrel@example.com")
+        other_query, _ = _create_rag_response_with_chunk(other)
+        unrelated_chunk = RAGRetrievedChunk.objects.filter(rag_query=other_query).first()
+        _, rag_response = _create_rag_response(self.doctor)
+        client = auth_client(self.doctor)
+        resp = client.post(
+            f"/api/rag/responses/{rag_response.pk}/feedback/",
+            {
+                "rating": RAGFeedbackRating.NOT_HELPFUL,
+                "source_feedback": [
+                    {
+                        "retrieved_chunk_id": str(unrelated_chunk.pk),
+                        "relevance": RAGSourceRelevance.NOT_RELEVANT,
+                    }
+                ],
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+
+
+class MyRAGFeedbackListViewTest(TestCase):
+    def setUp(self):
+        self.doctor = create_doctor(email="my_fb@example.com")
+        self.other_doctor = create_doctor(email="my_other@example.com")
+        self.unapproved = create_doctor(email="my_unapp@example.com", approved=False)
+        _, rag1 = _create_rag_response(self.doctor)
+        _, rag2 = _create_rag_response(self.other_doctor)
+        self.fb1 = RAGResponseFeedback.objects.create(
+            rag_response=rag1, doctor=self.doctor, rating=RAGFeedbackRating.HELPFUL
+        )
+        self.fb_other = RAGResponseFeedback.objects.create(
+            rag_response=rag2, doctor=self.other_doctor, rating=RAGFeedbackRating.NOT_HELPFUL
+        )
+
+    def url(self):
+        return "/api/rag/feedback/my/"
+
+    def test_doctor_sees_own_feedback_only(self):
+        client = auth_client(self.doctor)
+        resp = client.get(self.url())
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]["rating"], RAGFeedbackRating.HELPFUL)
+
+    def test_unapproved_doctor_gets_403(self):
+        client = auth_client(self.unapproved)
+        resp = client.get(self.url())
+        self.assertEqual(resp.status_code, 403)
+
+    def test_unauthenticated_gets_401(self):
+        resp = self.client.get(self.url())
+        self.assertEqual(resp.status_code, 401)
+
+    def test_filter_by_rating(self):
+        _, rag3 = _create_rag_response(self.doctor)
+        RAGResponseFeedback.objects.create(
+            rag_response=rag3, doctor=self.doctor, rating=RAGFeedbackRating.NOT_HELPFUL
+        )
+        client = auth_client(self.doctor)
+        resp = client.get(self.url() + f"?rating={RAGFeedbackRating.NOT_HELPFUL}")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]["rating"], RAGFeedbackRating.NOT_HELPFUL)
+
+    def test_filter_by_review_status(self):
+        client = auth_client(self.doctor)
+        resp = client.get(self.url() + f"?review_status={RAGFeedbackReviewStatus.PENDING}")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 1)
+
+
+class AdminRAGFeedbackListViewTest(TestCase):
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            email="admin_list@example.com",
+            password="StrongPass1!",
+            first_name="S",
+            last_name="T",
+            user_type=UserType.DOCTOR,
+            is_active=True,
+            is_staff=True,
+        )
+        self.doctor = create_doctor(email="admin_doc@example.com")
+        _, rag = _create_rag_response(self.doctor)
+        self.fb = RAGResponseFeedback.objects.create(
+            rag_response=rag, doctor=self.doctor, rating=RAGFeedbackRating.HELPFUL
+        )
+
+    def url(self):
+        return "/api/rag/admin/feedback/"
+
+    def test_staff_can_list_all_feedback(self):
+        client = auth_client(self.staff)
+        resp = client.get(self.url())
+        self.assertEqual(resp.status_code, 200)
+        self.assertGreaterEqual(len(resp.data), 1)
+
+    def test_non_staff_doctor_gets_403(self):
+        client = auth_client(self.doctor)
+        resp = client.get(self.url())
+        self.assertEqual(resp.status_code, 403)
+
+    def test_unauthenticated_gets_401(self):
+        resp = self.client.get(self.url())
+        self.assertEqual(resp.status_code, 401)
+
+    def test_filter_by_is_safe(self):
+        _, rag2 = _create_rag_response(self.doctor)
+        RAGResponseFeedback.objects.create(
+            rag_response=rag2, doctor=self.doctor,
+            rating=RAGFeedbackRating.UNSAFE,
+        )
+        client = auth_client(self.staff)
+        resp = client.get(self.url() + "?is_safe=false")
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(all(not f["is_safe"] for f in resp.data))
+
+    def test_filter_by_needs_admin_review(self):
+        _, rag3 = _create_rag_response(self.doctor)
+        RAGResponseFeedback.objects.create(
+            rag_response=rag3, doctor=self.doctor,
+            rating=RAGFeedbackRating.UNSAFE,
+        )
+        client = auth_client(self.staff)
+        resp = client.get(self.url() + "?needs_admin_review=true")
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(all(f["needs_admin_review"] for f in resp.data))
+
+
+class AdminRAGFeedbackReviewViewTest(TestCase):
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            email="admin_review@example.com",
+            password="StrongPass1!",
+            first_name="S",
+            last_name="T",
+            user_type=UserType.DOCTOR,
+            is_active=True,
+            is_staff=True,
+        )
+        self.doctor = create_doctor(email="admin_rev_doc@example.com")
+        _, rag = _create_rag_response(self.doctor)
+        self.feedback = RAGResponseFeedback.objects.create(
+            rag_response=rag, doctor=self.doctor, rating=RAGFeedbackRating.NOT_HELPFUL
+        )
+
+    def url(self):
+        return f"/api/rag/admin/feedback/{self.feedback.pk}/review/"
+
+    def test_staff_can_review_feedback(self):
+        client = auth_client(self.staff)
+        resp = client.post(
+            self.url(),
+            {"review_status": RAGFeedbackReviewStatus.REVIEWED, "review_notes": "OK"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["review_status"], RAGFeedbackReviewStatus.REVIEWED)
+        self.assertIsNotNone(resp.data["reviewed_at"])
+        self.assertEqual(resp.data["reviewed_by_email"], self.staff.email)
+
+    def test_staff_can_escalate_feedback(self):
+        client = auth_client(self.staff)
+        resp = client.post(
+            self.url(),
+            {"review_status": RAGFeedbackReviewStatus.ESCALATED},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["review_status"], RAGFeedbackReviewStatus.ESCALATED)
+
+    def test_staff_can_dismiss_feedback(self):
+        client = auth_client(self.staff)
+        resp = client.post(
+            self.url(),
+            {"review_status": RAGFeedbackReviewStatus.DISMISSED},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["review_status"], RAGFeedbackReviewStatus.DISMISSED)
+
+    def test_cannot_set_review_status_to_pending(self):
+        client = auth_client(self.staff)
+        resp = client.post(
+            self.url(),
+            {"review_status": RAGFeedbackReviewStatus.PENDING},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_non_staff_gets_403(self):
+        client = auth_client(self.doctor)
+        resp = client.post(
+            self.url(),
+            {"review_status": RAGFeedbackReviewStatus.REVIEWED},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 403)
+
+    def test_unauthenticated_gets_401(self):
+        resp = self.client.post(
+            self.url(),
+            {"review_status": RAGFeedbackReviewStatus.REVIEWED},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 401)
+
+    def test_review_creates_audit_log(self):
+        client = auth_client(self.staff)
+        client.post(
+            self.url(),
+            {"review_status": RAGFeedbackReviewStatus.REVIEWED},
+            format="json",
+        )
+        self.assertTrue(
+            AuditLog.objects.filter(action="rag_feedback_reviewed").exists()
+        )
+
+    def test_invalid_feedback_id_returns_404(self):
+        import uuid
+        client = auth_client(self.staff)
+        resp = client.post(
+            f"/api/rag/admin/feedback/{uuid.uuid4()}/review/",
+            {"review_status": RAGFeedbackReviewStatus.REVIEWED},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 404)

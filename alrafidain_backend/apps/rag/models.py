@@ -1,7 +1,14 @@
 from django.conf import settings
 from django.db import models
 
-from apps.common.choices import RAGResponseStatus, RAGSafetyLevel, RAGServiceContext
+from apps.common.choices import (
+    RAGFeedbackRating,
+    RAGFeedbackReviewStatus,
+    RAGResponseStatus,
+    RAGSafetyLevel,
+    RAGServiceContext,
+    RAGSourceRelevance,
+)
 from apps.common.models import BaseModel
 
 
@@ -93,3 +100,87 @@ class RAGResponse(BaseModel):
         self.patient_visible = False
         self.doctor_review_required = True
         super().save(*args, **kwargs)
+
+
+class RAGResponseFeedback(BaseModel):
+    """Doctor-submitted feedback on a single RAG response."""
+
+    rag_response = models.OneToOneField(
+        RAGResponse,
+        on_delete=models.CASCADE,
+        related_name="feedback",
+    )
+    doctor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="rag_feedbacks",
+    )
+    rating = models.CharField(
+        max_length=25,
+        choices=RAGFeedbackRating.choices,
+    )
+    comment = models.TextField(blank=True, null=True)
+    is_source_grounded = models.BooleanField(null=True, blank=True)
+    is_clinically_useful = models.BooleanField(null=True, blank=True)
+    is_safe = models.BooleanField(default=True)
+    needs_admin_review = models.BooleanField(default=False)
+    review_status = models.CharField(
+        max_length=20,
+        choices=RAGFeedbackReviewStatus.choices,
+        default=RAGFeedbackReviewStatus.PENDING,
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="reviewed_rag_feedbacks",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_notes = models.TextField(blank=True, null=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        verbose_name = "RAG Response Feedback"
+        verbose_name_plural = "RAG Response Feedbacks"
+
+    def __str__(self):
+        return f"RAGFeedback {self.id} [{self.rating}] by {self.doctor_id}"
+
+    def save(self, *args, **kwargs):
+        # Enforce safety escalation rules
+        if self.rating == RAGFeedbackRating.UNSAFE:
+            self.is_safe = False
+        if not self.is_safe:
+            self.needs_admin_review = True
+        super().save(*args, **kwargs)
+
+
+class RAGRetrievedChunkFeedback(BaseModel):
+    """Per-source relevance feedback for a single retrieved chunk."""
+
+    feedback = models.ForeignKey(
+        RAGResponseFeedback,
+        on_delete=models.CASCADE,
+        related_name="source_feedback",
+    )
+    retrieved_chunk = models.ForeignKey(
+        RAGRetrievedChunk,
+        on_delete=models.CASCADE,
+        related_name="feedback_items",
+    )
+    relevance = models.CharField(
+        max_length=25,
+        choices=RAGSourceRelevance.choices,
+        default=RAGSourceRelevance.UNKNOWN,
+    )
+    comment = models.TextField(blank=True, null=True)
+
+    class Meta:
+        ordering = ["feedback", "retrieved_chunk__rank"]
+        unique_together = [("feedback", "retrieved_chunk")]
+        verbose_name = "RAG Retrieved Chunk Feedback"
+        verbose_name_plural = "RAG Retrieved Chunk Feedbacks"
+
+    def __str__(self):
+        return f"ChunkFeedback [{self.relevance}] for chunk {self.retrieved_chunk_id}"

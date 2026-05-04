@@ -316,3 +316,24 @@ class RAGSafetyLevel(models.TextChoices):
     DOCTOR_ONLY = "doctor_only", "Doctor Only"
     PATIENT_SAFE = "patient_safe", "Patient Safe"
     UNSAFE = "unsafe", "Unsafe"
+
+
+class RAGFeedbackRating(models.TextChoices):
+    HELPFUL = "helpful", "Helpful"
+    PARTIALLY_HELPFUL = "partially_helpful", "Partially Helpful"
+    NOT_HELPFUL = "not_helpful", "Not Helpful"
+    UNSAFE = "unsafe", "Unsafe"
+
+
+class RAGFeedbackReviewStatus(models.TextChoices):
+    PENDING = "pending", "Pending"
+    REVIEWED = "reviewed", "Reviewed"
+    DISMISSED = "dismissed", "Dismissed"
+    ESCALATED = "escalated", "Escalated"
+
+
+class RAGSourceRelevance(models.TextChoices):
+    RELEVANT = "relevant", "Relevant"
+    PARTIALLY_RELEVANT = "partially_relevant", "Partially Relevant"
+    NOT_RELEVANT = "not_relevant", "Not Relevant"
+    UNKNOWN = "unknown", "Unknown"

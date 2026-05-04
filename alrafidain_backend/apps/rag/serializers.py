@@ -1,7 +1,9 @@
 from django.conf import settings
 from rest_framework import serializers
 
-from .models import RAGQuery, RAGResponse, RAGRetrievedChunk
+from apps.common.choices import RAGFeedbackRating, RAGFeedbackReviewStatus, RAGSourceRelevance
+
+from .models import RAGQuery, RAGResponse, RAGResponseFeedback, RAGRetrievedChunk, RAGRetrievedChunkFeedback
 
 
 class DoctorRAGQuerySerializer(serializers.Serializer):
@@ -121,3 +123,94 @@ class LabResultRAGSupportSerializer(serializers.Serializer):
         default_k = getattr(settings, "RAG_DEFAULT_TOP_K", 6)
         fields["top_k"].default = default_k
         return fields
+
+
+# ---------------------------------------------------------------------------
+# Phase 12D — Feedback serializers
+# ---------------------------------------------------------------------------
+
+
+class RAGRetrievedChunkFeedbackInputSerializer(serializers.Serializer):
+    """Input for a single source chunk's relevance feedback."""
+
+    retrieved_chunk_id = serializers.UUIDField()
+    relevance = serializers.ChoiceField(
+        choices=RAGSourceRelevance.choices,
+        default=RAGSourceRelevance.UNKNOWN,
+    )
+    comment = serializers.CharField(max_length=1000, required=False, allow_blank=True, default="")
+
+
+class RAGResponseFeedbackCreateSerializer(serializers.Serializer):
+    """Input serializer for creating RAG feedback."""
+
+    rating = serializers.ChoiceField(choices=RAGFeedbackRating.choices)
+    comment = serializers.CharField(max_length=2000, required=False, allow_blank=True, default="")
+    is_source_grounded = serializers.BooleanField(required=False, allow_null=True, default=None)
+    is_clinically_useful = serializers.BooleanField(required=False, allow_null=True, default=None)
+    is_safe = serializers.BooleanField(required=False, default=True)
+    source_feedback = RAGRetrievedChunkFeedbackInputSerializer(many=True, required=False, default=list)
+
+
+class RAGRetrievedChunkFeedbackSerializer(serializers.ModelSerializer):
+    retrieved_chunk_id = serializers.UUIDField(source="retrieved_chunk.id", read_only=True)
+    chunk_rank = serializers.IntegerField(source="retrieved_chunk.rank", read_only=True)
+
+    class Meta:
+        model = RAGRetrievedChunkFeedback
+        fields = [
+            "id",
+            "retrieved_chunk_id",
+            "chunk_rank",
+            "relevance",
+            "comment",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+
+class RAGResponseFeedbackSerializer(serializers.ModelSerializer):
+    rag_response_id = serializers.UUIDField(source="rag_response.id", read_only=True)
+    doctor_email = serializers.EmailField(source="doctor.email", read_only=True)
+    reviewed_by_email = serializers.SerializerMethodField()
+    source_feedback = RAGRetrievedChunkFeedbackSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = RAGResponseFeedback
+        fields = [
+            "id",
+            "rag_response_id",
+            "doctor_email",
+            "rating",
+            "comment",
+            "is_source_grounded",
+            "is_clinically_useful",
+            "is_safe",
+            "needs_admin_review",
+            "review_status",
+            "reviewed_by_email",
+            "reviewed_at",
+            "review_notes",
+            "source_feedback",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+    def get_reviewed_by_email(self, obj):
+        if obj.reviewed_by_id:
+            return obj.reviewed_by.email
+        return None
+
+
+class RAGFeedbackReviewSerializer(serializers.Serializer):
+    """Input for staff review of a RAG feedback item."""
+
+    ALLOWED_STATUSES = [
+        RAGFeedbackReviewStatus.REVIEWED,
+        RAGFeedbackReviewStatus.DISMISSED,
+        RAGFeedbackReviewStatus.ESCALATED,
+    ]
+
+    review_status = serializers.ChoiceField(choices=ALLOWED_STATUSES)
+    review_notes = serializers.CharField(max_length=2000, required=False, allow_blank=True, default="")

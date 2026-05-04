@@ -5,9 +5,16 @@ RAG service layer — orchestrates semantic search, prompt building, and DeepSee
 from __future__ import annotations
 
 from django.conf import settings
+from django.utils import timezone
 
 from apps.audit.services import create_audit_log
-from apps.common.choices import RAGResponseStatus, RAGSafetyLevel, RAGServiceContext
+from apps.common.choices import (
+    RAGFeedbackRating,
+    RAGFeedbackReviewStatus,
+    RAGResponseStatus,
+    RAGSafetyLevel,
+    RAGServiceContext,
+)
 
 from .permissions import is_approved_doctor
 from .prompting import build_doctor_rag_prompt
@@ -249,3 +256,193 @@ def build_lab_result_summary_for_rag(lab_result) -> str:
         parts.append(f"Doctor notes: {lab_result.doctor_notes}")
 
     return "\n".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Phase 12D — Feedback services
+# ---------------------------------------------------------------------------
+
+
+def submit_rag_response_feedback(
+    rag_response,
+    doctor,
+    rating: str,
+    comment: str | None = None,
+    is_source_grounded: bool | None = None,
+    is_clinically_useful: bool | None = None,
+    is_safe: bool = True,
+    source_feedback: list[dict] | None = None,
+    request=None,
+):
+    """
+    Create feedback for a RAG response.
+
+    Args:
+        rag_response: RAGResponse instance.
+        doctor: The User submitting feedback (must be rag_response.rag_query.requested_by).
+        rating: RAGFeedbackRating value.
+        comment: Optional free-text comment.
+        is_source_grounded: Whether the answer was grounded in retrieved sources.
+        is_clinically_useful: Whether the answer was clinically useful.
+        is_safe: Whether the answer was safe.
+        source_feedback: Optional list of {retrieved_chunk_id, relevance, comment} dicts.
+        request: Django request for audit logging.
+
+    Returns:
+        RAGResponseFeedback instance.
+
+    Raises:
+        PermissionError: If doctor is not the one who requested the RAG response.
+        ValueError: If feedback already exists for this response.
+    """
+    from .models import RAGResponseFeedback, RAGRetrievedChunk, RAGRetrievedChunkFeedback
+
+    if rag_response.rag_query.requested_by_id != doctor.pk:
+        raise PermissionError(
+            "Only the doctor who requested this RAG response can submit feedback."
+        )
+
+    if RAGResponseFeedback.objects.filter(rag_response=rag_response).exists():
+        raise ValueError("Feedback has already been submitted for this RAG response.")
+
+    # Enforce safety escalation
+    if rating == RAGFeedbackRating.UNSAFE:
+        is_safe = False
+
+    feedback = RAGResponseFeedback.objects.create(
+        rag_response=rag_response,
+        doctor=doctor,
+        rating=rating,
+        comment=comment,
+        is_source_grounded=is_source_grounded,
+        is_clinically_useful=is_clinically_useful,
+        is_safe=is_safe,
+    )
+
+    # Process source feedback
+    source_feedback_count = 0
+    if source_feedback:
+        valid_chunk_ids = set(
+            str(pk)
+            for pk in rag_response.rag_query.retrieved_chunks.values_list("id", flat=True)
+        )
+        for sf in source_feedback:
+            chunk_id = str(sf.get("retrieved_chunk_id", ""))
+            if chunk_id not in valid_chunk_ids:
+                raise ValueError(
+                    f"Retrieved chunk {chunk_id} does not belong to this RAG query."
+                )
+            try:
+                chunk = RAGRetrievedChunk.objects.get(
+                    id=chunk_id,
+                    rag_query=rag_response.rag_query,
+                )
+            except RAGRetrievedChunk.DoesNotExist:
+                raise ValueError(
+                    f"Retrieved chunk {chunk_id} not found for this RAG query."
+                )
+            RAGRetrievedChunkFeedback.objects.create(
+                feedback=feedback,
+                retrieved_chunk=chunk,
+                relevance=sf.get("relevance", "unknown"),
+                comment=sf.get("comment") or None,
+            )
+            source_feedback_count += 1
+
+    create_audit_log(
+        actor=doctor,
+        action="rag_feedback_submitted",
+        metadata={
+            "rag_response_id": str(rag_response.pk),
+            "rag_query_id": str(rag_response.rag_query_id),
+            "doctor_id": str(doctor.pk),
+            "rating": rating,
+            "is_safe": is_safe,
+            "needs_admin_review": feedback.needs_admin_review,
+            "review_status": feedback.review_status,
+            "source_feedback_count": source_feedback_count,
+        },
+        request=request,
+    )
+
+    return feedback
+
+
+def review_rag_feedback(
+    feedback,
+    reviewer,
+    review_status: str,
+    review_notes: str | None = None,
+    request=None,
+):
+    """
+    Staff review of a RAG feedback item.
+
+    Args:
+        feedback: RAGResponseFeedback instance.
+        reviewer: The User performing the review (must be staff or superuser).
+        review_status: One of reviewed / dismissed / escalated.
+        review_notes: Optional reviewer notes.
+        request: Django request for audit logging.
+
+    Returns:
+        Updated RAGResponseFeedback instance.
+
+    Raises:
+        PermissionError: If reviewer is not staff or superuser.
+        ValueError: If review_status is not a valid non-pending value.
+    """
+    allowed_statuses = {
+        RAGFeedbackReviewStatus.REVIEWED,
+        RAGFeedbackReviewStatus.DISMISSED,
+        RAGFeedbackReviewStatus.ESCALATED,
+    }
+
+    if not (reviewer.is_staff or reviewer.is_superuser):
+        raise PermissionError("Only staff or superusers may review RAG feedback.")
+
+    if review_status not in allowed_statuses:
+        raise ValueError(
+            f"Invalid review_status '{review_status}'. "
+            f"Allowed: {sorted(allowed_statuses)}"
+        )
+
+    feedback.review_status = review_status
+    feedback.reviewed_by = reviewer
+    feedback.reviewed_at = timezone.now()
+    feedback.review_notes = review_notes
+    feedback.save(update_fields=["review_status", "reviewed_by", "reviewed_at", "review_notes", "updated_at"])
+
+    create_audit_log(
+        actor=reviewer,
+        action="rag_feedback_reviewed",
+        metadata={
+            "rag_response_id": str(feedback.rag_response_id),
+            "rag_query_id": str(feedback.rag_response.rag_query_id),
+            "doctor_id": str(feedback.doctor_id),
+            "rating": feedback.rating,
+            "is_safe": feedback.is_safe,
+            "needs_admin_review": feedback.needs_admin_review,
+            "review_status": review_status,
+        },
+        request=request,
+    )
+
+    return feedback
+
+
+def get_rag_feedback_summary() -> dict:
+    """Return simple aggregate counts for admin dashboards."""
+    from .models import RAGResponseFeedback
+
+    qs = RAGResponseFeedback.objects.all()
+    summary: dict = {"total": qs.count(), "by_rating": {}, "by_review_status": {}}
+
+    from apps.common.choices import RAGFeedbackRating, RAGFeedbackReviewStatus
+
+    for rating in RAGFeedbackRating.values:
+        summary["by_rating"][rating] = qs.filter(rating=rating).count()
+    for status in RAGFeedbackReviewStatus.values:
+        summary["by_review_status"][status] = qs.filter(review_status=status).count()
+
+    return summary

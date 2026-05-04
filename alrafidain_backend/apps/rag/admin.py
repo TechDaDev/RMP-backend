@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from .models import RAGQuery, RAGResponse, RAGRetrievedChunk
+from .models import (
+    RAGQuery,
+    RAGResponse,
+    RAGResponseFeedback,
+    RAGRetrievedChunk,
+    RAGRetrievedChunkFeedback,
+)
 
 
 @admin.register(RAGQuery)
@@ -30,5 +36,43 @@ class RAGResponseAdmin(admin.ModelAdmin):
     ]
     list_filter = ["status", "safety_level", "provider"]
     search_fields = ["response_text", "rag_query__query_text"]
+    readonly_fields = ["id", "created_at", "updated_at"]
+    ordering = ["-created_at"]
+
+
+class RAGRetrievedChunkFeedbackInline(admin.TabularInline):
+    model = RAGRetrievedChunkFeedback
+    extra = 0
+    readonly_fields = ["id", "retrieved_chunk", "relevance", "comment", "created_at"]
+    can_delete = False
+
+
+@admin.register(RAGResponseFeedback)
+class RAGResponseFeedbackAdmin(admin.ModelAdmin):
+    list_display = [
+        "id", "doctor", "rag_response", "rating",
+        "is_safe", "needs_admin_review", "review_status",
+        "reviewed_by", "created_at",
+    ]
+    list_filter = ["rating", "is_safe", "needs_admin_review", "review_status", "created_at"]
+    search_fields = [
+        "doctor__email",
+        "comment",
+        "review_notes",
+        "rag_response__response_text",
+    ]
+    readonly_fields = [
+        "id", "rag_response", "doctor", "rating", "is_safe", "needs_admin_review",
+        "created_at", "updated_at",
+    ]
+    ordering = ["-created_at"]
+    inlines = [RAGRetrievedChunkFeedbackInline]
+
+
+@admin.register(RAGRetrievedChunkFeedback)
+class RAGRetrievedChunkFeedbackAdmin(admin.ModelAdmin):
+    list_display = ["id", "feedback", "retrieved_chunk", "relevance", "created_at"]
+    list_filter = ["relevance"]
+    search_fields = ["feedback__doctor__email", "comment"]
     readonly_fields = ["id", "created_at", "updated_at"]
     ordering = ["-created_at"]

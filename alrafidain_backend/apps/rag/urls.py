@@ -1,12 +1,17 @@
 from django.urls import path
 
 from .views import (
+    AdminRAGFeedbackListView,
+    AdminRAGFeedbackReviewView,
     ConsultationRAGSupportView,
     DoctorGeneralRAGQueryView,
     LabResultRAGSupportView,
+    MyRAGFeedbackListView,
+    RAGResponseFeedbackCreateView,
 )
 
 urlpatterns = [
+    # Phase 12C — RAG queries
     path("doctor/query/", DoctorGeneralRAGQueryView.as_view(), name="rag-doctor-query"),
     path(
         "consultations/<uuid:consultation_id>/support/",
@@ -17,5 +22,26 @@ urlpatterns = [
         "lab-results/<uuid:lab_result_id>/support/",
         LabResultRAGSupportView.as_view(),
         name="rag-lab-result-support",
+    ),
+    # Phase 12D — Feedback
+    path(
+        "responses/<uuid:rag_response_id>/feedback/",
+        RAGResponseFeedbackCreateView.as_view(),
+        name="rag-response-feedback-create",
+    ),
+    path(
+        "feedback/my/",
+        MyRAGFeedbackListView.as_view(),
+        name="rag-feedback-my-list",
+    ),
+    path(
+        "admin/feedback/",
+        AdminRAGFeedbackListView.as_view(),
+        name="rag-admin-feedback-list",
+    ),
+    path(
+        "admin/feedback/<uuid:feedback_id>/review/",
+        AdminRAGFeedbackReviewView.as_view(),
+        name="rag-admin-feedback-review",
     ),
 ]

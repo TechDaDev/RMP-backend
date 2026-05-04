@@ -1030,4 +1030,148 @@ The requesting user must be the **ordering doctor** (`lab_result.doctor`) for th
 - DeepSeek is the only supported LLM provider.
 - Embeddings use `all-MiniLM-L6-v2` (384 dimensions via sentence-transformers).
 
+---
+
+## Phase 12D — AI Evaluation and Doctor Feedback
+
+Base prefix: `/api/rag/`
+
+Doctors can submit structured feedback on RAG responses they received. Staff can review flagged feedback.
+
+### POST `/api/rag/responses/<rag_response_id>/feedback/`
+
+Submit feedback on a RAG response.  
+**Permission:** Approved doctor (must own the RAG response — one feedback per response).
+
+**Request body:**
+
+```json
+{
+  "rating": "helpful | partially_helpful | not_helpful | unsafe",
+  "comment": "Optional free-text comment.",
+  "is_source_grounded": true,
+  "is_clinically_useful": true,
+  "is_safe": true,
+  "source_feedback": [
+    {
+      "retrieved_chunk_id": "<uuid>",
+      "relevance": "relevant | partially_relevant | not_relevant | unknown",
+      "comment": "Optional per-chunk comment."
+    }
+  ]
+}
+```
+
+**Response `201`:** `RAGResponseFeedback` object (see schema below).
+
+Rules:
+- Only the requesting doctor can submit feedback on their own RAG responses.
+- One feedback per RAG response (OneToOneField — 400 on duplicate).
+- `rating=unsafe` automatically sets `is_safe=false` and `needs_admin_review=true`.
+- `is_safe=false` automatically sets `needs_admin_review=true`.
+- Source chunk IDs must belong to the same RAG query (400 on mismatch).
+
+---
+
+### GET `/api/rag/feedback/my/`
+
+List own RAG feedback.  
+**Permission:** Approved doctor.
+
+**Query params:** `rating`, `review_status`, `needs_admin_review` (true/false).
+
+**Response `200`:** List of `RAGResponseFeedback` objects.
+
+---
+
+### GET `/api/rag/admin/feedback/`
+
+List all RAG feedback.  
+**Permission:** Staff / superuser only.
+
+**Query params:** `rating`, `review_status`, `is_safe` (true/false), `needs_admin_review` (true/false).
+
+**Response `200`:** List of `RAGResponseFeedback` objects.
+
+---
+
+### POST `/api/rag/admin/feedback/<feedback_id>/review/`
+
+Review (mark reviewed / dismissed / escalated) a RAG feedback item.  
+**Permission:** Staff / superuser only.
+
+**Request body:**
+
+```json
+{
+  "review_status": "reviewed | dismissed | escalated",
+  "review_notes": "Optional staff notes."
+}
+```
+
+**Response `200`:** Updated `RAGResponseFeedback` object.
+
+---
+
+### RAGResponseFeedback Schema
+
+```json
+{
+  "id": "<uuid>",
+  "rag_response_id": "<uuid>",
+  "doctor_email": "doctor@example.com",
+  "rating": "helpful",
+  "comment": "Very clear explanation.",
+  "is_source_grounded": true,
+  "is_clinically_useful": true,
+  "is_safe": true,
+  "needs_admin_review": false,
+  "review_status": "pending",
+  "reviewed_by_email": null,
+  "reviewed_at": null,
+  "review_notes": null,
+  "source_feedback": [
+    {
+      "id": "<uuid>",
+      "retrieved_chunk_id": "<uuid>",
+      "chunk_rank": 1,
+      "relevance": "relevant",
+      "comment": null,
+      "created_at": "2025-01-01T00:00:00Z"
+    }
+  ],
+  "created_at": "2025-01-01T00:00:00Z",
+  "updated_at": "2025-01-01T00:00:00Z"
+}
+```
+
+### Rating values
+
+| Value | Meaning |
+|---|---|
+| `helpful` | Answer was useful |
+| `partially_helpful` | Partially useful |
+| `not_helpful` | Not useful |
+| `unsafe` | Answer was unsafe — triggers admin review |
+
+### Review status values
+
+| Value | Meaning |
+|---|---|
+| `pending` | Not yet reviewed (default) |
+| `reviewed` | Staff reviewed and cleared |
+| `dismissed` | Staff dismissed (no action needed) |
+| `escalated` | Requires further escalation |
+
+### Phase 12D Audit events
+
+- `rag_feedback_submitted` — doctor submits feedback (rating, is_safe, needs_admin_review recorded)
+- `rag_feedback_reviewed` — staff completes a review action
+
+### Phase 12D Limitations
+
+- One feedback per RAG response (no editing after submission).
+- Prompt text and raw LLM response are not exposed via the feedback API.
+- RAG responses remain `patient_visible=false` regardless of feedback.
+
 
