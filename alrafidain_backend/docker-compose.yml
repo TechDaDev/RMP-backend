@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     container_name: alrafidain_postgres
     restart: unless-stopped
     environment:
@@ -8,7 +8,7 @@ services:
       POSTGRES_USER: alrafidain_user
       POSTGRES_PASSWORD: alrafidain_password
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - alrafidain_postgres_data:/var/lib/postgresql/data
 

@@ -310,3 +310,175 @@ def search_approved_chunks(
         request=request,
     )
     return results
+
+
+# ---------------------------------------------------------------------------
+# Phase 12B — Embedding services
+# ---------------------------------------------------------------------------
+
+def embed_knowledge_chunk(chunk, embedding_client=None):
+    """
+    Compute and store an embedding for a single KnowledgeChunk.
+
+    Requirements:
+    - chunk.document.approval_status == APPROVED
+    - chunk.is_active == True
+
+    Returns the updated chunk.
+    """
+    from django.conf import settings
+
+    from .embedding_client import get_default_embedding_client
+
+    if chunk.document.approval_status != KnowledgeApprovalStatus.APPROVED:
+        raise ValueError(
+            f"Cannot embed chunk {chunk.pk}: document is not approved."
+        )
+    if not chunk.is_active:
+        raise ValueError(f"Cannot embed chunk {chunk.pk}: chunk is inactive.")
+
+    client = embedding_client or get_default_embedding_client()
+    vector = client.embed_text(chunk.text)
+    model_name = getattr(settings, "EMBEDDING_MODEL_NAME", "unknown")
+
+    from django.utils import timezone
+
+    chunk.embedding = vector
+    chunk.embedding_model = model_name
+    chunk.embedded_at = timezone.now()
+    chunk.save(update_fields=["embedding", "embedding_model", "embedded_at", "updated_at"])
+    return chunk
+
+
+def embed_document_chunks(document, force: bool = False, embedding_client=None):
+    """
+    Embed all active chunks of an approved document.
+
+    Args:
+        document: KnowledgeDocument instance (must be APPROVED).
+        force: If True, re-embed chunks that already have embeddings.
+        embedding_client: Optional client; defaults to singleton.
+
+    Returns:
+        dict with keys: embedded (int), skipped (int), failed (int).
+    """
+    if document.approval_status != KnowledgeApprovalStatus.APPROVED:
+        raise ValueError("Document must be approved before embedding its chunks.")
+
+    qs = document.chunks.filter(is_active=True)
+    if not force:
+        qs = qs.filter(embedding__isnull=True)
+
+    results = {"embedded": 0, "skipped": 0, "failed": 0}
+    for chunk in qs:
+        try:
+            embed_knowledge_chunk(chunk, embedding_client=embedding_client)
+            results["embedded"] += 1
+        except Exception:
+            results["failed"] += 1
+
+    _log(
+        document,
+        "embed_chunks",
+        "success",
+        f"Embedded {results['embedded']}, skipped {results['skipped']}, failed {results['failed']}.",
+        results,
+    )
+    return results
+
+
+def embed_all_approved_chunks(force: bool = False, limit: int | None = None, embedding_client=None):
+    """
+    Embed chunks across all approved, active documents.
+
+    Returns total counts dict.
+    """
+    from .models import KnowledgeDocument
+
+    qs = KnowledgeDocument.objects.filter(
+        approval_status=KnowledgeApprovalStatus.APPROVED,
+        is_active=True,
+    )
+    if limit:
+        qs = qs[:limit]
+
+    totals = {"embedded": 0, "skipped": 0, "failed": 0}
+    for document in qs:
+        result = embed_document_chunks(document, force=force, embedding_client=embedding_client)
+        for key in totals:
+            totals[key] += result[key]
+    return totals
+
+
+def semantic_search_approved_chunks(
+    query: str,
+    document_type: str | None = None,
+    specialty: str | None = None,
+    language: str | None = None,
+    audience: str | None = None,
+    limit: int = 10,
+    embedding_client=None,
+    actor=None,
+    request=None,
+):
+    """
+    Perform semantic (vector cosine) search over embedded, approved, active chunks.
+
+    Returns a list of dicts: [{chunk, score, distance, rank}].
+    """
+    from pgvector.django import CosineDistance
+
+    from .embedding_client import get_default_embedding_client
+    from .models import KnowledgeChunk
+
+    client = embedding_client or get_default_embedding_client()
+    query_vector = client.embed_text(query)
+
+    qs = KnowledgeChunk.objects.filter(
+        is_active=True,
+        embedding__isnull=False,
+        document__approval_status=KnowledgeApprovalStatus.APPROVED,
+        document__is_active=True,
+    ).select_related("document")
+
+    if document_type:
+        qs = qs.filter(document__document_type=document_type)
+    if specialty:
+        qs = qs.filter(document__specialty=specialty)
+    if language:
+        qs = qs.filter(document__language=language)
+    if audience:
+        qs = qs.filter(document__audience=audience)
+
+    qs = qs.annotate(distance=CosineDistance("embedding", query_vector)).order_by("distance")[
+        :limit
+    ]
+
+    results = []
+    for rank, chunk in enumerate(qs, start=1):
+        results.append(
+            {
+                "chunk": chunk,
+                "distance": float(chunk.distance),
+                "score": round(1.0 - float(chunk.distance), 6),
+                "rank": rank,
+            }
+        )
+
+    if actor is not None:
+        create_audit_log(
+            actor=actor,
+            action="knowledge_semantic_search_performed",
+            metadata={
+                "query": query,
+                "document_type": document_type,
+                "specialty": specialty,
+                "language": language,
+                "audience": audience,
+                "result_count": len(results),
+            },
+            request=request,
+        )
+
+    return results
+

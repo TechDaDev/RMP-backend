@@ -18,13 +18,17 @@ from .serializers import (
     KnowledgeDocumentRejectSerializer,
     KnowledgeDocumentSerializer,
     KnowledgeDocumentUploadSerializer,
+    SemanticSearchResultSerializer,
+    SemanticSearchSerializer,
 )
 from .services import (
     approve_knowledge_document,
     archive_knowledge_document,
+    embed_document_chunks,
     process_knowledge_document,
     reject_knowledge_document,
     search_approved_chunks,
+    semantic_search_approved_chunks,
 )
 
 
@@ -241,3 +245,86 @@ class KnowledgeChunkSearchView(APIView):
             request=request,
         )
         return success_response(data=KnowledgeChunkSerializer(chunks, many=True).data)
+
+
+@extend_schema(tags=["Knowledge Base"])
+class KnowledgeDocumentEmbedView(APIView):
+    """POST /api/knowledge-base/documents/<uuid:document_id>/embed/"""
+
+    permission_classes = [IsStaffOrSuperuser]
+
+    def post(self, request, document_id):
+        document = get_object_or_404(KnowledgeDocument, pk=document_id)
+        force = str(request.data.get("force", "false")).lower() in ("1", "true", "yes")
+        try:
+            result = embed_document_chunks(document, force=force)
+        except ValueError as exc:
+            return error_response(message=str(exc))
+
+        create_audit_log(
+            actor=request.user,
+            action="knowledge_document_embedded",
+            target=document,
+            metadata={
+                "document_id": str(document.pk),
+                "force": force,
+                **result,
+            },
+            request=request,
+        )
+        return success_response(data=result)
+
+
+@extend_schema(
+    tags=["Knowledge Base"],
+    parameters=[
+        OpenApiParameter("q", str, description="Semantic search query"),
+        OpenApiParameter("document_type", str, required=False),
+        OpenApiParameter("specialty", str, required=False),
+        OpenApiParameter("language", str, required=False),
+        OpenApiParameter("audience", str, required=False),
+        OpenApiParameter("limit", int, required=False),
+    ],
+)
+class KnowledgeChunkSemanticSearchView(APIView):
+    """GET /api/knowledge-base/chunks/semantic-search/?q=..."""
+
+    permission_classes = [IsStaffOrSuperuser]
+
+    def get(self, request):
+        serializer = SemanticSearchSerializer(data=request.query_params)
+        if not serializer.is_valid():
+            return error_response(errors=serializer.errors)
+
+        data = serializer.validated_data
+        hits = semantic_search_approved_chunks(
+            query=data["q"],
+            document_type=data.get("document_type") or None,
+            specialty=data.get("specialty") or None,
+            language=data.get("language") or None,
+            audience=data.get("audience") or None,
+            limit=data.get("limit", 10),
+            actor=request.user,
+            request=request,
+        )
+
+        output = [
+            {
+                "chunk_id": str(hit["chunk"].pk),
+                "document_id": str(hit["chunk"].document_id),
+                "document_title": hit["chunk"].document.title,
+                "document_type": hit["chunk"].document.document_type,
+                "language": hit["chunk"].document.language,
+                "text": hit["chunk"].text,
+                "chunk_index": hit["chunk"].chunk_index,
+                "score": hit["score"],
+                "distance": hit["distance"],
+                "rank": hit["rank"],
+                "embedding_model": hit["chunk"].embedding_model,
+            }
+            for hit in hits
+        ]
+        return success_response(
+            data=SemanticSearchResultSerializer(output, many=True).data
+        )
+

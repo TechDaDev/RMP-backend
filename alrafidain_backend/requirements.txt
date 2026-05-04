@@ -12,3 +12,6 @@ django-extensions
 pydot
 pypdf
 python-docx
+pgvector
+sentence-transformers
+numpy

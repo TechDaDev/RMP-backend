@@ -23,6 +23,8 @@ class KnowledgeProcessingLogSerializer(serializers.ModelSerializer):
 
 
 class KnowledgeChunkSerializer(serializers.ModelSerializer):
+    has_embedding = serializers.BooleanField(read_only=True)
+
     class Meta:
         model = KnowledgeChunk
         fields = [
@@ -35,6 +37,9 @@ class KnowledgeChunkSerializer(serializers.ModelSerializer):
             "token_estimate",
             "metadata",
             "is_active",
+            "has_embedding",
+            "embedding_model",
+            "embedded_at",
             "created_at",
         ]
 
@@ -177,3 +182,39 @@ class KnowledgeChunkSearchSerializer(serializers.Serializer):
         choices=KnowledgeLanguage.choices, required=False, allow_blank=True
     )
     limit = serializers.IntegerField(required=False, min_value=1, max_value=50, default=10)
+
+
+class SemanticSearchSerializer(serializers.Serializer):
+    """Input serializer for semantic (vector) search."""
+
+    q = serializers.CharField(required=True, min_length=1, max_length=500)
+    document_type = serializers.ChoiceField(
+        choices=KnowledgeDocumentType.choices, required=False, allow_blank=True
+    )
+    specialty = serializers.ChoiceField(
+        choices=MedicalSpecialty.choices, required=False, allow_blank=True
+    )
+    language = serializers.ChoiceField(
+        choices=KnowledgeLanguage.choices, required=False, allow_blank=True
+    )
+    audience = serializers.ChoiceField(
+        choices=KnowledgeAudience.choices, required=False, allow_blank=True
+    )
+    limit = serializers.IntegerField(required=False, min_value=1, max_value=50, default=10)
+
+
+class SemanticSearchResultSerializer(serializers.Serializer):
+    """Output serializer for a single semantic search hit."""
+
+    chunk_id = serializers.UUIDField()
+    document_id = serializers.UUIDField()
+    document_title = serializers.CharField()
+    document_type = serializers.CharField()
+    language = serializers.CharField()
+    text = serializers.CharField()
+    chunk_index = serializers.IntegerField()
+    score = serializers.FloatField()
+    distance = serializers.FloatField()
+    rank = serializers.IntegerField()
+    embedding_model = serializers.CharField(allow_null=True)
+

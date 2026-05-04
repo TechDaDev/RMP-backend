@@ -143,3 +143,14 @@ AUTH_USER_MODEL = "accounts.User"
 
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = "noreply@alrafidain.local"
+
+# ── Embedding settings ──────────────────────────────────────────────────────
+EMBEDDING_MODEL_NAME = config(
+    "EMBEDDING_MODEL_NAME",
+    default="sentence-transformers/all-MiniLM-L6-v2",
+)
+EMBEDDING_VECTOR_DIMENSION = config(
+    "EMBEDDING_VECTOR_DIMENSION",
+    default=384,
+    cast=int,
+)

@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from pgvector.django import VectorField
 
 from apps.common.choices import (
     KnowledgeApprovalStatus,
@@ -101,6 +102,16 @@ class KnowledgeChunk(BaseModel):
     token_estimate = models.PositiveIntegerField(blank=True, null=True)
     metadata = models.JSONField(default=dict)
     is_active = models.BooleanField(default=True)
+
+    # Embedding fields (Phase 12B)
+    embedding = VectorField(dimensions=384, null=True, blank=True)
+    embedding_model = models.CharField(max_length=200, blank=True, null=True)
+    embedded_at = models.DateTimeField(null=True, blank=True)
+    embedding_metadata = models.JSONField(default=dict)
+
+    @property
+    def has_embedding(self):
+        return self.embedding is not None
 
     class Meta:
         ordering = ["document", "chunk_index"]

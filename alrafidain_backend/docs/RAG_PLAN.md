@@ -44,26 +44,27 @@ These principles apply across all RAG phases:
 
 ---
 
-## Phase 12B — pgvector Embeddings and Retrieval
+## Phase 12B — pgvector Embeddings and Retrieval ✅ Complete
 
 **Goal**: Add semantic vector search to knowledge chunks.
 
-**Planned work:**
+**What was built:**
 
-- Add `pgvector` Django extension to PostgreSQL
-- Add `embedding` field (vector) to `KnowledgeChunk`
-- Integrate an embedding model (e.g., sentence-transformers or OpenAI embeddings)
-- Create a service: `embed_knowledge_chunk(chunk)` → generates and stores vector
-- Create a service: `semantic_search_chunks(query_vector, top_k)` → cosine similarity search
-- Create a background task (Celery): auto-embed chunks on approval
-- Update chunk search endpoint to support `mode=semantic` vs `mode=keyword`
-- Migration: add vector column to `knowledge_base_knowledgechunk`
+- `pgvector/pgvector:pg16` Docker image; migration 0002 enables `vector` extension in PostgreSQL
+- New fields on `KnowledgeChunk`: `embedding` (VectorField, dim=384), `embedding_model`, `embedded_at`, `embedding_metadata`; `has_embedding` property
+- `apps/knowledge_base/embedding_client.py` — `LocalEmbeddingClient` using `sentence-transformers/all-MiniLM-L6-v2` (lazy-loaded, normalised embeddings)
+- Services: `embed_knowledge_chunk`, `embed_document_chunks`, `embed_all_approved_chunks`, `semantic_search_approved_chunks` (CosineDistance via pgvector)
+- API endpoint: `POST /api/knowledge-base/documents/<id>/embed/` — embed all active chunks of an approved document
+- API endpoint: `GET /api/knowledge-base/chunks/semantic-search/?q=...` — semantic search over embedded approved chunks
+- Management command: `python manage.py embed_knowledge_base [--document-id <uuid>] [--force] [--limit N]`
+- Settings: `EMBEDDING_MODEL_NAME`, `EMBEDDING_VECTOR_DIMENSION`
+- 37 new tests (385 total); all embedding tests mock the client — no real model loaded in CI
 
-**Dependencies:**
-- `pgvector` (PostgreSQL extension)
-- `django-pgvector` or `pgvector-python`
-- Celery + Redis (for async embedding)
-- Embedding model (TBD)
+**Constraints respected:**
+- Only approved + active documents/chunks are eligible for embedding and retrieval
+- Raw embedding vectors are never exposed in API responses
+- No patient-facing AI; staff/superuser only
+- Processing is synchronous (no Celery)
 
 ---
 
