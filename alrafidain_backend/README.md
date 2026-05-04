@@ -1,5 +1,7 @@
 # Al-Rafidain Medical Platform — Backend
 
+**Current backend MVP version: v0.1.0**
+
 A production-oriented Django REST Framework backend for a medical platform serving patients, doctors, pharmacists, and laboratorians in Iraq.
 
 ---

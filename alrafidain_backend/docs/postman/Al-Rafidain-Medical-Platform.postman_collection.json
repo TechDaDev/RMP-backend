@@ -1,0 +1,675 @@
+{
+  "info": {
+    "_postman_id": "rmp-mvp-v0.1.0",
+    "name": "Al-Rafidain Medical Platform v0.1.0",
+    "description": "Core API flows for the Al-Rafidain Medical Platform MVP backend.\n\n**Before running:**\n1. Import the companion environment file.\n2. Run the 'Login (Doctor)' request — the test script saves `access_token` automatically.\n3. Execute folders in order or pick individual requests.\n\n**Seeded demo credentials** are in docs/SEEDING.md.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [],
+  "item": [
+    {
+      "name": "00 · Health & Schema",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/health/",
+            "description": "Returns service name, status, and current API version. No auth required."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('status ok', () => pm.expect(pm.response.json().status).to.eql('ok'));",
+                  "pm.test('version present', () => pm.expect(pm.response.json().version).to.eql('0.1.0'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "OpenAPI Schema (YAML)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/schema/",
+            "description": "Returns the live OpenAPI 3.0 YAML schema."
+          }
+        },
+        {
+          "name": "Swagger UI",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/docs/",
+            "description": "Swagger interactive docs (browser)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 · Auth",
+      "item": [
+        {
+          "name": "Register (Patient)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/accounts/register/",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"newpatient@example.com\",\n  \"password\": \"TestPass123!\",\n  \"first_name\": \"New\",\n  \"last_name\": \"Patient\",\n  \"user_type\": \"patient\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Verify OTP",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/accounts/verify-otp/",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"newpatient@example.com\",\n  \"otp\": \"123456\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Login (Doctor) — saves token",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/accounts/login/",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{doctor_email}}\",\n  \"password\": \"{{demo_password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const d = pm.response.json();",
+                  "if (d.data && d.data.tokens) {",
+                  "  pm.environment.set('access_token', d.data.tokens.access);",
+                  "  pm.environment.set('refresh_token', d.data.tokens.refresh);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Login (Patient) — saves token",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/accounts/login/",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{patient_email}}\",\n  \"password\": \"{{demo_password}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const d = pm.response.json();",
+                  "if (d.data && d.data.tokens) {",
+                  "  pm.environment.set('access_token', d.data.tokens.access);",
+                  "  pm.environment.set('refresh_token', d.data.tokens.refresh);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Token Refresh",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/accounts/token/refresh/",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{refresh_token}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const d = pm.response.json();",
+                  "if (d.access) pm.environment.set('access_token', d.access);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/accounts/logout/",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh\": \"{{refresh_token}}\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/accounts/change-password/",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"old_password\": \"{{demo_password}}\",\n  \"new_password\": \"NewPass456!\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 · Profiles",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/profiles/me/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        },
+        {
+          "name": "Update My Profile",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/profiles/me/",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone_number\": \"+9647801234567\",\n  \"city\": \"Baghdad\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 · Consultations",
+      "item": [
+        {
+          "name": "Create Consultation (Patient)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/consultations/request/",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"selected_specialty\": \"general_medicine\",\n  \"duration\": \"less_than_24_hours\",\n  \"severity\": \"mild\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const d = pm.response.json();",
+                  "if (d.data && d.data.id) pm.environment.set('consultation_id', d.data.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "List My Consultations",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/consultations/my/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        },
+        {
+          "name": "Doctor — Accept Consultation",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/consultations/{{consultation_id}}/accept/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        },
+        {
+          "name": "Get Consultation Detail",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/consultations/{{consultation_id}}/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        },
+        {
+          "name": "Close Consultation (Doctor)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/consultations/{{consultation_id}}/close/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 · Messaging",
+      "item": [
+        {
+          "name": "List Messages in Consultation",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/consultations/{{consultation_id}}/messages/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        },
+        {
+          "name": "Send Text Message",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/consultations/{{consultation_id}}/messages/",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message_type\": \"text\",\n  \"content\": \"Hello, how can I help you today?\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 · Prescriptions",
+      "item": [
+        {
+          "name": "Create Prescription (Doctor)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/prescriptions/create/",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"consultation\": \"{{consultation_id}}\",\n  \"notes\": \"Take with food.\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const d = pm.response.json();",
+                  "if (d.data && d.data.id) pm.environment.set('prescription_id', d.data.id);",
+                  "if (d.data && d.data.qr_token) pm.environment.set('prescription_qr_token', d.data.qr_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Patient — List My Prescriptions",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/prescriptions/my/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        },
+        {
+          "name": "Pharmacist — Scan QR Token",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/prescriptions/scan/{{prescription_qr_token}}/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        },
+        {
+          "name": "Pharmacist — Mark Dispensed",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/prescriptions/{{prescription_id}}/dispense/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 · Lab Orders",
+      "item": [
+        {
+          "name": "Create Lab Order (Doctor)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/lab-orders/create/",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"consultation\": \"{{consultation_id}}\",\n  \"notes\": \"Fasting required.\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const d = pm.response.json();",
+                  "if (d.data && d.data.id) pm.environment.set('lab_order_id', d.data.id);",
+                  "if (d.data && d.data.qr_token) pm.environment.set('lab_order_qr_token', d.data.qr_token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Laboratorian — Scan QR Token",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/lab-orders/scan/{{lab_order_qr_token}}/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 · Lab Results",
+      "item": [
+        {
+          "name": "Create Lab Result (Laboratorian)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/lab-orders/{{lab_order_id}}/results/",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"result_summary\": \"All values normal.\",\n  \"notes\": \"\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const d = pm.response.json();",
+                  "if (d.data && d.data.id) pm.environment.set('lab_result_id', d.data.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Doctor — Review Lab Result",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/lab-orders/results/{{lab_result_id}}/review/",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"doctor_notes\": \"Results look normal. No action needed.\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Doctor — Release Lab Result to Patient",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/lab-orders/results/{{lab_result_id}}/release/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        },
+        {
+          "name": "Patient — List My Lab Results",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/lab-orders/my/results/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 · Patient Records",
+      "item": [
+        {
+          "name": "Get My Patient Record",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/patient-records/my/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        },
+        {
+          "name": "Doctor — View Patient Record",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/patient-records/doctor/view/",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"consultation_id\": \"{{consultation_id}}\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 · Notifications",
+      "item": [
+        {
+          "name": "List Notifications",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/notifications/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        },
+        {
+          "name": "Mark Notification as Read",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/notifications/{{notification_id}}/read/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        },
+        {
+          "name": "Mark All Notifications as Read",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/notifications/read-all/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 · Knowledge Base (Staff)",
+      "item": [
+        {
+          "name": "Upload Document",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/knowledge-base/documents/upload/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "title", "value": "Test Document", "type": "text" },
+                { "key": "document_type", "value": "guideline", "type": "text" },
+                { "key": "file", "src": "", "type": "file" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const d = pm.response.json();",
+                  "if (d.data && d.data.id) pm.environment.set('knowledge_doc_id', d.data.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "List Documents",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/knowledge-base/documents/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        },
+        {
+          "name": "Process Document",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/knowledge-base/documents/{{knowledge_doc_id}}/process/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        },
+        {
+          "name": "Approve Document",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/knowledge-base/documents/{{knowledge_doc_id}}/approve/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 · RAG — Doctor Queries",
+      "item": [
+        {
+          "name": "Doctor RAG Query",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/rag/doctor/query/",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query_text\": \"What are the first-line treatments for hypertension?\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const d = pm.response.json();",
+                  "if (d.id) pm.environment.set('rag_response_id', d.id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "RAG Feedback — Submit",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/rag/doctor/feedback/",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rag_response\": \"{{rag_response_id}}\",\n  \"rating\": 5,\n  \"comment\": \"Very helpful response.\"\n}"
+            }
+          }
+        },
+        {
+          "name": "RAG Feedback — List My Feedback",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/rag/doctor/feedback/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 · RAG — Admin",
+      "item": [
+        {
+          "name": "Admin — List All Feedback",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/rag/admin/feedback/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        },
+        {
+          "name": "Admin — Analytics Summary",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/rag/admin/analytics/summary/",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }]
+          }
+        },
+        {
+          "name": "Admin — Export Training Dataset",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/rag/admin/exports/dataset/",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{access_token}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"format\": \"json\"\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
