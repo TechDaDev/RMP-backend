@@ -45,28 +45,25 @@ Register a new user account.
 
 - **Auth required**: No
 - **Allowed roles**: Public
-- **Purpose**: Create a new account (patient, doctor, pharmacist, or laboratorian)
+- **Purpose**: Create a new account (patient, doctor, pharmacist, or laboratorian). Account is inactive until the email OTP is verified.
 
 **Request body:**
 ```json
 {
   "email": "user@example.com",
   "password": "SecurePass123!",
-  "full_name": "John Doe",
+  "password_confirm": "SecurePass123!",
+  "first_name": "John",
+  "last_name": "Doe",
   "user_type": "patient"
 }
 ```
 
-**Response:**
+**Response `201`:**
 ```json
 {
   "status": "success",
-  "data": {
-    "id": "uuid",
-    "email": "user@example.com",
-    "full_name": "John Doe",
-    "user_type": "patient"
-  }
+  "message": "Registration successful. Check your email for the activation OTP."
 }
 ```
 
@@ -87,72 +84,104 @@ Obtain JWT token pair.
 }
 ```
 
-**Response:**
+**Response `200`:**
 ```json
 {
   "status": "success",
   "data": {
     "access": "<jwt_access_token>",
-    "refresh": "<jwt_refresh_token>"
+    "refresh": "<jwt_refresh_token>",
+    "user": {
+      "id": "uuid",
+      "email": "user@example.com",
+      "first_name": "John",
+      "last_name": "Doe",
+      "full_name": "John Doe",
+      "user_type": "patient",
+      "is_active": true,
+      "date_joined": "2025-01-01T00:00:00Z"
+    }
   }
 }
 ```
 
 ---
 
-### `POST /api/accounts/token/refresh/`
+### `POST /api/accounts/activate/`
 
-Refresh access token using refresh token.
+Activate account using the OTP sent to email at registration.
 
 - **Auth required**: No
 
 **Request body:**
 ```json
 {
-  "refresh": "<jwt_refresh_token>"
+  "email": "user@example.com",
+  "code": "123456"
 }
 ```
+
+**Response `200`:** `{ "status": "success", "message": "Account activated successfully." }`
+
+---
+
+### `POST /api/accounts/resend-activation-otp/`
+
+Resend the activation OTP email.
+
+- **Auth required**: No
+
+**Request body:**
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+**Response `200`:** Generic message (always returns success to prevent user enumeration).
+
+---
+
+### `POST /api/accounts/password-reset/request/`
+
+Request a password reset OTP.
+
+- **Auth required**: No
+
+**Request body:**
+```json
+{
+  "email": "user@example.com"
+}
+```
+
+**Response `200`:** Generic message (always returns success to prevent user enumeration).
+
+---
+
+### `POST /api/accounts/password-reset/confirm/`
+
+Reset password using the OTP.
+
+- **Auth required**: No
+
+**Request body:**
+```json
+{
+  "email": "user@example.com",
+  "code": "123456",
+  "new_password": "NewPass123!",
+  "new_password_confirm": "NewPass123!"
+}
+```
+
+**Response `200`:** `{ "status": "success", "message": "Password reset successful." }`
 
 ---
 
 ### `GET /api/accounts/me/`
 
 Get current authenticated user.
-
-- **Auth required**: Yes
-- **Allowed roles**: All
-
----
-
-### `POST /api/accounts/change-password/`
-
-Change account password.
-
-- **Auth required**: Yes
-- **Allowed roles**: All
-
-**Request body:**
-```json
-{
-  "old_password": "...",
-  "new_password": "..."
-}
-```
-
----
-
-### `POST /api/accounts/deactivate/`
-
-Deactivate current account.
-
-- **Auth required**: Yes
-- **Allowed roles**: All (self-deactivation only)
-
----
-
-### `POST /api/accounts/request-deletion/`
-
-Request permanent account deletion.
 
 - **Auth required**: Yes
 - **Allowed roles**: All
@@ -171,7 +200,7 @@ Get the full profile of the current user.
 
 ---
 
-### `PUT/PATCH /api/profiles/user/`
+### `PUT/PATCH /api/profiles/me/user-profile/`
 
 Update UserProfile (phone, gender, DOB, address, etc.).
 
@@ -180,7 +209,7 @@ Update UserProfile (phone, gender, DOB, address, etc.).
 
 ---
 
-### `PUT/PATCH /api/profiles/patient/`
+### `PUT/PATCH /api/profiles/me/patient/`
 
 Update patient-specific profile fields.
 
@@ -189,7 +218,7 @@ Update patient-specific profile fields.
 
 ---
 
-### `PUT/PATCH /api/profiles/doctor/`
+### `PUT/PATCH /api/profiles/me/doctor/`
 
 Update doctor profile (specialty, license, bio, etc.).
 
@@ -198,7 +227,7 @@ Update doctor profile (specialty, license, bio, etc.).
 
 ---
 
-### `PUT/PATCH /api/profiles/pharmacist/`
+### `PUT/PATCH /api/profiles/me/pharmacist/`
 
 Update pharmacist profile (license, pharmacy info).
 
@@ -207,7 +236,7 @@ Update pharmacist profile (license, pharmacy info).
 
 ---
 
-### `PUT/PATCH /api/profiles/laboratorian/`
+### `PUT/PATCH /api/profiles/me/laboratorian/`
 
 Update laboratorian profile (license, lab info).
 
@@ -218,18 +247,18 @@ Update laboratorian profile (license, lab info).
 
 ## Consultations
 
-### `GET /api/consultations/symptoms/`
+### `GET /api/consultations/symptom-categories/`
 
-List all active symptom categories and symptoms.
+List all active symptom categories.
 
 - **Auth required**: Yes
 - **Allowed roles**: All
 
 ---
 
-### `GET /api/consultations/symptoms/<id>/`
+### `GET /api/consultations/symptoms/`
 
-Get symptom detail including specialty rules.
+List all active symptoms (filterable by `?category=<id>` and `?is_red_flag=true`).
 
 - **Auth required**: Yes
 - **Allowed roles**: All
@@ -276,9 +305,18 @@ Get consultation detail.
 
 ---
 
-### `GET /api/consultations/pending/`
+### `GET /api/consultations/doctor/pending/`
 
 List pending consultations matching doctor's specialty.
+
+- **Auth required**: Yes
+- **Allowed roles**: Doctor
+
+---
+
+### `GET /api/consultations/doctor/assigned/`
+
+List consultations assigned to the doctor.
 
 - **Auth required**: Yes
 - **Allowed roles**: Doctor
@@ -294,7 +332,7 @@ Accept a consultation request.
 
 ---
 
-### `POST /api/consultations/<id>/respond/`
+### `POST /api/consultations/<id>/responses/`
 
 Submit a doctor's medical response.
 
@@ -305,7 +343,7 @@ Submit a doctor's medical response.
 ```json
 {
   "response_text": "Based on your symptoms...",
-  "recommendation": "needs_lab_test"
+  "recommendation_type": "needs_lab_test"
 }
 ```
 
@@ -324,7 +362,7 @@ Close a consultation.
 
 ### `GET /api/consultations/<id>/messages/`
 
-List messages in a consultation thread.
+List messages in a consultation thread. Also marks incoming unread messages as read.
 
 - **Auth required**: Yes
 - **Allowed roles**: Patient (own), Doctor (assigned)
@@ -341,16 +379,18 @@ Send a message in a consultation.
 **Request body (multipart for attachments):**
 ```json
 {
-  "content": "Can you clarify something?",
-  "message_type": "text"
+  "body": "Can you clarify something?",
+  "attachments": []
 }
 ```
 
+**Note**: `body` or at least one attachment is required.
+
 ---
 
-### `GET /api/consultations/<id>/messages/<msg_id>/`
+### `POST /api/consultations/<id>/messages/mark-read/`
 
-Get message detail.
+Mark all unread messages in this consultation as read (for the requesting user).
 
 - **Auth required**: Yes
 - **Allowed roles**: Patient (own), Doctor (assigned)
@@ -359,9 +399,9 @@ Get message detail.
 
 ## Prescriptions
 
-### `POST /api/prescriptions/`
+### `POST /api/consultations/<consultation_id>/prescriptions/`
 
-Create a new prescription.
+Create a new prescription for a consultation.
 
 - **Auth required**: Yes
 - **Allowed roles**: Doctor (approved, assigned to consultation)
@@ -369,14 +409,15 @@ Create a new prescription.
 **Request body:**
 ```json
 {
-  "consultation_id": "uuid",
   "items": [
     {
       "medication_name": "Amoxicillin",
-      "dosage": "500mg",
+      "strength": "500mg",
+      "dosage": "1 capsule",
       "frequency": "3x daily",
-      "duration_days": 7,
+      "duration": "7 days",
       "route": "oral",
+      "quantity": "21 capsules",
       "instructions": "After meals"
     }
   ]
@@ -396,21 +437,30 @@ List patient's own prescriptions (items hidden).
 
 ---
 
-### `GET /api/prescriptions/<id>/`
+### `GET /api/prescriptions/my/<id>/`
 
-Get prescription detail.
+Get prescription detail for patient (items hidden).
 
 - **Auth required**: Yes
-- **Allowed roles**: Doctor (issuer), Patient (own, items hidden)
+- **Allowed roles**: Patient (own)
 
 ---
 
-### `GET /api/prescriptions/doctor/`
+### `GET /api/prescriptions/doctor/<id>/`
 
-List prescriptions issued by the doctor.
+Get full prescription detail including medication items.
 
 - **Auth required**: Yes
-- **Allowed roles**: Doctor
+- **Allowed roles**: Doctor (issuer)
+
+---
+
+### `POST /api/prescriptions/doctor/<id>/cancel/`
+
+Cancel a prescription (only if no items have been dispensed yet).
+
+- **Auth required**: Yes
+- **Allowed roles**: Doctor (issuer)
 
 ---
 
@@ -428,7 +478,7 @@ Pharmacist scans QR token to access pending prescription items.
 }
 ```
 
-**Response**: Returns only `pending` items for this prescription.
+**Response**: Returns `prescription` metadata and only `pending` items for the scanned prescription. Also returns `locked: true` if the prescription is no longer dispensable.
 
 ---
 
@@ -445,20 +495,19 @@ Record dispensing of scanned prescription items.
   "items": [
     {
       "prescription_item_id": "uuid",
-      "status": "dispensed"
+      "status": "dispensed",
+      "dispensed_quantity": "21 capsules",
+      "note": ""
     }
   ]
 }
 ```
 
+**Response**: Same shape as scan response (updated `prescription` + remaining `pending` items).
+
 ---
 
-### `GET /api/prescriptions/<id>/qr/`
-
-Get QR token for a prescription (for patient to present to pharmacist).
-
-- **Auth required**: Yes
-- **Allowed roles**: Patient (own)
+> **Note**: There is no `GET /api/prescriptions/<id>/qr/` endpoint. Patients present the `qr_token` field from their own prescription detail response directly to the pharmacist.
 
 ---
 
@@ -491,12 +540,12 @@ Mark all unread notifications as read.
 
 ---
 
-### `DELETE /api/notifications/<id>/`
+### `GET /api/notifications/unread-count/`
 
-Delete a notification.
+Get the count of unread notifications for the current user.
 
 - **Auth required**: Yes
-- **Allowed roles**: All (own notifications)
+- **Allowed roles**: All
 
 ---
 
@@ -511,7 +560,7 @@ Get the current patient's medical record with entries.
 
 ---
 
-### `GET /api/patient-records/doctor/<patient_id>/`
+### `GET /api/patient-records/patients/<patient_id>/`
 
 Get a patient's medical record (doctor view).
 
@@ -520,24 +569,24 @@ Get a patient's medical record (doctor view).
 
 ---
 
-### `POST /api/patient-records/entries/`
+### `POST /api/patient-records/<record_id>/entries/`
 
 Create a new medical record entry.
 
 - **Auth required**: Yes
-- **Allowed roles**: Patient (self-reported), Doctor (doctor-confirmed for assigned patient)
+- **Allowed roles**: Patient (self-reported for own record), Doctor (for an authorized patient's record)
 
 **Request body:**
 ```json
 {
   "category": "chronic_condition",
   "title": "Type 2 Diabetes",
-  "description": "Diagnosed 2020",
-  "patient_id": "uuid"
+  "value": "Diagnosed 2020",
+  "notes": "Optional additional notes"
 }
 ```
 
-> **Note**: Patients cannot set `verification_status` or `source_role` — these are controlled by the system.
+> **Note**: Patients cannot set `verification_status`, `source_role`, `verified_by`, or `is_active` — these are controlled by the system. The `record_id` in the URL must be the patient's own record.
 
 ---
 
@@ -551,9 +600,12 @@ Doctor confirms or rejects a patient-submitted medical record entry.
 **Request body:**
 ```json
 {
-  "action": "confirm"
+  "verification_status": "doctor_confirmed",
+  "notes": "Confirmed via consultation review."
 }
 ```
+
+> `verification_status` accepts `"doctor_confirmed"` or `"rejected"`.
 
 ---
 
@@ -564,25 +616,33 @@ Deactivate (soft-delete) a medical record entry.
 - **Auth required**: Yes
 - **Allowed roles**: Patient (own), Doctor (authorized)
 
----
-
-### `POST /api/patient-records/blood-group/`
-
-Set or update blood group for a patient.
-
-- **Auth required**: Yes
-- **Allowed roles**: Patient (self-reported), Doctor
-
 **Request body:**
 ```json
 {
-  "blood_group": "o_positive"
+  "notes": "Optional reason for deactivation"
 }
 ```
 
 ---
 
-### `POST /api/patient-records/blood-group/lab-verify/`
+### `POST /api/patient-records/<record_id>/blood-group/`
+
+Set or update blood group for a patient.
+
+- **Auth required**: Yes
+- **Allowed roles**: Patient (self-reported for own record), Doctor
+
+**Request body:**
+```json
+{
+  "blood_group": "o_positive",
+  "notes": ""
+}
+```
+
+---
+
+### `POST /api/patient-records/patients/<patient_id>/blood-group/verify/`
 
 Laboratory-confirmed blood group update.
 
@@ -593,7 +653,16 @@ Laboratory-confirmed blood group update.
 
 ## Lab Orders
 
-### `POST /api/lab-orders/`
+### `GET /api/lab-orders/tests/`
+
+List available lab tests in the catalog (filterable by `?category=` and `?search=`).
+
+- **Auth required**: Yes
+- **Allowed roles**: All
+
+---
+
+### `POST /api/consultations/<consultation_id>/lab-orders/`
 
 Create a new lab order linked to a consultation.
 
@@ -603,7 +672,6 @@ Create a new lab order linked to a consultation.
 **Request body:**
 ```json
 {
-  "consultation_id": "uuid",
   "items": [
     {
       "lab_test_id": "uuid",
@@ -626,21 +694,30 @@ List patient's own lab orders.
 
 ---
 
-### `GET /api/lab-orders/<id>/`
+### `GET /api/lab-orders/my/<id>/`
 
-Get lab order detail.
+Get patient's own lab order detail (items hidden).
 
 - **Auth required**: Yes
-- **Allowed roles**: Doctor (issuer), Patient (own, items hidden)
+- **Allowed roles**: Patient (own)
 
 ---
 
-### `GET /api/lab-orders/doctor/`
+### `GET /api/lab-orders/doctor/<id>/`
 
-List all lab orders issued by the doctor.
+Get full lab order detail including test items.
 
 - **Auth required**: Yes
-- **Allowed roles**: Doctor
+- **Allowed roles**: Doctor (issuer)
+
+---
+
+### `POST /api/lab-orders/doctor/<id>/cancel/`
+
+Cancel a lab order (only if no items have been completed yet).
+
+- **Auth required**: Yes
+- **Allowed roles**: Doctor (issuer)
 
 ---
 
@@ -657,6 +734,8 @@ Laboratorian scans QR token to access pending lab order items.
   "qr_token": "..."
 }
 ```
+
+**Response**: Returns `lab_order` metadata and only `pending` items for the scanned order. Also returns `locked: true` if no pending items remain.
 
 ---
 
@@ -679,14 +758,11 @@ Record completion status for scanned lab order items.
 }
 ```
 
+**Response**: Same shape as scan response (updated `lab_order` + remaining `pending` items).
+
 ---
 
-### `GET /api/lab-orders/<id>/qr/`
-
-Get QR token for a lab order.
-
-- **Auth required**: Yes
-- **Allowed roles**: Patient (own)
+> **Note**: There is no `GET /api/lab-orders/<id>/qr/` endpoint. Patients present the `qr_token` field from their own lab order detail response directly to the laboratorian.
 
 ---
 
@@ -824,8 +900,6 @@ Get a specific released lab result (patient view).
 
 - **Auth required**: Yes
 - **Allowed roles**: Patient (own, released only)
-
----
 
 ## Audit / Admin Notes
 
