@@ -1,13 +1,36 @@
 from pathlib import Path
 
 from decouple import Csv, config
+from django.core.exceptions import ImproperlyConfigured
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-SECRET_KEY = config("SECRET_KEY", default="change-me")
+ENVIRONMENT = config("ENVIRONMENT", default="local")
+
+_ALLOWED_ENVIRONMENTS = {"local", "test", "staging", "production"}
+if ENVIRONMENT not in _ALLOWED_ENVIRONMENTS:
+    raise ImproperlyConfigured(
+        f"Invalid ENVIRONMENT '{ENVIRONMENT}'. Expected one of: {', '.join(sorted(_ALLOWED_ENVIRONMENTS))}."
+    )
+
+SECRET_KEY = config("SECRET_KEY")
 DEBUG = config("DEBUG", cast=bool, default=False)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", cast=Csv(), default="127.0.0.1,localhost")
+
+_normalized_secret = SECRET_KEY.strip().lower()
+_weak_secret_values = {
+    "",
+    "change-me",
+    "changeme",
+    "secret",
+    "dev-secret",
+    "test-secret",
+}
+
+if ENVIRONMENT in {"production", "staging"}:
+    if _normalized_secret in _weak_secret_values or _normalized_secret.startswith("django-insecure"):
+        raise ImproperlyConfigured("SECRET_KEY is weak for staging/production. Please set a strong secret.")
 
 INSTALLED_APPS = [
     "daphne",
@@ -42,6 +65,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "apps.common.middleware.RequestIDMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -117,6 +141,9 @@ REST_FRAMEWORK = {
     "DEFAULT_FILTER_BACKENDS": (
         "django_filters.rest_framework.DjangoFilterBackend",
     ),
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",
+    "PAGE_SIZE": 50,
+    "EXCEPTION_HANDLER": "apps.common.exceptions.custom_exception_handler",
     "DEFAULT_THROTTLE_CLASSES": [
         "rest_framework.throttling.AnonRateThrottle",
         "rest_framework.throttling.UserRateThrottle",
@@ -170,8 +197,11 @@ RAG_MAX_TOP_K = config("RAG_MAX_TOP_K", default=12, cast=int)
 
 # ── Phase 12E — Dataset export salt ────────────────────────────────────
 # Used to hash doctor/object IDs in exported datasets.
-# Set to a secret value in production. Falls back to SECRET_KEY if unset.
-EXPORT_HASH_SALT = config("EXPORT_HASH_SALT", default=SECRET_KEY)
+# Set to a secret value in production.
+EXPORT_HASH_SALT = config("EXPORT_HASH_SALT", default=None)
+
+if ENVIRONMENT == "production" and not EXPORT_HASH_SALT:
+    raise ImproperlyConfigured("EXPORT_HASH_SALT must be set in production.")
 
 # ── Phase 14 — Django Channels & WebSocket ─────────────────────────────────
 CHANNEL_LAYERS = {

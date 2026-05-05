@@ -1,0 +1,8 @@
+-r base.in
+
+pgvector
+sentence-transformers
+numpy
+httpx
+pypdf
+python-docx

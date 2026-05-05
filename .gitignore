@@ -25,6 +25,9 @@ local_settings.py
 .env
 .env.*
 !.env.example
+!**/.env.local.example
+!**/.env.production.example
+!**/.env.test.example
 
 # IDE
 .idea/

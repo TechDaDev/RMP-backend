@@ -1,0 +1,14 @@
+-r base.in
+
+pytest
+pytest-django
+pytest-cov
+ruff
+black
+bandit
+pip-audit
+pre-commit
+django-debug-toolbar
+
+django-extensions
+pydot

@@ -59,7 +59,7 @@ Connected clients receive update
 
 ---
 
-## Quick Setup
+## Development Setup
 
 ```bash
 # 1. Start PostgreSQL and Redis
@@ -69,12 +69,12 @@ docker compose up -d
 python -m venv venv
 source venv/bin/activate
 
-# 3. Install dependencies
-pip install -r requirements.txt
+# 3. Install dependencies (recommended for local development)
+pip install -r requirements/dev.in
 
 # 4. Copy environment config
-cp .env.example .env
-# Edit .env — set SECRET_KEY and DB credentials
+cp .env.local.example .env
+# Edit .env if needed
 
 # 5. Run migrations
 DB_PORT=5433 python manage.py migrate --settings=config.settings.local
@@ -86,8 +86,36 @@ DB_PORT=5433 python manage.py seed_all --settings=config.settings.local
 DB_PORT=5433 python manage.py runserver --settings=config.settings.local
 ```
 
+Dependency file structure:
+- `requirements/base.in` for core runtime dependencies
+- `requirements/dev.in` for local development and quality tooling
+- `requirements/prod.in` for production-only additions
+- `requirements/ai.in` for AI/RAG dependency set
+
+`requirements.txt` is kept as a backward-compatible entrypoint.
+
+For repeatable, pinned installs in CI/production, generate lock files later using `pip-tools` or `uv`.
+
 > If your system PostgreSQL already uses port 5432, map Docker to 5433 in `docker-compose.yml`.  
 > See [docs/OPERATIONAL_NOTES.md](docs/OPERATIONAL_NOTES.md) for details.
+
+## Quality Checks
+
+```bash
+ruff check .
+ruff format --check .
+bandit -r apps config
+pip-audit
+pytest
+```
+
+## Production Safety Notes
+
+- Production requires a strong `SECRET_KEY`.
+- Production requires `EXPORT_HASH_SALT`.
+- `DEBUG` is forced to `False` in production settings.
+- `ALLOWED_HOSTS` must be explicitly configured in production.
+- HTTPS/security headers are enabled in production settings.
 
 ---
 
@@ -116,7 +144,7 @@ DB_PORT=5433 python manage.py makemigrations --check --dry-run --settings=config
 ## Tests
 
 ```bash
-DB_PORT=5433 python manage.py test apps --settings=config.settings.test
+pytest
 ```
 
 Current test count: **288+ tests** across all apps.

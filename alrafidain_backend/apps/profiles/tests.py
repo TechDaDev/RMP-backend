@@ -211,5 +211,7 @@ class DoctorSpecialtyOtherValidationTests(TestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn("specialty_other", resp.data)
+        self.assertIn("error", resp.data)
+        self.assertIn("details", resp.data["error"])
+        self.assertIn("specialty_other", resp.data["error"]["details"])
 

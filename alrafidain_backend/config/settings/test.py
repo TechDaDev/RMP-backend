@@ -1,3 +1,9 @@
+import os
+
+
+os.environ.setdefault("ENVIRONMENT", "test")
+os.environ.setdefault("SECRET_KEY", "test-secret-key")
+
 from .base import *  # noqa: F401,F403
 
 
