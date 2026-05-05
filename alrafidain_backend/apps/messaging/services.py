@@ -100,19 +100,21 @@ def create_consultation_message(
             message="Your doctor has sent a message in your consultation.",
             data={"consultation_id": str(consultation.id), "message_id": str(message.id)},
         )
-    
+
     # Broadcast realtime message event (Phase 14)
     def broadcast_message_event():
         from apps.realtime.services import broadcast_message_created
+
         try:
             broadcast_message_created(message)
         except Exception as e:
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to broadcast message.created event: {e}")
-    
+
     transaction.on_commit(broadcast_message_event)
-    
+
     return message
 
 
@@ -133,18 +135,21 @@ def mark_messages_as_read(consultation, reader):
         raise ValidationError("You are not allowed to mark messages for this consultation.")
 
     count = qs.update(is_read=True, read_at=timezone.now())
-    
+
     # Broadcast read event (Phase 14)
     if count > 0:
+
         def broadcast_read_event():
             from apps.realtime.services import broadcast_messages_marked_read
+
             try:
                 broadcast_messages_marked_read(consultation, reader, count)
             except Exception as e:
                 import logging
+
                 logger = logging.getLogger(__name__)
                 logger.error(f"Failed to broadcast messages.read event: {e}")
-        
+
         transaction.on_commit(broadcast_read_event)
-    
+
     return count

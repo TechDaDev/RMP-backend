@@ -7,7 +7,7 @@ No patient-identifiable data is included.
 
 from __future__ import annotations
 
-from django.db.models import Avg, Count, Q, Sum
+from django.db.models import Avg, Sum
 
 
 def get_rag_feedback_metrics() -> dict:
@@ -18,15 +18,14 @@ def get_rag_feedback_metrics() -> dict:
     how much of the AI output received structured doctor feedback.
     """
     from apps.common.choices import RAGFeedbackRating, RAGFeedbackReviewStatus
+
     from .models import RAGResponse, RAGResponseFeedback
 
     total_responses = RAGResponse.objects.count()
     responses_with_feedback = RAGResponseFeedback.objects.count()
 
     coverage_rate = (
-        round(responses_with_feedback / total_responses, 4)
-        if total_responses > 0
-        else 0.0
+        round(responses_with_feedback / total_responses, 4) if total_responses > 0 else 0.0
     )
 
     ratings: dict[str, int] = {}
@@ -60,12 +59,13 @@ def get_retrieval_quality_metrics() -> dict:
     Average rank of chunks rated 'relevant' via source feedback.
     """
     from apps.common.choices import RAGSourceRelevance
+
     from .models import RAGRetrievedChunk, RAGRetrievedChunkFeedback
 
     total_retrieved_chunks = RAGRetrievedChunk.objects.count()
-    chunks_with_feedback = RAGRetrievedChunkFeedback.objects.values(
-        "retrieved_chunk_id"
-    ).distinct().count()
+    chunks_with_feedback = (
+        RAGRetrievedChunkFeedback.objects.values("retrieved_chunk_id").distinct().count()
+    )
 
     source_relevance: dict[str, int] = {}
     for relevance in RAGSourceRelevance.values:
@@ -96,15 +96,14 @@ def get_rag_usage_metrics() -> dict:
     Includes total token counts.
     """
     from apps.common.choices import RAGResponseStatus, RAGServiceContext
+
     from .models import RAGQuery, RAGResponse
 
     total_queries = RAGQuery.objects.count()
 
     by_service_context: dict[str, int] = {}
     for ctx in RAGServiceContext.values:
-        by_service_context[ctx] = RAGQuery.objects.filter(
-            service_context=ctx
-        ).count()
+        by_service_context[ctx] = RAGQuery.objects.filter(service_context=ctx).count()
 
     by_status: dict[str, int] = {}
     for status in RAGResponseStatus.values:

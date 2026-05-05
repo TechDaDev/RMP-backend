@@ -28,7 +28,14 @@ class KnowledgeDocumentAdmin(admin.ModelAdmin):
         "created_at",
     ]
     search_fields = ["title", "original_filename", "source_authority", "description"]
-    readonly_fields = ["id", "uploaded_by", "approved_by", "approved_at", "created_at", "updated_at"]
+    readonly_fields = [
+        "id",
+        "uploaded_by",
+        "approved_by",
+        "approved_at",
+        "created_at",
+        "updated_at",
+    ]
     raw_id_fields = ["uploaded_by", "approved_by"]
 
 
@@ -52,4 +59,13 @@ class KnowledgeProcessingLogAdmin(admin.ModelAdmin):
     list_display = ["document", "action", "status", "created_at"]
     list_filter = ["action", "status", "created_at"]
     search_fields = ["document__title", "message"]
-    readonly_fields = ["id", "document", "action", "status", "message", "metadata", "created_at", "updated_at"]
+    readonly_fields = [
+        "id",
+        "document",
+        "action",
+        "status",
+        "message",
+        "metadata",
+        "created_at",
+        "updated_at",
+    ]

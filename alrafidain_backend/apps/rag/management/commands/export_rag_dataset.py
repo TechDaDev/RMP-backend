@@ -119,7 +119,5 @@ class Command(BaseCommand):
             record_count = max(0, content.count("\n") - 1)
 
         self.stdout.write(
-            self.style.SUCCESS(
-                f"Done — {record_count} record(s) written to {output_path}"
-            )
+            self.style.SUCCESS(f"Done — {record_count} record(s) written to {output_path}")
         )

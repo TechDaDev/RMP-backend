@@ -18,6 +18,7 @@ class _SafeUserSerializer(serializers.Serializer):
 # Doctor: create prescription
 # ──────────────────────────────────────────────
 
+
 class PrescriptionItemCreateSerializer(serializers.Serializer):
     medication_name = serializers.CharField(max_length=200)
     strength = serializers.CharField(max_length=100, required=False, default="")
@@ -41,6 +42,7 @@ class PrescriptionCreateSerializer(serializers.Serializer):
 # ──────────────────────────────────────────────
 # Patient: safe view (no medication details)
 # ──────────────────────────────────────────────
+
 
 class PrescriptionPatientListSerializer(serializers.ModelSerializer):
     doctor = _SafeUserSerializer(read_only=True)
@@ -68,6 +70,7 @@ class PrescriptionPatientDetailSerializer(PrescriptionPatientListSerializer):
 # ──────────────────────────────────────────────
 # Doctor: full view
 # ──────────────────────────────────────────────
+
 
 class PrescriptionItemSerializer(serializers.ModelSerializer):
     class Meta:
@@ -136,6 +139,7 @@ class PrescriptionDoctorDetailSerializer(serializers.ModelSerializer):
 # Pharmacist: scan response
 # ──────────────────────────────────────────────
 
+
 class PrescriptionRemainingItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = PrescriptionItem
@@ -177,6 +181,7 @@ class PrescriptionPharmacistScanSerializer(serializers.Serializer):
 # ──────────────────────────────────────────────
 # Pharmacist: dispense items input
 # ──────────────────────────────────────────────
+
 
 class DispenseItemEntrySerializer(serializers.Serializer):
     prescription_item_id = serializers.UUIDField()

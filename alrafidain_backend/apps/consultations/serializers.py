@@ -124,7 +124,9 @@ class ConsultationDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_symptoms(self, obj):
-        symptom_objs = Symptom.objects.filter(consultation_links__consultation=obj).select_related("category")
+        symptom_objs = Symptom.objects.filter(consultation_links__consultation=obj).select_related(
+            "category"
+        )
         return SymptomSerializer(symptom_objs, many=True).data
 
 
@@ -143,8 +145,12 @@ class ConsultationDoctorDetailSerializer(ConsultationDetailSerializer):
 
 
 class ConsultationCreateSerializer(serializers.ModelSerializer):
-    symptom_ids = serializers.ListField(child=serializers.UUIDField(), write_only=True, allow_empty=False)
-    attachments = serializers.ListField(child=serializers.FileField(), write_only=True, required=False)
+    symptom_ids = serializers.ListField(
+        child=serializers.UUIDField(), write_only=True, allow_empty=False
+    )
+    attachments = serializers.ListField(
+        child=serializers.FileField(), write_only=True, required=False
+    )
 
     class Meta:
         model = Consultation
@@ -191,14 +197,18 @@ class ConsultationCreateSerializer(serializers.ModelSerializer):
         selected_specialty = attrs.get("selected_specialty")
         selected_specialty_other = attrs.get("selected_specialty_other", "")
         if selected_specialty == MedicalSpecialty.OTHER and not selected_specialty_other:
-            raise serializers.ValidationError({"selected_specialty_other": "This field is required when specialty is Other."})
+            raise serializers.ValidationError(
+                {"selected_specialty_other": "This field is required when specialty is Other."}
+            )
         if selected_specialty != MedicalSpecialty.OTHER:
             attrs["selected_specialty_other"] = ""
 
         symptom_ids = attrs.get("symptom_ids", [])
         active_count = Symptom.objects.filter(id__in=symptom_ids, is_active=True).count()
         if active_count == 0:
-            raise serializers.ValidationError({"symptom_ids": "At least one active symptom must be selected."})
+            raise serializers.ValidationError(
+                {"symptom_ids": "At least one active symptom must be selected."}
+            )
 
         return attrs
 
@@ -211,7 +221,9 @@ class ConsultationCreateSerializer(serializers.ModelSerializer):
         rec = recommend_specialty_from_symptoms(symptom_ids)
         recommended_specialty = rec["recommended_specialty"]
         selected_specialty = validated_data.pop("selected_specialty", None) or recommended_specialty
-        has_emergency_warning = rec["has_red_flag"] or validated_data.get("has_breathing_difficulty", False)
+        has_emergency_warning = rec["has_red_flag"] or validated_data.get(
+            "has_breathing_difficulty", False
+        )
 
         consultation = Consultation.objects.create(
             patient=request.user,
@@ -263,9 +275,13 @@ class ConsultationAcceptSerializer(serializers.Serializer):
         target_specialty = consultation.selected_specialty or consultation.recommended_specialty
         if doctor_profile.specialty == MedicalSpecialty.OTHER:
             if target_specialty != MedicalSpecialty.OTHER:
-                raise serializers.ValidationError("Doctor with Other specialty can only accept Other consultations.")
+                raise serializers.ValidationError(
+                    "Doctor with Other specialty can only accept Other consultations."
+                )
         elif target_specialty and doctor_profile.specialty != target_specialty:
-            raise serializers.ValidationError("Doctor specialty does not match consultation specialty.")
+            raise serializers.ValidationError(
+                "Doctor specialty does not match consultation specialty."
+            )
 
         return attrs
 
@@ -276,8 +292,13 @@ class ConsultationCloseSerializer(serializers.Serializer):
         consultation = self.context["consultation"]
         if not is_assigned_doctor(request.user, consultation):
             raise serializers.ValidationError("Only assigned doctor can close this consultation.")
-        if consultation.status not in [ConsultationStatus.ACCEPTED, ConsultationStatus.DOCTOR_RESPONDED]:
-            raise serializers.ValidationError("Only accepted or doctor_responded consultations can be closed.")
+        if consultation.status not in [
+            ConsultationStatus.ACCEPTED,
+            ConsultationStatus.DOCTOR_RESPONDED,
+        ]:
+            raise serializers.ValidationError(
+                "Only accepted or doctor_responded consultations can be closed."
+            )
         return attrs
 
 
@@ -293,8 +314,13 @@ class ConsultationResponseCreateSerializer(serializers.ModelSerializer):
         if not is_assigned_doctor(request.user, consultation):
             raise serializers.ValidationError("Only assigned doctor can add responses.")
 
-        if consultation.status not in [ConsultationStatus.ACCEPTED, ConsultationStatus.DOCTOR_RESPONDED]:
-            raise serializers.ValidationError("Consultation must be accepted before adding a response.")
+        if consultation.status not in [
+            ConsultationStatus.ACCEPTED,
+            ConsultationStatus.DOCTOR_RESPONDED,
+        ]:
+            raise serializers.ValidationError(
+                "Consultation must be accepted before adding a response."
+            )
 
         return attrs
 

@@ -50,9 +50,13 @@ class PatientProfileSerializer(serializers.ModelSerializer):
 class DoctorProfileSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         specialty = attrs.get("specialty", getattr(self.instance, "specialty", ""))
-        specialty_other = attrs.get("specialty_other", getattr(self.instance, "specialty_other", ""))
+        specialty_other = attrs.get(
+            "specialty_other", getattr(self.instance, "specialty_other", "")
+        )
         if specialty == MedicalSpecialty.OTHER and not specialty_other:
-            raise serializers.ValidationError({"specialty_other": "This field is required when specialty is Other."})
+            raise serializers.ValidationError(
+                {"specialty_other": "This field is required when specialty is Other."}
+            )
         if specialty != MedicalSpecialty.OTHER and "specialty_other" in attrs:
             attrs["specialty_other"] = ""
         return attrs
@@ -199,7 +203,9 @@ class FullProfileSerializer(serializers.Serializer):
 
         return {
             "user": UserSerializer(user).data,
-            "user_profile": UserProfileSerializer(user_profile_obj).data if user_profile_obj else None,
+            "user_profile": UserProfileSerializer(user_profile_obj).data
+            if user_profile_obj
+            else None,
             "role_profile": role_profile_data,
             "completion": completion,
             "verification": verification,

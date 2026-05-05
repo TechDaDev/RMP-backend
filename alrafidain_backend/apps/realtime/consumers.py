@@ -134,9 +134,7 @@ class ConsultationMessageConsumer(AsyncJsonWebsocketConsumer):
             return
 
         # Check permissions
-        has_access = await can_connect_consultation_messages(
-            user, consultation
-        )
+        has_access = await can_connect_consultation_messages(user, consultation)
         if not has_access:
             logger.warning(
                 f"User {self.user_id} denied access to consultation {self.consultation_id}"
@@ -149,9 +147,7 @@ class ConsultationMessageConsumer(AsyncJsonWebsocketConsumer):
         # Join consultation group
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
-        logger.debug(
-            f"User {self.user_id} connected to consultation {self.consultation_id} socket"
-        )
+        logger.debug(f"User {self.user_id} connected to consultation {self.consultation_id} socket")
 
     async def disconnect(self, close_code):
         """Handle WebSocket disconnection."""

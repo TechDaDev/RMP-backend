@@ -17,7 +17,6 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
-import json
 
 
 def hash_identifier(value: str, salt: str = "") -> str:
@@ -106,9 +105,9 @@ def _build_record(
 
     # -- Sources (retrieved chunks) ----------------------------------------
     sources = []
-    for rc in rag_response.rag_query.retrieved_chunks.select_related(
-        "chunk__document"
-    ).order_by("rank"):
+    for rc in rag_response.rag_query.retrieved_chunks.select_related("chunk__document").order_by(
+        "rank"
+    ):
         chunk = rc.chunk
         doc = chunk.document
 
@@ -174,10 +173,7 @@ def export_rag_evaluation_dataset(
         .order_by("rag_query__created_at")
     )
 
-    records = [
-        _build_record(r, include_text=include_text, anonymize=anonymize)
-        for r in responses
-    ]
+    records = [_build_record(r, include_text=include_text, anonymize=anonymize) for r in responses]
 
     if format == "json":
         return records

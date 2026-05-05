@@ -26,6 +26,7 @@ User = get_user_model()
 # Helpers
 # ──────────────────────────────────────────────
 
+
 def auth_client(user):
     client = APIClient()
     token = str(RefreshToken.for_user(user).access_token)
@@ -35,8 +36,12 @@ def auth_client(user):
 
 def create_patient(email="patient@example.com"):
     user = User.objects.create_user(
-        email=email, password="StrongPass1!", first_name="Pat", last_name="Ient",
-        user_type=UserType.PATIENT, is_active=True,
+        email=email,
+        password="StrongPass1!",
+        first_name="Pat",
+        last_name="Ient",
+        user_type=UserType.PATIENT,
+        is_active=True,
     )
     UserProfile.objects.create(user=user)
     PatientProfile.objects.create(user=user)
@@ -45,8 +50,12 @@ def create_patient(email="patient@example.com"):
 
 def create_doctor(email="doctor@example.com", approved=True):
     user = User.objects.create_user(
-        email=email, password="StrongPass1!", first_name="Doc", last_name="Tor",
-        user_type=UserType.DOCTOR, is_active=True,
+        email=email,
+        password="StrongPass1!",
+        first_name="Doc",
+        last_name="Tor",
+        user_type=UserType.DOCTOR,
+        is_active=True,
     )
     UserProfile.objects.create(user=user)
     DoctorProfile.objects.create(
@@ -59,8 +68,12 @@ def create_doctor(email="doctor@example.com", approved=True):
 
 def create_pharmacist(email="pharma@example.com", approved=True):
     user = User.objects.create_user(
-        email=email, password="StrongPass1!", first_name="Phar", last_name="Mist",
-        user_type=UserType.PHARMACIST, is_active=True,
+        email=email,
+        password="StrongPass1!",
+        first_name="Phar",
+        last_name="Mist",
+        user_type=UserType.PHARMACIST,
+        is_active=True,
     )
     UserProfile.objects.create(user=user)
     PharmacistProfile.objects.create(
@@ -72,8 +85,12 @@ def create_pharmacist(email="pharma@example.com", approved=True):
 
 def create_laboratorian(email="lab@example.com"):
     user = User.objects.create_user(
-        email=email, password="StrongPass1!", first_name="Lab", last_name="Tech",
-        user_type=UserType.LABORATORIAN, is_active=True,
+        email=email,
+        password="StrongPass1!",
+        first_name="Lab",
+        last_name="Tech",
+        user_type=UserType.LABORATORIAN,
+        is_active=True,
     )
     UserProfile.objects.create(user=user)
     return user
@@ -107,8 +124,8 @@ ITEM_PAYLOAD = {
 # Prescription Creation Tests
 # ──────────────────────────────────────────────
 
-class PrescriptionCreationTests(TestCase):
 
+class PrescriptionCreationTests(TestCase):
     def setUp(self):
         self.patient = create_patient()
         self.doctor = create_doctor()
@@ -197,8 +214,8 @@ class PrescriptionCreationTests(TestCase):
 # Patient Safety Tests
 # ──────────────────────────────────────────────
 
-class PatientSafetyTests(TestCase):
 
+class PatientSafetyTests(TestCase):
     def setUp(self):
         self.patient = create_patient()
         self.other_patient = create_patient("other@example.com")
@@ -237,6 +254,7 @@ class PatientSafetyTests(TestCase):
         resp = client.get(f"/api/prescriptions/my/{self.prescription.id}/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         import json
+
         text = json.dumps(resp.data["data"])
         self.assertNotIn("medication_name", text)
         self.assertNotIn("Amoxicillin", text)
@@ -257,7 +275,9 @@ class PatientSafetyTests(TestCase):
 
     def test_patient_cannot_access_scan_endpoint(self):
         client = auth_client(self.patient)
-        resp = client.post("/api/prescriptions/scan/", {"qr_token": self.prescription.qr_token}, format="json")
+        resp = client.post(
+            "/api/prescriptions/scan/", {"qr_token": self.prescription.qr_token}, format="json"
+        )
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
 
@@ -265,8 +285,8 @@ class PatientSafetyTests(TestCase):
 # Doctor Visibility Tests
 # ──────────────────────────────────────────────
 
-class DoctorVisibilityTests(TestCase):
 
+class DoctorVisibilityTests(TestCase):
     def setUp(self):
         self.patient = create_patient()
         self.doctor = create_doctor()
@@ -340,8 +360,8 @@ class DoctorVisibilityTests(TestCase):
 # Pharmacist QR Scan Tests
 # ──────────────────────────────────────────────
 
-class PharmacistScanTests(TestCase):
 
+class PharmacistScanTests(TestCase):
     def setUp(self):
         self.patient = create_patient()
         self.doctor = create_doctor()
@@ -365,7 +385,9 @@ class PharmacistScanTests(TestCase):
     def _scan(self, user, token=None):
         if token is None:
             token = self.prescription.qr_token
-        return auth_client(user).post("/api/prescriptions/scan/", {"qr_token": token}, format="json")
+        return auth_client(user).post(
+            "/api/prescriptions/scan/", {"qr_token": token}, format="json"
+        )
 
     def test_approved_pharmacist_can_scan_valid_qr(self):
         resp = self._scan(self.pharmacist)
@@ -435,8 +457,8 @@ class PharmacistScanTests(TestCase):
 # Dispensing Tests
 # ──────────────────────────────────────────────
 
-class DispensingTests(TestCase):
 
+class DispensingTests(TestCase):
     def setUp(self):
         self.patient = create_patient()
         self.doctor = create_doctor()
@@ -469,7 +491,15 @@ class DispensingTests(TestCase):
         return f"/api/prescriptions/{self.prescription.id}/dispense/"
 
     def test_approved_pharmacist_can_dispense_pending_item(self):
-        payload = {"items": [{"prescription_item_id": str(self.item1.id), "status": "dispensed", "dispensed_quantity": "1 box"}]}
+        payload = {
+            "items": [
+                {
+                    "prescription_item_id": str(self.item1.id),
+                    "status": "dispensed",
+                    "dispensed_quantity": "1 box",
+                }
+            ]
+        }
         resp = auth_client(self.pharmacist).post(self._dispense_url(), payload, format="json")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.item1.refresh_from_db()
@@ -486,12 +516,24 @@ class DispensingTests(TestCase):
         self.assertNotIn(str(self.item1.id), remaining_ids)
 
     def test_unavailable_creates_record_but_item_stays_pending(self):
-        payload = {"items": [{"prescription_item_id": str(self.item1.id), "status": "unavailable", "note": "Not in stock"}]}
+        payload = {
+            "items": [
+                {
+                    "prescription_item_id": str(self.item1.id),
+                    "status": "unavailable",
+                    "note": "Not in stock",
+                }
+            ]
+        }
         resp = auth_client(self.pharmacist).post(self._dispense_url(), payload, format="json")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.item1.refresh_from_db()
         self.assertEqual(self.item1.status, PrescriptionItemStatus.PENDING)
-        self.assertTrue(DispensingRecord.objects.filter(prescription_item=self.item1, status="unavailable").exists())
+        self.assertTrue(
+            DispensingRecord.objects.filter(
+                prescription_item=self.item1, status="unavailable"
+            ).exists()
+        )
 
     def test_unavailable_item_remains_visible_to_other_pharmacists(self):
         payload = {"items": [{"prescription_item_id": str(self.item1.id), "status": "unavailable"}]}
@@ -509,19 +551,23 @@ class DispensingTests(TestCase):
         self.assertEqual(self.prescription.status, PrescriptionStatus.PARTIALLY_DISPENSED)
 
     def test_all_items_dispensed_sets_fully_dispensed(self):
-        payload = {"items": [
-            {"prescription_item_id": str(self.item1.id), "status": "dispensed"},
-            {"prescription_item_id": str(self.item2.id), "status": "dispensed"},
-        ]}
+        payload = {
+            "items": [
+                {"prescription_item_id": str(self.item1.id), "status": "dispensed"},
+                {"prescription_item_id": str(self.item2.id), "status": "dispensed"},
+            ]
+        }
         auth_client(self.pharmacist).post(self._dispense_url(), payload, format="json")
         self.prescription.refresh_from_db()
         self.assertEqual(self.prescription.status, PrescriptionStatus.FULLY_DISPENSED)
 
     def test_fully_dispensed_sets_fully_dispensed_at(self):
-        payload = {"items": [
-            {"prescription_item_id": str(self.item1.id), "status": "dispensed"},
-            {"prescription_item_id": str(self.item2.id), "status": "dispensed"},
-        ]}
+        payload = {
+            "items": [
+                {"prescription_item_id": str(self.item1.id), "status": "dispensed"},
+                {"prescription_item_id": str(self.item2.id), "status": "dispensed"},
+            ]
+        }
         auth_client(self.pharmacist).post(self._dispense_url(), payload, format="json")
         self.prescription.refresh_from_db()
         self.assertIsNotNone(self.prescription.fully_dispensed_at)
@@ -570,10 +616,12 @@ class DispensingTests(TestCase):
         self.assertTrue(AuditLog.objects.filter(action="prescription_item_unavailable").exists())
 
     def test_audit_log_created_for_fully_dispensed(self):
-        payload = {"items": [
-            {"prescription_item_id": str(self.item1.id), "status": "dispensed"},
-            {"prescription_item_id": str(self.item2.id), "status": "dispensed"},
-        ]}
+        payload = {
+            "items": [
+                {"prescription_item_id": str(self.item1.id), "status": "dispensed"},
+                {"prescription_item_id": str(self.item2.id), "status": "dispensed"},
+            ]
+        }
         auth_client(self.pharmacist).post(self._dispense_url(), payload, format="json")
         self.assertTrue(AuditLog.objects.filter(action="prescription_fully_dispensed").exists())
 
@@ -582,8 +630,8 @@ class DispensingTests(TestCase):
 # Role Access Tests
 # ──────────────────────────────────────────────
 
-class RoleAccessTests(TestCase):
 
+class RoleAccessTests(TestCase):
     def setUp(self):
         self.patient = create_patient()
         self.doctor = create_doctor()
@@ -597,7 +645,9 @@ class RoleAccessTests(TestCase):
         )
 
     def test_pharmacist_cannot_view_doctor_detail(self):
-        resp = auth_client(self.pharmacist).get(f"/api/prescriptions/doctor/{self.prescription.id}/")
+        resp = auth_client(self.pharmacist).get(
+            f"/api/prescriptions/doctor/{self.prescription.id}/"
+        )
         self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_patient_cannot_view_doctor_detail(self):
@@ -609,9 +659,13 @@ class RoleAccessTests(TestCase):
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_laboratorian_cannot_scan_qr(self):
-        resp = auth_client(self.lab).post("/api/prescriptions/scan/", {"qr_token": self.prescription.qr_token}, format="json")
+        resp = auth_client(self.lab).post(
+            "/api/prescriptions/scan/", {"qr_token": self.prescription.qr_token}, format="json"
+        )
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_laboratorian_cannot_dispense(self):
-        resp = auth_client(self.lab).post(f"/api/prescriptions/{self.prescription.id}/dispense/", {"items": []}, format="json")
+        resp = auth_client(self.lab).post(
+            f"/api/prescriptions/{self.prescription.id}/dispense/", {"items": []}, format="json"
+        )
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)

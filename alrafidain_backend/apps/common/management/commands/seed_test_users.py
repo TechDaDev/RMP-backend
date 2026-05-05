@@ -3,6 +3,7 @@ Management command: seed_test_users
 Creates one test user per role plus a Django superuser for local/Postman testing.
 Idempotent — safe to run multiple times; existing users are skipped.
 """
+
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.utils import timezone
@@ -24,7 +25,7 @@ USERS = [
         "password": "Admin1234!",
         "first_name": "Admin",
         "last_name": "User",
-        "user_type": UserType.DOCTOR,   # superusers need a user_type to satisfy the model
+        "user_type": UserType.DOCTOR,  # superusers need a user_type to satisfy the model
         "is_active": True,
         "is_staff": True,
         "is_superuser": True,
@@ -145,9 +146,7 @@ class Command(BaseCommand):
                 builder(user)
 
             label = "SUPERUSER" if is_super else spec["user_type"].upper()
-            self.stdout.write(
-                self.style.SUCCESS(f"  CREATED [{label:15}] {email}")
-            )
+            self.stdout.write(self.style.SUCCESS(f"  CREATED [{label:15}] {email}"))
 
         self.stdout.write("")
         self.stdout.write(self.style.SUCCESS("Done. Test credentials:"))

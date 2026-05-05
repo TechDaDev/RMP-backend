@@ -3,16 +3,14 @@ from pathlib import Path
 from decouple import Csv, config
 from django.core.exceptions import ImproperlyConfigured
 
-
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 ENVIRONMENT = config("ENVIRONMENT", default="local")
 
 _ALLOWED_ENVIRONMENTS = {"local", "test", "staging", "production"}
 if ENVIRONMENT not in _ALLOWED_ENVIRONMENTS:
-    raise ImproperlyConfigured(
-        f"Invalid ENVIRONMENT '{ENVIRONMENT}'. Expected one of: {', '.join(sorted(_ALLOWED_ENVIRONMENTS))}."
-    )
+    allowed = ", ".join(sorted(_ALLOWED_ENVIRONMENTS))
+    raise ImproperlyConfigured(f"Invalid ENVIRONMENT '{ENVIRONMENT}'. Expected one of: {allowed}.")
 
 SECRET_KEY = config("SECRET_KEY")
 DEBUG = config("DEBUG", cast=bool, default=False)
@@ -29,8 +27,12 @@ _weak_secret_values = {
 }
 
 if ENVIRONMENT in {"production", "staging"}:
-    if _normalized_secret in _weak_secret_values or _normalized_secret.startswith("django-insecure"):
-        raise ImproperlyConfigured("SECRET_KEY is weak for staging/production. Please set a strong secret.")
+    if _normalized_secret in _weak_secret_values or _normalized_secret.startswith(
+        "django-insecure"
+    ):
+        raise ImproperlyConfigured(
+            "SECRET_KEY is weak for staging/production. Please set a strong secret."
+        )
 
 INSTALLED_APPS = [
     "daphne",
@@ -134,13 +136,9 @@ REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-    "DEFAULT_PERMISSION_CLASSES": (
-        "rest_framework.permissions.IsAuthenticated",
-    ),
+    "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "DEFAULT_FILTER_BACKENDS": (
-        "django_filters.rest_framework.DjangoFilterBackend",
-    ),
+    "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.LimitOffsetPagination",
     "PAGE_SIZE": 50,
     "EXCEPTION_HANDLER": "apps.common.exceptions.custom_exception_handler",

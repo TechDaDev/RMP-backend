@@ -30,7 +30,11 @@ def _create_otp(user, purpose: str) -> EmailOTP:
 def _send_activation_email(user, otp: EmailOTP) -> None:
     send_mail(
         subject="Activate your Al-Rafidain account",
-        message=f"Hi {user.first_name},\n\nYour activation code is: {otp.code}\n\nIt expires in 10 minutes.",
+        message=(
+            f"Hi {user.first_name},\n\n"
+            f"Your activation code is: {otp.code}\n\n"
+            "It expires in 10 minutes."
+        ),
         from_email=None,
         recipient_list=[user.email],
         fail_silently=False,
@@ -40,7 +44,11 @@ def _send_activation_email(user, otp: EmailOTP) -> None:
 def _send_password_reset_email(user, otp: EmailOTP) -> None:
     send_mail(
         subject="Reset your Al-Rafidain password",
-        message=f"Hi {user.first_name},\n\nYour password reset code is: {otp.code}\n\nIt expires in 10 minutes.",
+        message=(
+            f"Hi {user.first_name},\n\n"
+            f"Your password reset code is: {otp.code}\n\n"
+            "It expires in 10 minutes."
+        ),
         from_email=None,
         recipient_list=[user.email],
         fail_silently=False,
@@ -52,7 +60,16 @@ class UserSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ["id", "email", "first_name", "last_name", "full_name", "user_type", "is_active", "date_joined"]
+        fields = [
+            "id",
+            "email",
+            "first_name",
+            "last_name",
+            "full_name",
+            "user_type",
+            "is_active",
+            "date_joined",
+        ]
         read_only_fields = fields
 
 
@@ -119,7 +136,7 @@ class LoginSerializer(serializers.Serializer):
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
-            raise serializers.ValidationError("Invalid credentials.")
+            raise serializers.ValidationError("Invalid credentials.") from None
 
         if not user.check_password(password):
             raise serializers.ValidationError("Invalid credentials.")
@@ -144,7 +161,7 @@ class ActivateAccountSerializer(serializers.Serializer):
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
-            raise serializers.ValidationError("User not found.")
+            raise serializers.ValidationError("User not found.") from None
 
         otp = (
             EmailOTP.objects.filter(
@@ -207,7 +224,7 @@ class ConfirmPasswordResetSerializer(serializers.Serializer):
         try:
             user = User.objects.get(email=email)
         except User.DoesNotExist:
-            raise serializers.ValidationError("User not found.")
+            raise serializers.ValidationError("User not found.") from None
 
         otp = (
             EmailOTP.objects.filter(

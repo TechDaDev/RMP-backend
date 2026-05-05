@@ -45,7 +45,14 @@ class KnowledgeDocumentUploadView(APIView):
         qs = KnowledgeDocument.objects.select_related("uploaded_by", "approved_by")
         params = request.query_params
 
-        for field in ("approval_status", "processing_status", "document_type", "language", "audience", "specialty"):
+        for field in (
+            "approval_status",
+            "processing_status",
+            "document_type",
+            "language",
+            "audience",
+            "specialty",
+        ):
             val = params.get(field)
             if val:
                 qs = qs.filter(**{field: val})
@@ -94,9 +101,9 @@ class KnowledgeDocumentDetailView(RetrieveAPIView):
     lookup_url_kwarg = "document_id"
 
     def get_queryset(self):
-        return KnowledgeDocument.objects.prefetch_related(
-            "processing_logs"
-        ).select_related("uploaded_by", "approved_by")
+        return KnowledgeDocument.objects.prefetch_related("processing_logs").select_related(
+            "uploaded_by", "approved_by"
+        )
 
     def retrieve(self, request, *args, **kwargs):
         document = get_object_or_404(self.get_queryset(), pk=kwargs["document_id"])
@@ -324,7 +331,4 @@ class KnowledgeChunkSemanticSearchView(APIView):
             }
             for hit in hits
         ]
-        return success_response(
-            data=SemanticSearchResultSerializer(output, many=True).data
-        )
-
+        return success_response(data=SemanticSearchResultSerializer(output, many=True).data)

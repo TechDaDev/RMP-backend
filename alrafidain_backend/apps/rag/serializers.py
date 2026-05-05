@@ -3,14 +3,21 @@ from rest_framework import serializers
 
 from apps.common.choices import RAGFeedbackRating, RAGFeedbackReviewStatus, RAGSourceRelevance
 
-from .models import RAGQuery, RAGResponse, RAGResponseFeedback, RAGRetrievedChunk, RAGRetrievedChunkFeedback
+from .models import (
+    RAGResponse,
+    RAGResponseFeedback,
+    RAGRetrievedChunk,
+    RAGRetrievedChunkFeedback,
+)
 
 
 class DoctorRAGQuerySerializer(serializers.Serializer):
     """Input serializer for the general doctor RAG query endpoint."""
 
     question = serializers.CharField(max_length=2000)
-    document_type = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
+    document_type = serializers.CharField(
+        max_length=50, required=False, allow_blank=True, default=""
+    )
     specialty = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
     language = serializers.CharField(max_length=20, required=False, allow_blank=True, default="")
     audience = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
@@ -22,9 +29,7 @@ class DoctorRAGQuerySerializer(serializers.Serializer):
     def validate_top_k(self, value):
         max_k = getattr(settings, "RAG_MAX_TOP_K", 12)
         if value > max_k:
-            raise serializers.ValidationError(
-                f"top_k may not exceed {max_k}."
-            )
+            raise serializers.ValidationError(f"top_k may not exceed {max_k}.")
         return value
 
     def get_fields(self):
@@ -149,7 +154,9 @@ class RAGResponseFeedbackCreateSerializer(serializers.Serializer):
     is_source_grounded = serializers.BooleanField(required=False, allow_null=True, default=None)
     is_clinically_useful = serializers.BooleanField(required=False, allow_null=True, default=None)
     is_safe = serializers.BooleanField(required=False, default=True)
-    source_feedback = RAGRetrievedChunkFeedbackInputSerializer(many=True, required=False, default=list)
+    source_feedback = RAGRetrievedChunkFeedbackInputSerializer(
+        many=True, required=False, default=list
+    )
 
 
 class RAGRetrievedChunkFeedbackSerializer(serializers.ModelSerializer):
@@ -213,7 +220,9 @@ class RAGFeedbackReviewSerializer(serializers.Serializer):
     ]
 
     review_status = serializers.ChoiceField(choices=ALLOWED_STATUSES)
-    review_notes = serializers.CharField(max_length=2000, required=False, allow_blank=True, default="")
+    review_notes = serializers.CharField(
+        max_length=2000, required=False, allow_blank=True, default=""
+    )
 
 
 # ---------------------------------------------------------------------------

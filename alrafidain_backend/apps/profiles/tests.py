@@ -4,7 +4,6 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from apps.common.choices import UserType, VerificationStatus
-from apps.accounts.models import EmailOTP, OTPPurpose
 from apps.profiles.models import (
     DoctorProfile,
     LaboratorianProfile,
@@ -41,6 +40,7 @@ def _create_active_user(user_type=UserType.PATIENT, email="user@example.com"):
 
 def _auth_client(user):
     from rest_framework_simplejwt.tokens import RefreshToken
+
     client = APIClient()
     token = str(RefreshToken.for_user(user).access_token)
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
@@ -214,4 +214,3 @@ class DoctorSpecialtyOtherValidationTests(TestCase):
         self.assertIn("error", resp.data)
         self.assertIn("details", resp.data["error"])
         self.assertIn("specialty_other", resp.data["error"]["details"])
-

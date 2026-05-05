@@ -16,6 +16,7 @@ if TYPE_CHECKING:
 # Internal helpers
 # ---------------------------------------------------------------------------
 
+
 def _log(document, action: str, status: str, message: str = "", metadata: dict | None = None):
     from .models import KnowledgeProcessingLog
 
@@ -37,7 +38,8 @@ def _require_staff(user, label: str = "action"):
 # Text extraction
 # ---------------------------------------------------------------------------
 
-def extract_text_from_document(document: "KnowledgeDocument"):
+
+def extract_text_from_document(document: KnowledgeDocument):
     """
     Extract text from the uploaded file (PDF / DOCX / TXT).
     Creates a KnowledgeDocumentText row and updates processing_status.
@@ -98,7 +100,7 @@ def _extract_docx(path: str) -> tuple[str, int]:
 
 
 def _extract_txt(path: str) -> tuple[str, None]:
-    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+    with open(path, encoding="utf-8", errors="replace") as fh:
         return fh.read(), None
 
 
@@ -106,8 +108,9 @@ def _extract_txt(path: str) -> tuple[str, None]:
 # Chunking
 # ---------------------------------------------------------------------------
 
+
 def chunk_knowledge_document(
-    document: "KnowledgeDocument",
+    document: KnowledgeDocument,
     chunk_size: int = 1200,
     overlap: int = 200,
 ):
@@ -120,7 +123,7 @@ def chunk_knowledge_document(
     try:
         doc_text = document.extracted_text
     except Exception:
-        raise ValueError("Document has no extracted text. Run extraction first.")
+        raise ValueError("Document has no extracted text. Run extraction first.") from None
 
     text = doc_text.text
     if not text.strip():
@@ -168,7 +171,8 @@ def chunk_knowledge_document(
 # Process (extract + chunk)
 # ---------------------------------------------------------------------------
 
-def process_knowledge_document(document: "KnowledgeDocument"):
+
+def process_knowledge_document(document: KnowledgeDocument):
     """Extract text and chunk in one call."""
     extract_text_from_document(document)
     chunk_knowledge_document(document)
@@ -180,7 +184,8 @@ def process_knowledge_document(document: "KnowledgeDocument"):
 # Approval workflow
 # ---------------------------------------------------------------------------
 
-def approve_knowledge_document(document: "KnowledgeDocument", approved_by):
+
+def approve_knowledge_document(document: KnowledgeDocument, approved_by):
     _require_staff(approved_by, "approve")
 
     if not document.chunks.filter(is_active=True).exists():
@@ -209,7 +214,7 @@ def approve_knowledge_document(document: "KnowledgeDocument", approved_by):
     return document
 
 
-def reject_knowledge_document(document: "KnowledgeDocument", rejected_by, reason: str):
+def reject_knowledge_document(document: KnowledgeDocument, rejected_by, reason: str):
     _require_staff(rejected_by, "reject")
 
     document.approval_status = KnowledgeApprovalStatus.REJECTED
@@ -234,7 +239,7 @@ def reject_knowledge_document(document: "KnowledgeDocument", rejected_by, reason
     return document
 
 
-def archive_knowledge_document(document: "KnowledgeDocument", archived_by):
+def archive_knowledge_document(document: KnowledgeDocument, archived_by):
     _require_staff(archived_by, "archive")
 
     document.approval_status = KnowledgeApprovalStatus.ARCHIVED
@@ -264,6 +269,7 @@ def archive_knowledge_document(document: "KnowledgeDocument", archived_by):
 # ---------------------------------------------------------------------------
 # Search
 # ---------------------------------------------------------------------------
+
 
 def search_approved_chunks(
     query: str,
@@ -316,6 +322,7 @@ def search_approved_chunks(
 # Phase 12B — Embedding services
 # ---------------------------------------------------------------------------
 
+
 def embed_knowledge_chunk(chunk, embedding_client=None):
     """
     Compute and store an embedding for a single KnowledgeChunk.
@@ -331,9 +338,7 @@ def embed_knowledge_chunk(chunk, embedding_client=None):
     from .embedding_client import get_default_embedding_client
 
     if chunk.document.approval_status != KnowledgeApprovalStatus.APPROVED:
-        raise ValueError(
-            f"Cannot embed chunk {chunk.pk}: document is not approved."
-        )
+        raise ValueError(f"Cannot embed chunk {chunk.pk}: document is not approved.")
     if not chunk.is_active:
         raise ValueError(f"Cannot embed chunk {chunk.pk}: chunk is inactive.")
 
@@ -381,7 +386,11 @@ def embed_document_chunks(document, force: bool = False, embedding_client=None):
         document,
         "embed_chunks",
         "success",
-        f"Embedded {results['embedded']}, skipped {results['skipped']}, failed {results['failed']}.",
+        (
+            f"Embedded {results['embedded']}, "
+            f"skipped {results['skipped']}, "
+            f"failed {results['failed']}."
+        ),
         results,
     )
     return results
@@ -481,4 +490,3 @@ def semantic_search_approved_chunks(
         )
 
     return results
-

@@ -18,8 +18,20 @@ LAB_TESTS = [
     ("Random Blood Sugar", LabTestCategory.BIOCHEMISTRY, "RBS", "Random Blood Sugar", "Serum"),
     ("HbA1c", LabTestCategory.BIOCHEMISTRY, "HBA1C", "Glycated Haemoglobin", "Whole blood"),
     ("Lipid Profile", LabTestCategory.BIOCHEMISTRY, "LIPID", "Cholesterol, TG, HDL, LDL", "Serum"),
-    ("Liver Function Test", LabTestCategory.BIOCHEMISTRY, "LFT", "ALT, AST, ALP, Bilirubin, Albumin", "Serum"),
-    ("Kidney Function Test", LabTestCategory.BIOCHEMISTRY, "KFT", "Creatinine, Urea, Uric Acid", "Serum"),
+    (
+        "Liver Function Test",
+        LabTestCategory.BIOCHEMISTRY,
+        "LFT",
+        "ALT, AST, ALP, Bilirubin, Albumin",
+        "Serum",
+    ),
+    (
+        "Kidney Function Test",
+        LabTestCategory.BIOCHEMISTRY,
+        "KFT",
+        "Creatinine, Urea, Uric Acid",
+        "Serum",
+    ),
     ("Electrolytes", LabTestCategory.BIOCHEMISTRY, "ELEC", "Na, K, Cl, CO2", "Serum"),
     ("CRP", LabTestCategory.IMMUNOLOGY, "CRP", "C-Reactive Protein", "Serum"),
     ("Vitamin D", LabTestCategory.IMMUNOLOGY, "VITD", "25-OH Vitamin D", "Serum"),
@@ -51,6 +63,10 @@ class Command(BaseCommand):
             if created:
                 created_count += 1
 
-        self.stdout.write(self.style.SUCCESS(
-            f"seed_lab_tests done: {created_count} lab tests created (total in db: {LabTestCatalog.objects.count()})."
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                "seed_lab_tests done: "
+                f"{created_count} lab tests created "
+                f"(total in db: {LabTestCatalog.objects.count()})."
+            )
+        )

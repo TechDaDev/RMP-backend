@@ -6,8 +6,8 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.audit.services import create_audit_log
-from apps.common.throttles import LoginRateThrottle, OTPRateThrottle, PasswordResetRateThrottle
 from apps.common.responses import error_response, success_response
+from apps.common.throttles import LoginRateThrottle, OTPRateThrottle, PasswordResetRateThrottle
 
 from .models import OTPPurpose
 from .serializers import (
@@ -35,7 +35,9 @@ class RegisterView(APIView):
     @extend_schema(
         request=RegisterSerializer,
         summary="Register a new user",
-        description="Creates an inactive user account and sends an activation OTP to the provided email.",
+        description=(
+            "Creates an inactive user account and sends an activation OTP to the provided email."
+        ),
     )
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
@@ -97,7 +99,10 @@ class LoginView(APIView):
 class MeView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(summary="Get current user", description="Returns the authenticated user's basic information.")
+    @extend_schema(
+        summary="Get current user",
+        description="Returns the authenticated user's basic information.",
+    )
     def get(self, request):
         return success_response(data=UserSerializer(request.user).data)
 
@@ -137,7 +142,9 @@ class ResendActivationOTPView(APIView):
     @extend_schema(
         request=ResendActivationOTPSerializer,
         summary="Resend activation OTP",
-        description="Resends the activation OTP. Returns a generic response to avoid user enumeration.",
+        description=(
+            "Resends the activation OTP. Returns a generic response to avoid user enumeration."
+        ),
     )
     def post(self, request):
         serializer = ResendActivationOTPSerializer(data=request.data, context={"request": request})
@@ -165,7 +172,9 @@ class RequestPasswordResetView(APIView):
     @extend_schema(
         request=RequestPasswordResetSerializer,
         summary="Request password reset",
-        description="Sends a password reset OTP. Returns a generic response to avoid user enumeration.",
+        description=(
+            "Sends a password reset OTP. Returns a generic response to avoid user enumeration."
+        ),
     )
     def post(self, request):
         serializer = RequestPasswordResetSerializer(data=request.data, context={"request": request})
@@ -180,9 +189,7 @@ class RequestPasswordResetView(APIView):
                 target=user,
                 request=request,
             )
-        return success_response(
-            message="If the email exists, a password reset OTP has been sent."
-        )
+        return success_response(message="If the email exists, a password reset OTP has been sent.")
 
 
 @extend_schema(tags=["Accounts"])
@@ -210,4 +217,3 @@ class ConfirmPasswordResetView(APIView):
             request=request,
         )
         return success_response(message="Password reset successful.")
-

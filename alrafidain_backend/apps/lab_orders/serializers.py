@@ -4,11 +4,17 @@ from apps.common.choices import (
     BloodGroup,
     LabCompletionAttemptStatus,
     LabResultFlag,
-    LabResultStatus,
     LabResultValueType,
 )
 
-from .models import LabCompletionRecord, LabOrder, LabOrderItem, LabResult, LabResultCorrection, LabTestCatalog
+from .models import (
+    LabCompletionRecord,
+    LabOrder,
+    LabOrderItem,
+    LabResult,
+    LabResultCorrection,
+    LabTestCatalog,
+)
 
 PATIENT_LAB_GUIDANCE = (
     "Show this QR code to any verified laboratory/laboratorian registered in the platform. "
@@ -41,10 +47,16 @@ class LabTestCatalogSerializer(serializers.ModelSerializer):
 
 
 class LabOrderItemCreateSerializer(serializers.Serializer):
-    test = serializers.PrimaryKeyRelatedField(queryset=LabTestCatalog.objects.filter(is_active=True), required=False)
+    test = serializers.PrimaryKeyRelatedField(
+        queryset=LabTestCatalog.objects.filter(is_active=True), required=False
+    )
     test_name = serializers.CharField(max_length=200, required=False, allow_blank=True)
-    category = serializers.ChoiceField(choices=LabOrderItem._meta.get_field("category").choices, required=False)
-    sample_type = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
+    category = serializers.ChoiceField(
+        choices=LabOrderItem._meta.get_field("category").choices, required=False
+    )
+    sample_type = serializers.CharField(
+        max_length=100, required=False, allow_blank=True, default=""
+    )
     instructions = serializers.CharField(required=False, allow_blank=True, default="")
 
     def validate(self, attrs):
@@ -298,16 +310,26 @@ class LabResultCreateSerializer(serializers.Serializer):
     def validate(self, attrs):
         value_type = attrs.get("value_type")
         if value_type == LabResultValueType.NUMERIC and attrs.get("numeric_value") is None:
-            raise serializers.ValidationError({"numeric_value": "This field is required for numeric results."})
+            raise serializers.ValidationError(
+                {"numeric_value": "This field is required for numeric results."}
+            )
         if value_type == LabResultValueType.TEXT and not attrs.get("text_value"):
-            raise serializers.ValidationError({"text_value": "This field is required for text results."})
+            raise serializers.ValidationError(
+                {"text_value": "This field is required for text results."}
+            )
         if value_type == LabResultValueType.BLOOD_GROUP and not attrs.get("blood_group_value"):
-            raise serializers.ValidationError({"blood_group_value": "This field is required for blood group results."})
+            raise serializers.ValidationError(
+                {"blood_group_value": "This field is required for blood group results."}
+            )
         if value_type == LabResultValueType.FILE_ONLY and attrs.get("result_file") is None:
-            raise serializers.ValidationError({"result_file": "This field is required for file-only results."})
+            raise serializers.ValidationError(
+                {"result_file": "This field is required for file-only results."}
+            )
         if value_type == LabResultValueType.POSITIVE_NEGATIVE:
             if (attrs.get("text_value") or "").strip().lower() not in {"positive", "negative"}:
-                raise serializers.ValidationError({"text_value": "Value must be 'positive' or 'negative'."})
+                raise serializers.ValidationError(
+                    {"text_value": "Value must be 'positive' or 'negative'."}
+                )
         return attrs
 
 

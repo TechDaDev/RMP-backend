@@ -11,9 +11,9 @@ from django.test import TransactionTestCase
 from apps.common.choices import (
     ConsultationDuration,
     ConsultationStatus,
+    MedicalSpecialty,
     MessageSenderRole,
     MessageType,
-    MedicalSpecialty,
     NotificationType,
     SeverityLevel,
     UserType,

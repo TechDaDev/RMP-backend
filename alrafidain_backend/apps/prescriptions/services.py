@@ -38,9 +38,13 @@ def _is_approved_doctor(user) -> bool:
 def create_prescription(consultation, doctor, items_data, request=None):
     valid_statuses = {ConsultationStatus.ACCEPTED, ConsultationStatus.DOCTOR_RESPONDED}
     if consultation.status not in valid_statuses:
-        raise ValueError("Prescription can only be created for accepted or doctor_responded consultations.")
+        raise ValueError(
+            "Prescription can only be created for accepted or doctor_responded consultations."
+        )
     if consultation.assigned_doctor_id != doctor.id:
-        raise ValueError("Only the assigned doctor can create a prescription for this consultation.")
+        raise ValueError(
+            "Only the assigned doctor can create a prescription for this consultation."
+        )
     if not _is_approved_doctor(doctor):
         raise ValueError("Doctor must be approved to create prescriptions.")
     if not items_data:
@@ -75,21 +79,27 @@ def create_prescription(consultation, doctor, items_data, request=None):
         notification_type=NotificationType.PRESCRIPTION,
         title="Prescription issued",
         message="Your doctor has issued a prescription for your consultation.",
-        data={"prescription_id": str(prescription.id), "consultation_id": str(consultation.id), "status": prescription.status},
+        data={
+            "prescription_id": str(prescription.id),
+            "consultation_id": str(consultation.id),
+            "status": prescription.status,
+        },
     )
-    
+
     # Broadcast realtime prescription event (Phase 14)
     def broadcast_update():
         from apps.realtime.services import broadcast_prescription_updated
+
         try:
             broadcast_prescription_updated(prescription)
         except Exception as e:
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to broadcast prescription.updated event: {e}")
-    
+
     transaction.on_commit(broadcast_update)
-    
+
     return prescription
 
 
@@ -98,9 +108,11 @@ def get_prescription_by_qr_token(token, pharmacist):
         raise PermissionError("Only approved pharmacists can scan QR tokens.")
 
     try:
-        prescription = Prescription.objects.select_related("doctor", "patient", "consultation").get(qr_token=token)
+        prescription = Prescription.objects.select_related("doctor", "patient", "consultation").get(
+            qr_token=token
+        )
     except Prescription.DoesNotExist:
-        raise ValueError("Invalid QR token.")
+        raise ValueError("Invalid QR token.") from None
 
     if prescription.is_expired() and prescription.status not in (
         PrescriptionStatus.CANCELLED,
@@ -226,17 +238,19 @@ def dispense_prescription_items(prescription, pharmacist, items_payload, request
             message="All items in your prescription have been processed.",
             data={"prescription_id": str(prescription.id), "status": prescription.status},
         )
-    
+
     # Broadcast realtime prescription update event (Phase 14)
     def broadcast_update():
         from apps.realtime.services import broadcast_prescription_updated
+
         try:
             broadcast_prescription_updated(prescription)
         except Exception as e:
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to broadcast prescription.updated event: {e}")
-    
+
     transaction.on_commit(broadcast_update)
 
     return prescription

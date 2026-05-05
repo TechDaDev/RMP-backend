@@ -5,30 +5,29 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ('knowledge_base', '0002_vector_extension'),
+        ("knowledge_base", "0002_vector_extension"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='knowledgechunk',
-            name='embedded_at',
+            model_name="knowledgechunk",
+            name="embedded_at",
             field=models.DateTimeField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='knowledgechunk',
-            name='embedding',
+            model_name="knowledgechunk",
+            name="embedding",
             field=pgvector.django.vector.VectorField(blank=True, dimensions=384, null=True),
         ),
         migrations.AddField(
-            model_name='knowledgechunk',
-            name='embedding_metadata',
+            model_name="knowledgechunk",
+            name="embedding_metadata",
             field=models.JSONField(default=dict),
         ),
         migrations.AddField(
-            model_name='knowledgechunk',
-            name='embedding_model',
+            model_name="knowledgechunk",
+            name="embedding_model",
             field=models.CharField(blank=True, max_length=200, null=True),
         ),
     ]

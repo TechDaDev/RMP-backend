@@ -100,7 +100,7 @@ class Command(BaseCommand):
 
         # Categories
         category_map = {}
-        for order, (name, display_order) in enumerate(CATEGORIES):
+        for _order, (name, display_order) in enumerate(CATEGORIES):
             obj, created = SymptomCategory.objects.get_or_create(
                 name=name,
                 defaults={"display_order": display_order},
@@ -142,9 +142,11 @@ class Command(BaseCommand):
             if created:
                 rule_created += 1
 
-        self.stdout.write(self.style.SUCCESS(
-            f"seed_symptoms done: "
-            f"{cat_created} categories, "
-            f"{symptom_created} symptoms, "
-            f"{rule_created} specialty rules created."
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"seed_symptoms done: "
+                f"{cat_created} categories, "
+                f"{symptom_created} symptoms, "
+                f"{rule_created} specialty rules created."
+            )
+        )

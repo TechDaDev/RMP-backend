@@ -1,5 +1,4 @@
 import io
-import os
 import tempfile
 
 from django.contrib.auth import get_user_model
@@ -23,7 +22,6 @@ from .services import (
     archive_knowledge_document,
     chunk_knowledge_document,
     extract_text_from_document,
-    reject_knowledge_document,
     search_approved_chunks,
 )
 
@@ -45,7 +43,11 @@ def _make_docx_file() -> SimpleUploadedFile:
     doc.add_paragraph("This is a test DOCX medical document content. " * 100)
     doc.save(buf)
     buf.seek(0)
-    return SimpleUploadedFile("test_doc.docx", buf.read(), content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    return SimpleUploadedFile(
+        "test_doc.docx",
+        buf.read(),
+        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
 
 
 def _make_staff_user(email="staff@example.com"):
@@ -121,7 +123,9 @@ class UploadTests(TestCase):
 
     def test_invalid_extension_rejected(self):
         self.client.force_authenticate(self.staff)
-        bad_file = SimpleUploadedFile("malware.exe", b"data", content_type="application/octet-stream")
+        bad_file = SimpleUploadedFile(
+            "malware.exe", b"data", content_type="application/octet-stream"
+        )
         response = _upload_document(self.client, file=bad_file)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
@@ -264,7 +268,10 @@ class SearchTests(TestCase):
         self.client = APIClient()
         self.client.force_authenticate(self.staff)
         # Create and approve a document
-        _upload_document(self.client, file=_make_txt_file("CRP C-reactive protein inflammation marker blood test " * 200))
+        _upload_document(
+            self.client,
+            file=_make_txt_file("CRP C-reactive protein inflammation marker blood test " * 200),
+        )
         self.doc = KnowledgeDocument.objects.first()
         extract_text_from_document(self.doc)
         self.doc.refresh_from_db()
@@ -274,7 +281,11 @@ class SearchTests(TestCase):
         self.doc.refresh_from_db()
 
         # Create pending document (should not appear in search)
-        _upload_document(self.client, file=_make_txt_file("Hemoglobin pending test " * 200), extra={"title": "Pending Doc"})
+        _upload_document(
+            self.client,
+            file=_make_txt_file("Hemoglobin pending test " * 200),
+            extra={"title": "Pending Doc"},
+        )
         self.pending_doc = KnowledgeDocument.objects.order_by("-created_at").first()
 
     def test_search_returns_approved_documents(self):

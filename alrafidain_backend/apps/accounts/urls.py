@@ -16,6 +16,14 @@ urlpatterns = [
     path("me/", MeView.as_view(), name="accounts-me"),
     path("activate/", ActivateAccountView.as_view(), name="accounts-activate"),
     path("resend-activation-otp/", ResendActivationOTPView.as_view(), name="accounts-resend-otp"),
-    path("password-reset/request/", RequestPasswordResetView.as_view(), name="accounts-password-reset-request"),
-    path("password-reset/confirm/", ConfirmPasswordResetView.as_view(), name="accounts-password-reset-confirm"),
+    path(
+        "password-reset/request/",
+        RequestPasswordResetView.as_view(),
+        name="accounts-password-reset-request",
+    ),
+    path(
+        "password-reset/confirm/",
+        ConfirmPasswordResetView.as_view(),
+        name="accounts-password-reset-confirm",
+    ),
 ]

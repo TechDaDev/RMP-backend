@@ -80,7 +80,9 @@ class MedicalRecordEntryDeactivateSerializer(serializers.Serializer):
 
 
 class SetBloodGroupSerializer(serializers.Serializer):
-    blood_group = serializers.ChoiceField(choices=BloodGroupRecord._meta.get_field("blood_group").choices)
+    blood_group = serializers.ChoiceField(
+        choices=BloodGroupRecord._meta.get_field("blood_group").choices
+    )
     notes = serializers.CharField(required=False, allow_blank=True)
 
 

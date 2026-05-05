@@ -1,6 +1,5 @@
 from apps.common.choices import ConsultationStatus, UserType
 
-
 READABLE_STATUSES = [
     ConsultationStatus.ACCEPTED,
     ConsultationStatus.DOCTOR_RESPONDED,

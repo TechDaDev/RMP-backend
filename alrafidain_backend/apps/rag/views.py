@@ -80,7 +80,10 @@ class DoctorGeneralRAGQueryView(APIView):
 
 
 class ConsultationRAGSupportView(APIView):
-    """POST /api/rag/consultations/<uuid:consultation_id>/support/ — RAG support for a specific consultation."""
+    """
+    POST /api/rag/consultations/<uuid:consultation_id>/support/ —
+    RAG support for a specific consultation.
+    """
 
     permission_classes = [IsAuthenticated]
 
@@ -309,6 +312,7 @@ class AdminRAGAnalyticsSummaryView(APIView):
             return Response({"detail": "Staff only."}, status=403)
 
         from apps.audit.services import create_audit_log
+
         from .analytics import get_rag_analytics_summary
 
         summary = get_rag_analytics_summary()
@@ -341,6 +345,7 @@ class AdminRAGDatasetExportView(APIView):
         anonymize: bool = d["anonymize"]
 
         from apps.audit.services import create_audit_log
+
         from .exporters import export_rag_evaluation_dataset
 
         content = export_rag_evaluation_dataset(

@@ -1,11 +1,10 @@
 import os
 
-
 os.environ.setdefault("ENVIRONMENT", "test")
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
 
 from .base import *  # noqa: F401,F403
-
+from .base import REST_FRAMEWORK as BASE_REST_FRAMEWORK
 
 DATABASES = {
     "default": {
@@ -19,7 +18,7 @@ PASSWORD_HASHERS = [
 ]
 
 REST_FRAMEWORK = {
-    **REST_FRAMEWORK,
+    **BASE_REST_FRAMEWORK,
     "DEFAULT_THROTTLE_CLASSES": [],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "100000/day",

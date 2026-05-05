@@ -40,8 +40,7 @@ class DeepSeekClient:
 
         if not self.api_key:
             raise DeepSeekConfigError(
-                "DEEPSEEK_API_KEY is not configured. "
-                "Set it in your environment or settings file."
+                "DEEPSEEK_API_KEY is not configured. Set it in your environment or settings file."
             )
 
     def chat(

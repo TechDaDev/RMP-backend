@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.utils import timezone
 
-from .models import EmailOTP, OTPPurpose
+from .models import EmailOTP
 
 User = get_user_model()
 
@@ -61,12 +61,11 @@ def verify_email_otp(user, purpose: str, code: str) -> EmailOTP:
     Returns the validated EmailOTP instance on success.
     """
     try:
-        otp = (
-            EmailOTP.objects.filter(user=user, purpose=purpose, is_used=False)
-            .latest("created_at")
+        otp = EmailOTP.objects.filter(user=user, purpose=purpose, is_used=False).latest(
+            "created_at"
         )
     except EmailOTP.DoesNotExist:
-        raise ValidationError("No active OTP found. Please request a new one.")
+        raise ValidationError("No active OTP found. Please request a new one.") from None
 
     if otp.code != code:
         raise ValidationError("Invalid OTP code.")

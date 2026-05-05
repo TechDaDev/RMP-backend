@@ -78,7 +78,9 @@ def doctor_can_access_patient_record(doctor, patient) -> bool:
     ).exists()
 
 
-def create_medical_record_entry(record, source_user, category, title, value, notes=None, request=None):
+def create_medical_record_entry(
+    record, source_user, category, title, value, notes=None, request=None
+):
     if not record or not source_user:
         raise ValueError("Record and source user are required.")
 
@@ -98,7 +100,9 @@ def create_medical_record_entry(record, source_user, category, title, value, not
         verified_by = source_user
         verified_at = timezone.now()
     else:
-        raise PermissionError("Only patient or approved doctor can create generic medical record entries.")
+        raise PermissionError(
+            "Only patient or approved doctor can create generic medical record entries."
+        )
 
     entry = MedicalRecordEntry.objects.create(
         medical_record=record,
@@ -146,7 +150,9 @@ def confirm_medical_record_entry(entry, doctor, status, notes=None, request=None
     entry.verified_at = timezone.now()
     if notes:
         entry.notes = notes
-    entry.save(update_fields=["verification_status", "verified_by", "verified_at", "notes", "updated_at"])
+    entry.save(
+        update_fields=["verification_status", "verified_by", "verified_at", "notes", "updated_at"]
+    )
 
     action = (
         "medical_record_entry_confirmed"

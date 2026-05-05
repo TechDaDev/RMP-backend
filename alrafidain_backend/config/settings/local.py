@@ -2,7 +2,6 @@ from decouple import config
 
 from .base import *  # noqa: F401,F403
 
-
 DEBUG = config("DEBUG", cast=bool, default=True)
 
 DATABASES = {

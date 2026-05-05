@@ -10,7 +10,6 @@ Strategy:
 - Management command tests mock embed_document_chunks / embed_all_approved_chunks.
 """
 
-import io
 import tempfile
 import uuid
 from unittest import mock
@@ -31,7 +30,7 @@ from apps.common.choices import (
     KnowledgeProcessingStatus,
 )
 
-from .models import KnowledgeChunk, KnowledgeDocument, KnowledgeProcessingLog
+from .models import KnowledgeDocument, KnowledgeProcessingLog
 from .services import (
     embed_all_approved_chunks,
     embed_document_chunks,
@@ -49,6 +48,7 @@ MOCK_VECTOR = [0.1] * 384
 # ---------------------------------------------------------------------------
 # Helpers (shared with existing tests.py pattern)
 # ---------------------------------------------------------------------------
+
 
 def _make_txt_file(content: str = "Medical content. " * 300) -> SimpleUploadedFile:
     return SimpleUploadedFile("test_doc.txt", content.encode("utf-8"), content_type="text/plain")
@@ -79,7 +79,6 @@ def _make_mock_embedding_client():
 @override_settings(MEDIA_ROOT=MEDIA_ROOT_TMP)
 def _create_approved_document(staff_user, title="Test Doc"):
     """Create an approved document with active chunks via the service layer."""
-    from django.utils import timezone
 
     from .models import KnowledgeDocumentText
     from .services import approve_knowledge_document, chunk_knowledge_document
@@ -112,6 +111,7 @@ def _create_approved_document(staff_user, title="Test Doc"):
 # Unit tests — embed_knowledge_chunk
 # ---------------------------------------------------------------------------
 
+
 @override_settings(
     MEDIA_ROOT=MEDIA_ROOT_TMP,
     EMBEDDING_MODEL_NAME="test-model",
@@ -124,7 +124,7 @@ class EmbedKnowledgeChunkTest(TestCase):
 
     def test_embed_chunk_sets_fields(self):
         client = _make_mock_embedding_client()
-        result = embed_knowledge_chunk(self.chunk, embedding_client=client)
+        embed_knowledge_chunk(self.chunk, embedding_client=client)
 
         self.chunk.refresh_from_db()
         self.assertEqual(list(self.chunk.embedding), MOCK_VECTOR)
@@ -161,6 +161,7 @@ class EmbedKnowledgeChunkTest(TestCase):
 # Unit tests — embed_document_chunks
 # ---------------------------------------------------------------------------
 
+
 @override_settings(
     MEDIA_ROOT=MEDIA_ROOT_TMP,
     EMBEDDING_MODEL_NAME="test-model",
@@ -180,7 +181,6 @@ class EmbedDocumentChunksTest(TestCase):
     def test_skips_already_embedded_without_force(self):
         client = _make_mock_embedding_client()
         embed_document_chunks(self.doc, embedding_client=client)
-        first_count = client.embed_text.call_count
 
         # Second call without force — nothing new to embed
         client.embed_text.reset_mock()
@@ -216,6 +216,7 @@ class EmbedDocumentChunksTest(TestCase):
 # Unit tests — embed_all_approved_chunks
 # ---------------------------------------------------------------------------
 
+
 @override_settings(
     MEDIA_ROOT=MEDIA_ROOT_TMP,
     EMBEDDING_MODEL_NAME="test-model",
@@ -246,7 +247,7 @@ class EmbedAllApprovedChunksTest(TestCase):
         self.doc2.save(update_fields=["is_active"])
         client = _make_mock_embedding_client()
         # Should only embed doc1
-        result = embed_all_approved_chunks(embedding_client=client)
+        embed_all_approved_chunks(embedding_client=client)
         doc2_embedded = self.doc2.chunks.filter(embedding__isnull=False).count()
         self.assertEqual(doc2_embedded, 0)
 
@@ -254,6 +255,7 @@ class EmbedAllApprovedChunksTest(TestCase):
 # ---------------------------------------------------------------------------
 # API tests — KnowledgeDocumentEmbedView
 # ---------------------------------------------------------------------------
+
 
 @override_settings(
     MEDIA_ROOT=MEDIA_ROOT_TMP,
@@ -286,9 +288,12 @@ class KnowledgeDocumentEmbedViewTest(TestCase):
         mock_embed.return_value = {"embedded": 3, "skipped": 0, "failed": 0}
         self.staff_client.post(self.url, {"force": "true"})
         _, kwargs = mock_embed.call_args
-        self.assertTrue(kwargs.get("force") or mock_embed.call_args[0][1] is True or
-                        mock_embed.call_args.kwargs.get("force") is True or
-                        mock_embed.call_args.args[1] is True)
+        self.assertTrue(
+            kwargs.get("force")
+            or mock_embed.call_args[0][1] is True
+            or mock_embed.call_args.kwargs.get("force") is True
+            or mock_embed.call_args.args[1] is True
+        )
 
     def test_non_staff_blocked(self):
         response = self.regular_client.post(self.url)
@@ -302,9 +307,7 @@ class KnowledgeDocumentEmbedViewTest(TestCase):
     def test_audit_log_created(self, mock_embed):
         mock_embed.return_value = {"embedded": 2, "skipped": 0, "failed": 0}
         self.staff_client.post(self.url)
-        self.assertTrue(
-            AuditLog.objects.filter(action="knowledge_document_embedded").exists()
-        )
+        self.assertTrue(AuditLog.objects.filter(action="knowledge_document_embedded").exists())
 
     def test_invalid_document_id_returns_404(self):
         url = EMBED_URL_FMT.format(uuid.uuid4())
@@ -321,6 +324,7 @@ class KnowledgeDocumentEmbedViewTest(TestCase):
 # ---------------------------------------------------------------------------
 # API tests — KnowledgeChunkSemanticSearchView (service mocked)
 # ---------------------------------------------------------------------------
+
 
 @override_settings(
     MEDIA_ROOT=MEDIA_ROOT_TMP,
@@ -410,6 +414,7 @@ class KnowledgeChunkSemanticSearchViewTest(TestCase):
 # Serializer tests — KnowledgeChunkSerializer embedding fields
 # ---------------------------------------------------------------------------
 
+
 @override_settings(MEDIA_ROOT=MEDIA_ROOT_TMP)
 class KnowledgeChunkSerializerEmbeddingFieldsTest(TestCase):
     def setUp(self):
@@ -442,31 +447,40 @@ class KnowledgeChunkSerializerEmbeddingFieldsTest(TestCase):
 # Management command tests
 # ---------------------------------------------------------------------------
 
+
 @override_settings(MEDIA_ROOT=MEDIA_ROOT_TMP)
 class ManagementCommandEmbedKnowledgeBaseTest(TestCase):
     def setUp(self):
         self.staff = _make_staff_user("staff_cmd@test.com")
         self.doc = _create_approved_document(self.staff)
 
-    @mock.patch("apps.knowledge_base.management.commands.embed_knowledge_base.embed_all_approved_chunks")
+    @mock.patch(
+        "apps.knowledge_base.management.commands.embed_knowledge_base.embed_all_approved_chunks"
+    )
     def test_command_calls_embed_all(self, mock_fn):
         mock_fn.return_value = {"embedded": 3, "skipped": 0, "failed": 0}
         call_command("embed_knowledge_base")
         mock_fn.assert_called_once_with(force=False, limit=None)
 
-    @mock.patch("apps.knowledge_base.management.commands.embed_knowledge_base.embed_all_approved_chunks")
+    @mock.patch(
+        "apps.knowledge_base.management.commands.embed_knowledge_base.embed_all_approved_chunks"
+    )
     def test_command_force_flag(self, mock_fn):
         mock_fn.return_value = {"embedded": 3, "skipped": 0, "failed": 0}
         call_command("embed_knowledge_base", "--force")
         mock_fn.assert_called_once_with(force=True, limit=None)
 
-    @mock.patch("apps.knowledge_base.management.commands.embed_knowledge_base.embed_document_chunks")
+    @mock.patch(
+        "apps.knowledge_base.management.commands.embed_knowledge_base.embed_document_chunks"
+    )
     def test_command_single_document(self, mock_fn):
         mock_fn.return_value = {"embedded": 2, "skipped": 0, "failed": 0}
         call_command("embed_knowledge_base", f"--document-id={self.doc.pk}")
         mock_fn.assert_called_once()
 
-    @mock.patch("apps.knowledge_base.management.commands.embed_knowledge_base.embed_all_approved_chunks")
+    @mock.patch(
+        "apps.knowledge_base.management.commands.embed_knowledge_base.embed_all_approved_chunks"
+    )
     def test_command_limit_option(self, mock_fn):
         mock_fn.return_value = {"embedded": 1, "skipped": 0, "failed": 0}
         call_command("embed_knowledge_base", "--limit=5")
@@ -488,6 +502,7 @@ class ManagementCommandEmbedKnowledgeBaseTest(TestCase):
 # ---------------------------------------------------------------------------
 # embedding_client unit tests (no real model loaded)
 # ---------------------------------------------------------------------------
+
 
 class EmbeddingClientTest(TestCase):
     @mock.patch("apps.knowledge_base.embedding_client.LocalEmbeddingClient._load_model")

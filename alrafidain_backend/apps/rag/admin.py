@@ -30,9 +30,16 @@ class RAGRetrievedChunkAdmin(admin.ModelAdmin):
 @admin.register(RAGResponse)
 class RAGResponseAdmin(admin.ModelAdmin):
     list_display = [
-        "id", "rag_query", "status", "safety_level",
-        "doctor_review_required", "patient_visible",
-        "model_name", "token_input", "token_output", "created_at",
+        "id",
+        "rag_query",
+        "status",
+        "safety_level",
+        "doctor_review_required",
+        "patient_visible",
+        "model_name",
+        "token_input",
+        "token_output",
+        "created_at",
     ]
     list_filter = ["status", "safety_level", "provider"]
     search_fields = ["response_text", "rag_query__query_text"]
@@ -50,9 +57,15 @@ class RAGRetrievedChunkFeedbackInline(admin.TabularInline):
 @admin.register(RAGResponseFeedback)
 class RAGResponseFeedbackAdmin(admin.ModelAdmin):
     list_display = [
-        "id", "doctor", "rag_response", "rating",
-        "is_safe", "needs_admin_review", "review_status",
-        "reviewed_by", "created_at",
+        "id",
+        "doctor",
+        "rag_response",
+        "rating",
+        "is_safe",
+        "needs_admin_review",
+        "review_status",
+        "reviewed_by",
+        "created_at",
     ]
     list_filter = ["rating", "is_safe", "needs_admin_review", "review_status", "created_at"]
     search_fields = [
@@ -62,8 +75,14 @@ class RAGResponseFeedbackAdmin(admin.ModelAdmin):
         "rag_response__response_text",
     ]
     readonly_fields = [
-        "id", "rag_response", "doctor", "rating", "is_safe", "needs_admin_review",
-        "created_at", "updated_at",
+        "id",
+        "rag_response",
+        "doctor",
+        "rating",
+        "is_safe",
+        "needs_admin_review",
+        "created_at",
+        "updated_at",
     ]
     ordering = ["-created_at"]
     inlines = [RAGRetrievedChunkFeedbackInline]

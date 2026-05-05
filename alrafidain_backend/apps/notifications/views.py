@@ -49,7 +49,9 @@ class MarkNotificationReadView(APIView):
         if notification.recipient_id != request.user.id:
             return error_response("Not found.", status_code=404)
         notification.mark_as_read()
-        return success_response("Notification marked as read.", data=NotificationSerializer(notification).data)
+        return success_response(
+            "Notification marked as read.", data=NotificationSerializer(notification).data
+        )
 
 
 @extend_schema(tags=["Notifications"])
@@ -61,4 +63,6 @@ class MarkAllNotificationsReadView(APIView):
         updated = Notification.objects.filter(recipient=request.user, is_read=False).update(
             is_read=True, read_at=now
         )
-        return success_response("All notifications marked as read.", data={"updated_count": updated})
+        return success_response(
+            "All notifications marked as read.", data={"updated_count": updated}
+        )

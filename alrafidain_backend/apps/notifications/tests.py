@@ -1,6 +1,5 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -13,8 +12,8 @@ from apps.common.choices import (
     VerificationStatus,
 )
 from apps.consultations.models import Consultation
-from apps.profiles.models import DoctorProfile, PatientProfile, PharmacistProfile, UserProfile
 from apps.prescriptions.models import Prescription, PrescriptionItem
+from apps.profiles.models import DoctorProfile, PatientProfile, PharmacistProfile, UserProfile
 
 from .models import Notification
 from .services import create_notification, notify_many
@@ -26,6 +25,7 @@ User = get_user_model()
 # Helpers
 # ─────────────────────────────────────────
 
+
 def auth_client(user):
     client = APIClient()
     token = str(RefreshToken.for_user(user).access_token)
@@ -35,8 +35,12 @@ def auth_client(user):
 
 def create_patient(email="patient@example.com"):
     user = User.objects.create_user(
-        email=email, password="StrongPass1!", first_name="Pat", last_name="Ient",
-        user_type=UserType.PATIENT, is_active=True,
+        email=email,
+        password="StrongPass1!",
+        first_name="Pat",
+        last_name="Ient",
+        user_type=UserType.PATIENT,
+        is_active=True,
     )
     UserProfile.objects.create(user=user)
     PatientProfile.objects.create(user=user)
@@ -45,8 +49,12 @@ def create_patient(email="patient@example.com"):
 
 def create_doctor(email="doctor@example.com", approved=True):
     user = User.objects.create_user(
-        email=email, password="StrongPass1!", first_name="Doc", last_name="Tor",
-        user_type=UserType.DOCTOR, is_active=True,
+        email=email,
+        password="StrongPass1!",
+        first_name="Doc",
+        last_name="Tor",
+        user_type=UserType.DOCTOR,
+        is_active=True,
     )
     UserProfile.objects.create(user=user)
     DoctorProfile.objects.create(
@@ -59,8 +67,12 @@ def create_doctor(email="doctor@example.com", approved=True):
 
 def create_pharmacist(email="pharma@example.com", approved=True):
     user = User.objects.create_user(
-        email=email, password="StrongPass1!", first_name="Phar", last_name="Ma",
-        user_type=UserType.PHARMACIST, is_active=True,
+        email=email,
+        password="StrongPass1!",
+        first_name="Phar",
+        last_name="Ma",
+        user_type=UserType.PHARMACIST,
+        is_active=True,
     )
     UserProfile.objects.create(user=user)
     PharmacistProfile.objects.create(
@@ -83,7 +95,9 @@ def create_accepted_consultation(patient, doctor):
 
 def create_pending_prescription(consultation, doctor, patient):
     prescription = Prescription.objects.create(
-        consultation=consultation, doctor=doctor, patient=patient,
+        consultation=consultation,
+        doctor=doctor,
+        patient=patient,
     )
     PrescriptionItem.objects.create(
         prescription=prescription,
@@ -98,6 +112,7 @@ def create_pending_prescription(consultation, doctor, patient):
 # ─────────────────────────────────────────
 # Model & Service Tests
 # ─────────────────────────────────────────
+
 
 class NotificationModelTest(TestCase):
     def setUp(self):
@@ -136,7 +151,9 @@ class NotificationModelTest(TestCase):
 
     def test_create_notification_requires_recipient(self):
         with self.assertRaises(ValueError):
-            create_notification(recipient=None, notification_type=NotificationType.SYSTEM, title="T", message="M")
+            create_notification(
+                recipient=None, notification_type=NotificationType.SYSTEM, title="T", message="M"
+            )
 
     def test_mark_as_read(self):
         n = create_notification(
@@ -164,12 +181,15 @@ class NotificationModelTest(TestCase):
             title="Broadcast",
             message="Hello all",
         )
-        self.assertEqual(Notification.objects.filter(notification_type=NotificationType.SYSTEM).count(), 2)
+        self.assertEqual(
+            Notification.objects.filter(notification_type=NotificationType.SYSTEM).count(), 2
+        )
 
 
 # ─────────────────────────────────────────
 # API Tests
 # ─────────────────────────────────────────
+
 
 class NotificationListAPITest(TestCase):
     def setUp(self):
@@ -198,7 +218,9 @@ class NotificationListAPITest(TestCase):
         self.assertEqual(len(r.data["data"]), 2)
 
     def test_filter_by_notification_type(self):
-        r = self.client.get(f"/api/notifications/?notification_type={NotificationType.CONSULTATION}")
+        r = self.client.get(
+            f"/api/notifications/?notification_type={NotificationType.CONSULTATION}"
+        )
         self.assertEqual(r.status_code, status.HTTP_200_OK)
         self.assertEqual(len(r.data["data"]), 1)
 
@@ -253,6 +275,7 @@ class MarkNotificationReadAPITest(TestCase):
 
     def test_mark_nonexistent_notification_returns_404(self):
         import uuid
+
         r = self.client.post(f"/api/notifications/{uuid.uuid4()}/mark-read/")
         self.assertEqual(r.status_code, status.HTTP_404_NOT_FOUND)
 
@@ -287,8 +310,10 @@ class MarkAllNotificationsReadAPITest(TestCase):
 # Workflow Integration Tests
 # ─────────────────────────────────────────
 
+
 class ConsultationNotificationIntegrationTest(TestCase):
     """Test that consultation workflow steps create appropriate notifications."""
+
     def setUp(self):
         self.patient = create_patient()
         self.doctor = create_doctor()
@@ -296,8 +321,9 @@ class ConsultationNotificationIntegrationTest(TestCase):
     def test_prescription_issued_notifies_patient(self):
         """Test that patient is notified when doctor issues a prescription."""
         from apps.prescriptions.services import create_prescription
+
         consultation = create_accepted_consultation(self.patient, self.doctor)
-        prescription = create_prescription(
+        create_prescription(
             consultation,
             self.doctor,
             [
@@ -322,6 +348,7 @@ class ConsultationNotificationIntegrationTest(TestCase):
     def test_patient_receives_doctor_dispensing_notifications(self):
         """Test that patient is notified when prescription is fully dispensed."""
         from apps.prescriptions.services import create_prescription, dispense_prescription_items
+
         consultation = create_accepted_consultation(self.patient, self.doctor)
         pharmacist = create_pharmacist()
         prescription = create_prescription(
@@ -340,7 +367,13 @@ class ConsultationNotificationIntegrationTest(TestCase):
         dispense_prescription_items(
             prescription,
             pharmacist,
-            [{"prescription_item_id": item.id, "status": "dispensed", "dispensed_quantity": "1 box"}],
+            [
+                {
+                    "prescription_item_id": item.id,
+                    "status": "dispensed",
+                    "dispensed_quantity": "1 box",
+                }
+            ],
         )
         # Check doctor is notified of dispensing
         self.assertTrue(
@@ -370,6 +403,7 @@ class ConsultationNotificationIntegrationTest(TestCase):
 
 class MessagingNotificationIntegrationTest(TestCase):
     """Test that messaging creates notifications for consultation parties."""
+
     def setUp(self):
         self.patient = create_patient()
         self.doctor = create_doctor()
@@ -378,6 +412,7 @@ class MessagingNotificationIntegrationTest(TestCase):
     def test_patient_message_notifies_doctor(self):
         """Test that doctor is notified when patient sends a message."""
         from apps.messaging.services import create_consultation_message
+
         create_consultation_message(self.consultation, self.patient, body="I have a question.")
         self.assertTrue(
             Notification.objects.filter(
@@ -390,6 +425,7 @@ class MessagingNotificationIntegrationTest(TestCase):
     def test_doctor_message_notifies_patient(self):
         """Test that patient is notified when doctor sends a message."""
         from apps.messaging.services import create_consultation_message
+
         create_consultation_message(self.consultation, self.doctor, body="Please follow up.")
         self.assertTrue(
             Notification.objects.filter(
@@ -398,4 +434,3 @@ class MessagingNotificationIntegrationTest(TestCase):
                 title="New doctor message",
             ).exists()
         )
-

@@ -7,6 +7,7 @@ Usage:
     python manage.py embed_knowledge_base --document-id <uuid>
     python manage.py embed_knowledge_base --limit 100
 """
+
 import uuid
 
 from django.core.management.base import BaseCommand, CommandError
@@ -49,18 +50,18 @@ class Command(BaseCommand):
             try:
                 doc_uuid = uuid.UUID(document_id)
             except ValueError:
-                raise CommandError(f"Invalid UUID: {document_id}")
+                raise CommandError(f"Invalid UUID: {document_id}") from None
 
             try:
                 document = KnowledgeDocument.objects.get(pk=doc_uuid)
             except KnowledgeDocument.DoesNotExist:
-                raise CommandError(f"Document not found: {document_id}")
+                raise CommandError(f"Document not found: {document_id}") from None
 
             self.stdout.write(f"Embedding document: {document.title} …")
             try:
                 result = embed_document_chunks(document, force=force)
             except ValueError as exc:
-                raise CommandError(str(exc))
+                raise CommandError(str(exc)) from None
 
             self.stdout.write(
                 self.style.SUCCESS(

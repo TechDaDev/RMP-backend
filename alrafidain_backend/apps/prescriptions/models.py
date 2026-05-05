@@ -104,9 +104,13 @@ class Prescription(BaseModel):
     def clean(self):
         valid_statuses = {ConsultationStatus.ACCEPTED, ConsultationStatus.DOCTOR_RESPONDED}
         if self.consultation.status not in valid_statuses:
-            raise ValidationError("Prescription can only be created for accepted or doctor_responded consultations.")
+            raise ValidationError(
+                "Prescription can only be created for accepted or doctor_responded consultations."
+            )
         if self.doctor_id != self.consultation.assigned_doctor_id:
-            raise ValidationError("Only the assigned doctor can create a prescription for this consultation.")
+            raise ValidationError(
+                "Only the assigned doctor can create a prescription for this consultation."
+            )
         if self.patient_id != self.consultation.patient_id:
             raise ValidationError("Patient must match the consultation patient.")
         if self.doctor.user_type != UserType.DOCTOR:
@@ -119,7 +123,9 @@ class Prescription(BaseModel):
             self.qr_token = _generate_unique_qr_token()
             self.qr_token_created_at = timezone.now()
         if not self.expires_at:
-            self.expires_at = (self.qr_token_created_at or timezone.now()) + timedelta(days=PRESCRIPTION_EXPIRY_DAYS)
+            self.expires_at = (self.qr_token_created_at or timezone.now()) + timedelta(
+                days=PRESCRIPTION_EXPIRY_DAYS
+            )
         super().save(*args, **kwargs)
 
 
@@ -190,7 +196,10 @@ class DispensingRecord(BaseModel):
         if self.pharmacist.user_type != UserType.PHARMACIST:
             raise ValidationError("Only pharmacists can create dispensing records.")
         try:
-            approved = self.pharmacist.pharmacist_profile.verification_status == VerificationStatus.APPROVED
+            approved = (
+                self.pharmacist.pharmacist_profile.verification_status
+                == VerificationStatus.APPROVED
+            )
         except Exception:
             approved = False
         if not approved:

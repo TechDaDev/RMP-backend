@@ -22,19 +22,11 @@ class UserProfile(BaseModel):
         on_delete=models.CASCADE,
         related_name="user_profile",
     )
-    phone_number = models.CharField(
-        max_length=11, blank=True, validators=[iraqi_phone_validator]
-    )
-    profile_image = models.ImageField(
-        upload_to=profile_image_upload_path, blank=True, null=True
-    )
-    gender = models.CharField(
-        max_length=10, choices=Gender.choices, blank=True
-    )
+    phone_number = models.CharField(max_length=11, blank=True, validators=[iraqi_phone_validator])
+    profile_image = models.ImageField(upload_to=profile_image_upload_path, blank=True, null=True)
+    gender = models.CharField(max_length=10, choices=Gender.choices, blank=True)
     date_of_birth = models.DateField(blank=True, null=True)
-    governorate = models.CharField(
-        max_length=20, choices=Governorate.choices, blank=True
-    )
+    governorate = models.CharField(max_length=20, choices=Governorate.choices, blank=True)
     district = models.CharField(max_length=100, blank=True)
     address = models.TextField(blank=True)
     national_id = models.CharField(max_length=20, blank=True)
@@ -44,8 +36,13 @@ class UserProfile(BaseModel):
         verbose_name_plural = "User Profiles"
 
     _REQUIRED_FIELDS = [
-        "phone_number", "gender", "date_of_birth",
-        "governorate", "district", "address", "national_id",
+        "phone_number",
+        "gender",
+        "date_of_birth",
+        "governorate",
+        "district",
+        "address",
+        "national_id",
     ]
 
     @property
@@ -129,11 +126,7 @@ class DoctorProfile(BaseModel):
 
     @property
     def is_complete(self) -> bool:
-        return bool(
-            self.medical_license_number
-            and self.medical_license_image
-            and self.specialty
-        )
+        return bool(self.medical_license_number and self.medical_license_image and self.specialty)
 
     @property
     def missing_fields(self) -> list:
@@ -148,7 +141,9 @@ class DoctorProfile(BaseModel):
 
     def clean(self):
         if self.specialty == MedicalSpecialty.OTHER and not self.specialty_other:
-            raise ValidationError({"specialty_other": "This field is required when specialty is Other."})
+            raise ValidationError(
+                {"specialty_other": "This field is required when specialty is Other."}
+            )
         if self.specialty != MedicalSpecialty.OTHER:
             self.specialty_other = ""
 
@@ -197,7 +192,12 @@ class PharmacistProfile(BaseModel):
     @property
     def missing_fields(self) -> list:
         result = []
-        for field in ["pharmacist_license_number", "pharmacist_license_image", "pharmacy_name", "pharmacy_address"]:
+        for field in [
+            "pharmacist_license_number",
+            "pharmacist_license_image",
+            "pharmacy_name",
+            "pharmacy_address",
+        ]:
             if not getattr(self, field):
                 result.append(field)
         return result
@@ -248,11 +248,15 @@ class LaboratorianProfile(BaseModel):
     @property
     def missing_fields(self) -> list:
         result = []
-        for field in ["laboratorian_license_number", "laboratorian_license_image", "laboratory_name", "laboratory_address"]:
+        for field in [
+            "laboratorian_license_number",
+            "laboratorian_license_image",
+            "laboratory_name",
+            "laboratory_address",
+        ]:
             if not getattr(self, field):
                 result.append(field)
         return result
 
     def __str__(self):
         return f"Laboratorian: {self.user.email}"
-

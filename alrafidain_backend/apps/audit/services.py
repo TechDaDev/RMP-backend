@@ -6,7 +6,7 @@ if TYPE_CHECKING:
     from django.http import HttpRequest
 
 
-def _get_client_ip(request: "HttpRequest") -> str | None:
+def _get_client_ip(request: HttpRequest) -> str | None:
     if request is None:
         return None
     x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
@@ -15,7 +15,7 @@ def _get_client_ip(request: "HttpRequest") -> str | None:
     return request.META.get("REMOTE_ADDR")
 
 
-def _get_user_agent(request: "HttpRequest") -> str:
+def _get_user_agent(request: HttpRequest) -> str:
     if request is None:
         return ""
     return request.META.get("HTTP_USER_AGENT", "")

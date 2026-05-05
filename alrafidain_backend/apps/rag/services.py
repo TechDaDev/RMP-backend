@@ -13,7 +13,6 @@ from apps.common.choices import (
     RAGFeedbackReviewStatus,
     RAGResponseStatus,
     RAGSafetyLevel,
-    RAGServiceContext,
 )
 
 from .permissions import is_approved_doctor
@@ -49,9 +48,10 @@ def run_doctor_rag_query(
     8. Audit.
     9. Return (rag_query, rag_response) tuple.
     """
+    from apps.knowledge_base.services import semantic_search_approved_chunks
+
     from .llm_clients.deepseek_client import DeepSeekClient
     from .models import RAGQuery, RAGResponse, RAGRetrievedChunk
-    from apps.knowledge_base.services import semantic_search_approved_chunks
 
     if not doctor_can_use_rag(doctor):
         raise PermissionError("Only approved doctors may use the RAG endpoint.")
@@ -243,8 +243,7 @@ def build_lab_result_summary_for_rag(lab_result) -> str:
         unit = getattr(lab_result, "unit", "") or ""
         ref = getattr(lab_result, "reference_range", "") or ""
         parts.append(
-            f"Numeric value: {lab_result.numeric_value} {unit} "
-            f"(reference: {ref or 'N/A'})"
+            f"Numeric value: {lab_result.numeric_value} {unit} (reference: {ref or 'N/A'})"
         )
     if getattr(lab_result, "text_value", None):
         parts.append(f"Text value: {lab_result.text_value}")
@@ -322,16 +321,13 @@ def submit_rag_response_feedback(
     # Process source feedback
     source_feedback_count = 0
     if source_feedback:
-        valid_chunk_ids = set(
-            str(pk)
-            for pk in rag_response.rag_query.retrieved_chunks.values_list("id", flat=True)
-        )
+        valid_chunk_ids = {
+            str(pk) for pk in rag_response.rag_query.retrieved_chunks.values_list("id", flat=True)
+        }
         for sf in source_feedback:
             chunk_id = str(sf.get("retrieved_chunk_id", ""))
             if chunk_id not in valid_chunk_ids:
-                raise ValueError(
-                    f"Retrieved chunk {chunk_id} does not belong to this RAG query."
-                )
+                raise ValueError(f"Retrieved chunk {chunk_id} does not belong to this RAG query.")
             try:
                 chunk = RAGRetrievedChunk.objects.get(
                     id=chunk_id,
@@ -340,7 +336,7 @@ def submit_rag_response_feedback(
             except RAGRetrievedChunk.DoesNotExist:
                 raise ValueError(
                     f"Retrieved chunk {chunk_id} not found for this RAG query."
-                )
+                ) from None
             RAGRetrievedChunkFeedback.objects.create(
                 feedback=feedback,
                 retrieved_chunk=chunk,
@@ -403,15 +399,16 @@ def review_rag_feedback(
 
     if review_status not in allowed_statuses:
         raise ValueError(
-            f"Invalid review_status '{review_status}'. "
-            f"Allowed: {sorted(allowed_statuses)}"
+            f"Invalid review_status '{review_status}'. Allowed: {sorted(allowed_statuses)}"
         )
 
     feedback.review_status = review_status
     feedback.reviewed_by = reviewer
     feedback.reviewed_at = timezone.now()
     feedback.review_notes = review_notes
-    feedback.save(update_fields=["review_status", "reviewed_by", "reviewed_at", "review_notes", "updated_at"])
+    feedback.save(
+        update_fields=["review_status", "reviewed_by", "reviewed_at", "review_notes", "updated_at"]
+    )
 
     create_audit_log(
         actor=reviewer,

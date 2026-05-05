@@ -27,4 +27,3 @@ class AuditLog(BaseModel):
     def __str__(self):
         actor = self.actor.email if self.actor_id else "anonymous"
         return f"[{self.action}] by {actor}"
-

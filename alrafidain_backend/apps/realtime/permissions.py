@@ -2,8 +2,6 @@
 Permission checks for WebSocket consumers.
 """
 
-from apps.consultations.models import Consultation
-
 
 def can_connect_user_socket(user):
     """
@@ -47,9 +45,7 @@ async def can_connect_consultation_messages(user, consultation):
     # Check if user is patient or assigned doctor
     is_patient = consultation.patient_id == user.id
     is_doctor = (
-        consultation.assigned_doctor_id == user.id
-        if consultation.assigned_doctor_id
-        else False
+        consultation.assigned_doctor_id == user.id if consultation.assigned_doctor_id else False
     )
 
     if not (is_patient or is_doctor):

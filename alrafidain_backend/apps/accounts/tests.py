@@ -1,6 +1,5 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -43,7 +42,9 @@ def _register(client, user_type=UserType.PATIENT, email="test@example.com"):
 
 def _activate(client, email="test@example.com"):
     user = User.objects.get(email=email)
-    otp = EmailOTP.objects.filter(user=user, purpose=OTPPurpose.ACCOUNT_ACTIVATION, is_used=False).first()
+    otp = EmailOTP.objects.filter(
+        user=user, purpose=OTPPurpose.ACCOUNT_ACTIVATION, is_used=False
+    ).first()
     return client.post(ACTIVATE_URL, {"email": email, "code": otp.code}, format="json")
 
 
@@ -218,21 +219,25 @@ class PhoneValidatorTests(TestCase):
 
     def test_invalid_prefix(self):
         from django.core.exceptions import ValidationError
+
         with self.assertRaises(ValidationError):
             iraqi_phone_validator("07112345678")
 
     def test_invalid_short(self):
         from django.core.exceptions import ValidationError
+
         with self.assertRaises(ValidationError):
             iraqi_phone_validator("0771234567")
 
     def test_invalid_letters(self):
         from django.core.exceptions import ValidationError
+
         with self.assertRaises(ValidationError):
             iraqi_phone_validator("0771234567A")
 
 
 # ─── Phase 2 tests ────────────────────────────────────────────────────────────
+
 
 class OTPHardeningTests(TestCase):
     """New OTP invalidates older; expired OTP fails; wrong OTP fails."""
@@ -259,6 +264,7 @@ class OTPHardeningTests(TestCase):
 
     def test_expired_otp_fails(self):
         from datetime import timedelta
+
         from django.utils import timezone
 
         otp = EmailOTP.objects.filter(
@@ -323,9 +329,7 @@ class AuditLogTests(TestCase):
         )
         token = resp.data["data"]["access"]
         self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}")
-        self.client.patch(
-            "/api/profiles/me/user-profile/", {"district": "Karrada"}, format="json"
-        )
+        self.client.patch("/api/profiles/me/user-profile/", {"district": "Karrada"}, format="json")
         self.assertTrue(AuditLog.objects.filter(action="user_profile_updated").exists())
 
 
@@ -359,4 +363,3 @@ class StandardResponseFormatTests(TestCase):
         )
         self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
         self.assertFalse(resp.data["success"])
-

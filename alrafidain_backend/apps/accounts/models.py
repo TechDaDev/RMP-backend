@@ -1,4 +1,3 @@
-import uuid
 from datetime import timedelta
 
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin
@@ -44,9 +43,7 @@ class OTPPurpose(models.TextChoices):
 
 
 class EmailOTP(BaseModel):
-    user = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="otps"
-    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="otps")
     purpose = models.CharField(max_length=30, choices=OTPPurpose.choices)
     code = models.CharField(max_length=6)
     is_used = models.BooleanField(default=False)
@@ -71,4 +68,3 @@ class EmailOTP(BaseModel):
 
     def __str__(self):
         return f"{self.user.email} – {self.purpose} – {'used' if self.is_used else 'active'}"
-

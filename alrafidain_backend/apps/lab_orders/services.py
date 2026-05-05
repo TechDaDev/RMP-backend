@@ -10,10 +10,10 @@ from apps.common.choices import (
     BloodGroup,
     ConsultationStatus,
     LabCompletionAttemptStatus,
-    LabResultStatus,
-    LabResultValueType,
     LabOrderItemStatus,
     LabOrderStatus,
+    LabResultStatus,
+    LabResultValueType,
     MedicalRecordCategory,
     MedicalRecordSourceRole,
     MedicalRecordVerificationStatus,
@@ -38,7 +38,9 @@ def generate_qr_token():
 def create_lab_order(consultation, doctor, items_data, request=None):
     valid_statuses = {ConsultationStatus.ACCEPTED, ConsultationStatus.DOCTOR_RESPONDED}
     if consultation.status not in valid_statuses:
-        raise ValueError("Lab order can only be created for accepted or doctor_responded consultations.")
+        raise ValueError(
+            "Lab order can only be created for accepted or doctor_responded consultations."
+        )
     if consultation.assigned_doctor_id != doctor.id:
         raise ValueError("Only assigned doctor can create a lab order for this consultation.")
     if not is_approved_doctor(doctor):
@@ -82,17 +84,19 @@ def create_lab_order(consultation, doctor, items_data, request=None):
             "status": lab_order.status,
         },
     )
-    
+
     # Broadcast realtime lab order event (Phase 14)
     def broadcast_update():
         from apps.realtime.services import broadcast_lab_order_updated
+
         try:
             broadcast_lab_order_updated(lab_order)
         except Exception as e:
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to broadcast lab_order.updated event: {e}")
-    
+
     transaction.on_commit(broadcast_update)
 
     return lab_order
@@ -103,11 +107,16 @@ def get_lab_order_by_qr_token(token, laboratorian, request=None):
         raise PermissionError("Only approved laboratorians can scan QR tokens.")
 
     try:
-        lab_order = LabOrder.objects.select_related("doctor", "patient", "consultation").get(qr_token=token)
+        lab_order = LabOrder.objects.select_related("doctor", "patient", "consultation").get(
+            qr_token=token
+        )
     except LabOrder.DoesNotExist:
-        raise ValueError("Invalid QR token.")
+        raise ValueError("Invalid QR token.") from None
 
-    if lab_order.is_expired() and lab_order.status not in (LabOrderStatus.CANCELLED, LabOrderStatus.FULLY_COMPLETED):
+    if lab_order.is_expired() and lab_order.status not in (
+        LabOrderStatus.CANCELLED,
+        LabOrderStatus.FULLY_COMPLETED,
+    ):
         lab_order.status = LabOrderStatus.EXPIRED
         lab_order.save(update_fields=["status", "updated_at"])
 
@@ -140,7 +149,10 @@ def complete_lab_order_items(lab_order, laboratorian, items_payload, request=Non
 
     lab_order = LabOrder.objects.select_for_update().get(pk=lab_order.pk)
 
-    if lab_order.is_expired() and lab_order.status not in (LabOrderStatus.CANCELLED, LabOrderStatus.FULLY_COMPLETED):
+    if lab_order.is_expired() and lab_order.status not in (
+        LabOrderStatus.CANCELLED,
+        LabOrderStatus.FULLY_COMPLETED,
+    ):
         lab_order.status = LabOrderStatus.EXPIRED
         lab_order.save(update_fields=["status", "updated_at"])
 
@@ -151,7 +163,9 @@ def complete_lab_order_items(lab_order, laboratorian, items_payload, request=Non
         item_id = entry["lab_order_item_id"]
         attempt_status = entry["status"]
 
-        item = LabOrderItem.objects.select_for_update().filter(pk=item_id, lab_order=lab_order).first()
+        item = (
+            LabOrderItem.objects.select_for_update().filter(pk=item_id, lab_order=lab_order).first()
+        )
         if item is None:
             raise ValueError(f"Lab order item {item_id} not found in this lab order.")
 
@@ -212,7 +226,10 @@ def complete_lab_order_items(lab_order, laboratorian, items_payload, request=Non
     previous_status = lab_order.status
     lab_order.update_status_from_items()
 
-    if lab_order.status == LabOrderStatus.FULLY_COMPLETED and previous_status != LabOrderStatus.FULLY_COMPLETED:
+    if (
+        lab_order.status == LabOrderStatus.FULLY_COMPLETED
+        and previous_status != LabOrderStatus.FULLY_COMPLETED
+    ):
         create_audit_log(
             actor=laboratorian,
             action="lab_order_fully_completed",
@@ -234,17 +251,19 @@ def complete_lab_order_items(lab_order, laboratorian, items_payload, request=Non
             message="Your lab order has been completed.",
             data={"lab_order_id": str(lab_order.id), "status": lab_order.status},
         )
-    
+
     # Broadcast realtime lab order update event (Phase 14)
     def broadcast_update():
         from apps.realtime.services import broadcast_lab_order_updated
+
         try:
             broadcast_lab_order_updated(lab_order)
         except Exception as e:
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to broadcast lab_order.updated event: {e}")
-    
+
     transaction.on_commit(broadcast_update)
 
     return lab_order
@@ -255,7 +274,9 @@ def _result_payload_snapshot(lab_result):
         "status": lab_result.status,
         "value_type": lab_result.value_type,
         "text_value": lab_result.text_value,
-        "numeric_value": str(lab_result.numeric_value) if lab_result.numeric_value is not None else None,
+        "numeric_value": str(lab_result.numeric_value)
+        if lab_result.numeric_value is not None
+        else None,
         "blood_group_value": lab_result.blood_group_value,
         "unit": lab_result.unit,
         "reference_range": lab_result.reference_range,
@@ -267,9 +288,7 @@ def _result_payload_snapshot(lab_result):
 def _json_safe_dict(data: dict) -> dict:
     out = {}
     for key, value in data.items():
-        if isinstance(value, Decimal):
-            out[key] = str(value)
-        elif isinstance(value, UUID):
+        if isinstance(value, Decimal) or isinstance(value, UUID):
             out[key] = str(value)
         else:
             out[key] = value
@@ -372,7 +391,9 @@ def correct_lab_result(lab_result, corrected_by, new_data, reason, request=None)
         lab_result=lab_result,
         corrected_by=corrected_by,
         previous_data=previous_data,
-        new_data=_json_safe_dict({k: v for k, v in new_data.items() if k in previous_data or k == "value_type"}),
+        new_data=_json_safe_dict(
+            {k: v for k, v in new_data.items() if k in previous_data or k == "value_type"}
+        ),
         reason=reason,
     )
 
@@ -409,7 +430,9 @@ def correct_lab_result(lab_result, corrected_by, new_data, reason, request=None)
 
 
 @transaction.atomic
-def review_lab_result(lab_result, doctor, doctor_notes=None, release_to_patient=False, request=None):
+def review_lab_result(
+    lab_result, doctor, doctor_notes=None, release_to_patient=False, request=None
+):
     if doctor.id != lab_result.doctor_id:
         raise PermissionError("Only ordering doctor can review this result.")
 
@@ -422,7 +445,9 @@ def review_lab_result(lab_result, doctor, doctor_notes=None, release_to_patient=
         lab_result.status = LabResultStatus.RELEASED
         lab_result.released_at = timezone.now()
 
-    lab_result.save(update_fields=["status", "reviewed_at", "doctor_notes", "released_at", "updated_at"])
+    lab_result.save(
+        update_fields=["status", "reviewed_at", "doctor_notes", "released_at", "updated_at"]
+    )
 
     create_audit_log(
         actor=doctor,
@@ -496,17 +521,19 @@ def release_lab_result_to_patient(lab_result, doctor, request=None):
             "lab_order_item_id": str(lab_result.lab_order_item_id),
         },
     )
-    
+
     # Broadcast realtime lab result release event (Phase 14)
     def broadcast_release():
         from apps.realtime.services import broadcast_lab_result_released
+
         try:
             broadcast_lab_result_released(lab_result)
         except Exception as e:
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to broadcast lab_result.released event: {e}")
-    
+
     transaction.on_commit(broadcast_release)
 
     return lab_result
@@ -529,7 +556,9 @@ def link_lab_result_to_medical_record(lab_result, doctor, request=None):
             raise ValueError("Blood group result requires a valid blood_group_value to link.")
         blood_group_record = record.blood_group_record
         blood_group_record.blood_group = lab_result.blood_group_value
-        blood_group_record.verification_status = MedicalRecordVerificationStatus.LABORATORY_CONFIRMED
+        blood_group_record.verification_status = (
+            MedicalRecordVerificationStatus.LABORATORY_CONFIRMED
+        )
         blood_group_record.source_user = lab_result.laboratorian
         blood_group_record.verified_by = lab_result.laboratorian
         blood_group_record.verified_at = now
@@ -568,7 +597,14 @@ def link_lab_result_to_medical_record(lab_result, doctor, request=None):
         lab_result.linked_entry = linked_entry
 
     lab_result.is_linked_to_medical_record = True
-    lab_result.save(update_fields=["is_linked_to_medical_record", "linked_entry", "linked_blood_group_record", "updated_at"])
+    lab_result.save(
+        update_fields=[
+            "is_linked_to_medical_record",
+            "linked_entry",
+            "linked_blood_group_record",
+            "updated_at",
+        ]
+    )
 
     create_audit_log(
         actor=doctor,

@@ -1,6 +1,6 @@
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
-from rest_framework import generics, status
+from rest_framework import generics
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
@@ -30,7 +30,10 @@ from .serializers import (
 class MyProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(summary="Get full profile", description="Returns the full profile with completion and verification info.")
+    @extend_schema(
+        summary="Get full profile",
+        description="Returns the full profile with completion and verification info.",
+    )
     def get(self, request):
         return success_response(data=FullProfileSerializer(request.user).data)
 
@@ -140,5 +143,3 @@ class UpdateLaboratorianProfileView(generics.RetrieveUpdateAPIView):
             target=instance,
             request=self.request,
         )
-
-

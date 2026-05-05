@@ -40,7 +40,12 @@ def message_attachment_upload_path(instance, filename: str) -> str:
 
 
 def lab_result_file_upload_path(instance, filename: str) -> str:
-    return f"lab-results/{instance.lab_order_id}/{instance.lab_order_item_id}/{_uuid_filename(filename)}"
+    return (
+        "lab-results/"
+        f"{instance.lab_order_id}/"
+        f"{instance.lab_order_item_id}/"
+        f"{_uuid_filename(filename)}"
+    )
 
 
 def knowledge_document_upload_path(instance, filename: str) -> str:

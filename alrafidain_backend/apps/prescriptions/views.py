@@ -21,7 +21,6 @@ from .serializers import (
     PrescriptionPatientDetailSerializer,
     PrescriptionPatientListSerializer,
     PrescriptionPharmacistScanSerializer,
-    PrescriptionRemainingItemSerializer,
 )
 from .services import (
     create_prescription,
@@ -41,13 +40,21 @@ class PrescriptionCreateView(CreateAPIView):
         consultation = get_object_or_404(Consultation, id=consultation_id)
 
         if not is_approved_doctor(request.user):
-            return error_response("Only approved doctors can create prescriptions.", status_code=status.HTTP_403_FORBIDDEN)
+            return error_response(
+                "Only approved doctors can create prescriptions.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
         if not is_assigned_doctor(request.user, consultation):
-            return error_response("You are not the assigned doctor for this consultation.", status_code=status.HTTP_403_FORBIDDEN)
+            return error_response(
+                "You are not the assigned doctor for this consultation.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
 
         serializer = self.get_serializer(data=request.data)
         if not serializer.is_valid():
-            return error_response("Invalid input.", errors=serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
+            return error_response(
+                "Invalid input.", errors=serializer.errors, status_code=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             prescription = create_prescription(
@@ -74,11 +81,15 @@ class PatientPrescriptionListView(ListAPIView):
     def get_queryset(self):
         if self.request.user.user_type != UserType.PATIENT:
             return Prescription.objects.none()
-        return Prescription.objects.filter(patient=self.request.user).select_related("doctor", "consultation")
+        return Prescription.objects.filter(patient=self.request.user).select_related(
+            "doctor", "consultation"
+        )
 
     def list(self, request, *args, **kwargs):
         if request.user.user_type != UserType.PATIENT:
-            return error_response("Only patients can list their prescriptions.", status_code=status.HTTP_403_FORBIDDEN)
+            return error_response(
+                "Only patients can list their prescriptions.", status_code=status.HTTP_403_FORBIDDEN
+            )
         qs = self.get_queryset()
         serializer = self.get_serializer(qs, many=True)
         return success_response("Prescriptions retrieved.", data=serializer.data)
@@ -96,7 +107,9 @@ class PatientPrescriptionDetailView(RetrieveAPIView):
         )
         if not is_prescription_patient(request.user, prescription):
             return error_response("Not found.", status_code=status.HTTP_404_NOT_FOUND)
-        return success_response("Prescription retrieved.", data=self.get_serializer(prescription).data)
+        return success_response(
+            "Prescription retrieved.", data=self.get_serializer(prescription).data
+        )
 
 
 @extend_schema(tags=["Prescriptions"])
@@ -106,14 +119,16 @@ class DoctorPrescriptionDetailView(RetrieveAPIView):
 
     def retrieve(self, request, *args, **kwargs):
         prescription = get_object_or_404(
-            Prescription.objects.select_related("doctor", "patient", "consultation").prefetch_related(
-                "items", "dispensing_records__pharmacist"
-            ),
+            Prescription.objects.select_related(
+                "doctor", "patient", "consultation"
+            ).prefetch_related("items", "dispensing_records__pharmacist"),
             id=kwargs["prescription_id"],
         )
         if not is_prescription_doctor(request.user, prescription):
             return error_response("Not found.", status_code=status.HTTP_404_NOT_FOUND)
-        return success_response("Prescription retrieved.", data=self.get_serializer(prescription).data)
+        return success_response(
+            "Prescription retrieved.", data=self.get_serializer(prescription).data
+        )
 
 
 @extend_schema(tags=["Prescriptions"])
@@ -131,9 +146,12 @@ class DoctorCancelPrescriptionView(APIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
         if prescription.status == PrescriptionStatus.CANCELLED:
-            return error_response("Prescription is already cancelled.", status_code=status.HTTP_400_BAD_REQUEST)
+            return error_response(
+                "Prescription is already cancelled.", status_code=status.HTTP_400_BAD_REQUEST
+            )
 
         from django.utils import timezone
+
         now = timezone.now()
         prescription.status = PrescriptionStatus.CANCELLED
         prescription.cancelled_at = now
@@ -154,7 +172,9 @@ class DoctorCancelPrescriptionView(APIView):
             },
             request=request,
         )
-        return success_response("Prescription cancelled.", data=PrescriptionDoctorDetailSerializer(prescription).data)
+        return success_response(
+            "Prescription cancelled.", data=PrescriptionDoctorDetailSerializer(prescription).data
+        )
 
 
 @extend_schema(tags=["Prescriptions"])
@@ -164,7 +184,10 @@ class PharmacistPrescriptionScanView(APIView):
 
     def post(self, request):
         if not is_approved_pharmacist(request.user):
-            return error_response("Only approved pharmacists can scan QR tokens.", status_code=status.HTTP_403_FORBIDDEN)
+            return error_response(
+                "Only approved pharmacists can scan QR tokens.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
 
         token = request.data.get("qr_token", "").strip()
         if not token:
@@ -197,7 +220,9 @@ class PharmacistPrescriptionScanView(APIView):
             "prescription": prescription,
             "remaining_items": remaining,
             "locked": locked,
-            "message": "This prescription is no longer available for dispensing." if locked else None,
+            "message": "This prescription is no longer available for dispensing."
+            if locked
+            else None,
         }
         serializer = PrescriptionPharmacistScanSerializer(data)
         return success_response("QR scanned.", data=serializer.data)
@@ -209,13 +234,18 @@ class PharmacistDispenseItemsView(APIView):
 
     def post(self, request, prescription_id):
         if not is_approved_pharmacist(request.user):
-            return error_response("Only approved pharmacists can dispense items.", status_code=status.HTTP_403_FORBIDDEN)
+            return error_response(
+                "Only approved pharmacists can dispense items.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
 
         prescription = get_object_or_404(Prescription, id=prescription_id)
 
         serializer = DispenseItemsSerializer(data=request.data)
         if not serializer.is_valid():
-            return error_response("Invalid input.", errors=serializer.errors, status_code=status.HTTP_400_BAD_REQUEST)
+            return error_response(
+                "Invalid input.", errors=serializer.errors, status_code=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             prescription = dispense_prescription_items(
@@ -234,7 +264,9 @@ class PharmacistDispenseItemsView(APIView):
             "prescription": prescription,
             "remaining_items": remaining,
             "locked": locked,
-            "message": "This prescription is no longer available for dispensing." if locked else None,
+            "message": "This prescription is no longer available for dispensing."
+            if locked
+            else None,
         }
         response_serializer = PrescriptionPharmacistScanSerializer(data)
         return success_response("Items processed.", data=response_serializer.data)

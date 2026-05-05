@@ -94,10 +94,14 @@ def _seed_doctor(user):
         profile.specialty = MedicalSpecialty.INTERNAL_MEDICINE
         profile.verification_status = VerificationStatus.APPROVED
         profile.verified_at = timezone.now()
-        profile.save(update_fields=[
-            "medical_license_number", "specialty",
-            "verification_status", "verified_at",
-        ])
+        profile.save(
+            update_fields=[
+                "medical_license_number",
+                "specialty",
+                "verification_status",
+                "verified_at",
+            ]
+        )
 
 
 def _seed_pharmacist(user):
@@ -110,11 +114,16 @@ def _seed_pharmacist(user):
         profile.pharmacy_address = "123 Demo Street, Baghdad"
         profile.verification_status = VerificationStatus.APPROVED
         profile.verified_at = timezone.now()
-        profile.save(update_fields=[
-            "pharmacist_license_number", "pharmacy_name",
-            "pharmacy_license_number", "pharmacy_address",
-            "verification_status", "verified_at",
-        ])
+        profile.save(
+            update_fields=[
+                "pharmacist_license_number",
+                "pharmacy_name",
+                "pharmacy_license_number",
+                "pharmacy_address",
+                "verification_status",
+                "verified_at",
+            ]
+        )
 
 
 def _seed_laboratorian(user):
@@ -127,11 +136,16 @@ def _seed_laboratorian(user):
         profile.laboratory_address = "456 Demo Ave, Baghdad"
         profile.verification_status = VerificationStatus.APPROVED
         profile.verified_at = timezone.now()
-        profile.save(update_fields=[
-            "laboratorian_license_number", "laboratory_name",
-            "laboratory_license_number", "laboratory_address",
-            "verification_status", "verified_at",
-        ])
+        profile.save(
+            update_fields=[
+                "laboratorian_license_number",
+                "laboratory_name",
+                "laboratory_license_number",
+                "laboratory_address",
+                "verification_status",
+                "verified_at",
+            ]
+        )
 
 
 _SEEDERS = {
@@ -146,9 +160,11 @@ class Command(BaseCommand):
     help = "Create demo users for local development. DO NOT use in production."
 
     def handle(self, *args, **options):
-        self.stdout.write(self.style.WARNING(
-            "WARNING: Demo users are for DEVELOPMENT only. Never run this in production."
-        ))
+        self.stdout.write(
+            self.style.WARNING(
+                "WARNING: Demo users are for DEVELOPMENT only. Never run this in production."
+            )
+        )
         created_count = 0
         for spec in DEMO_USERS:
             user, created = _get_or_create_user(
@@ -160,9 +176,9 @@ class Command(BaseCommand):
             if created:
                 created_count += 1
 
-        self.stdout.write(self.style.SUCCESS(
-            f"seed_demo_users done: {created_count} new users created."
-        ))
+        self.stdout.write(
+            self.style.SUCCESS(f"seed_demo_users done: {created_count} new users created.")
+        )
         self.stdout.write("")
         self.stdout.write("Demo credentials (development only):")
         for spec in DEMO_USERS:

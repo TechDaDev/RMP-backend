@@ -224,9 +224,7 @@ def broadcast_prescription_updated(prescription):
         safe_payload = {
             "id": str(prescription.id),
             "status": prescription.status,
-            "expires_at": prescription.expires_at.isoformat()
-            if prescription.expires_at
-            else None,
+            "expires_at": prescription.expires_at.isoformat() if prescription.expires_at else None,
             "fully_dispensed_at": prescription.fully_dispensed_at.isoformat()
             if prescription.fully_dispensed_at
             else None,
@@ -260,9 +258,7 @@ def broadcast_lab_order_updated(lab_order):
             "id": str(lab_order.id),
             "status": lab_order.status,
             "test_count": lab_order.items.count(),
-            "expires_at": lab_order.expires_at.isoformat()
-            if lab_order.expires_at
-            else None,
+            "expires_at": lab_order.expires_at.isoformat() if lab_order.expires_at else None,
             "fully_completed_at": lab_order.fully_completed_at.isoformat()
             if lab_order.fully_completed_at
             else None,
@@ -296,9 +292,7 @@ def broadcast_lab_result_released(lab_result):
             "id": str(lab_result.id),
             "lab_order": str(lab_result.lab_order_id),
             "status": lab_result.status,
-            "released_at": lab_result.released_at.isoformat()
-            if lab_result.released_at
-            else None,
+            "released_at": lab_result.released_at.isoformat() if lab_result.released_at else None,
         }
 
         event_data = {

@@ -17,7 +17,15 @@ class DispensingRecordInline(admin.TabularInline):
 
 @admin.register(Prescription)
 class PrescriptionAdmin(admin.ModelAdmin):
-    list_display = ("id", "patient", "doctor", "status", "created_at", "expires_at", "fully_dispensed_at")
+    list_display = (
+        "id",
+        "patient",
+        "doctor",
+        "status",
+        "created_at",
+        "expires_at",
+        "fully_dispensed_at",
+    )
     list_filter = ("status", "created_at", "expires_at", "fully_dispensed_at")
     search_fields = ("qr_token", "doctor__email", "patient__email")
     readonly_fields = ("id", "qr_token", "qr_token_created_at", "created_at", "updated_at")

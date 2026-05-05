@@ -11,7 +11,7 @@ from apps.common.choices import (
     MedicalSpecialty,
 )
 
-from .models import KnowledgeChunk, KnowledgeDocument, KnowledgeDocumentText, KnowledgeProcessingLog
+from .models import KnowledgeChunk, KnowledgeDocument, KnowledgeProcessingLog
 
 ALLOWED_EXTENSIONS = {".pdf", ".docx", ".txt"}
 
@@ -158,6 +158,7 @@ class KnowledgeDocumentUploadSerializer(serializers.ModelSerializer):
 
 class KnowledgeDocumentApproveSerializer(serializers.Serializer):
     """Empty body — approval has no required input."""
+
     pass
 
 
@@ -167,6 +168,7 @@ class KnowledgeDocumentRejectSerializer(serializers.Serializer):
 
 class KnowledgeDocumentArchiveSerializer(serializers.Serializer):
     """Empty body — archive has no required input."""
+
     pass
 
 
@@ -217,4 +219,3 @@ class SemanticSearchResultSerializer(serializers.Serializer):
     distance = serializers.FloatField()
     rank = serializers.IntegerField()
     embedding_model = serializers.CharField(allow_null=True)
-

@@ -17,7 +17,8 @@ SAFETY_DISCLAIMER = (
     "The licensed doctor remains responsible for clinical judgment."
 )
 
-SYSTEM_PROMPT = """\
+SYSTEM_PROMPT = (
+    """\
 You are a doctor-facing medical support assistant for Al-Rafidain Medical Platform.
 
 Your role is to assist licensed doctors by summarising relevant approved medical knowledge.
@@ -38,8 +39,11 @@ REQUIRED RESPONSE FORMAT:
 3. Suggested follow-up questions or clinical considerations
 4. Red flags (if applicable)
 5. Sources (Document title, Chunk ID, Page if available)
-6. Safety note: \"""" + SAFETY_DISCLAIMER + """\"""
+6. Safety note: \""""
+    + SAFETY_DISCLAIMER
+    + """\"""
 """
+)
 
 
 def _format_chunks(retrieved_chunks: list[dict]) -> str:

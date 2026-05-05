@@ -53,8 +53,12 @@ def _auth_client(user):
 
 def _make_patient(email="cpt_patient@example.com"):
     user = User.objects.create_user(
-        email=email, password="StrongPass1!", first_name="Pat", last_name="Ient",
-        user_type=UserType.PATIENT, is_active=True,
+        email=email,
+        password="StrongPass1!",
+        first_name="Pat",
+        last_name="Ient",
+        user_type=UserType.PATIENT,
+        is_active=True,
     )
     UserProfile.objects.create(user=user)
     PatientProfile.objects.create(user=user)
@@ -63,8 +67,12 @@ def _make_patient(email="cpt_patient@example.com"):
 
 def _make_doctor(email="cpt_doctor@example.com", approved=True):
     user = User.objects.create_user(
-        email=email, password="StrongPass1!", first_name="Doc", last_name="Tor",
-        user_type=UserType.DOCTOR, is_active=True,
+        email=email,
+        password="StrongPass1!",
+        first_name="Doc",
+        last_name="Tor",
+        user_type=UserType.DOCTOR,
+        is_active=True,
     )
     UserProfile.objects.create(user=user)
     DoctorProfile.objects.create(
@@ -77,8 +85,12 @@ def _make_doctor(email="cpt_doctor@example.com", approved=True):
 
 def _make_pharmacist(email="cpt_pharmacist@example.com"):
     user = User.objects.create_user(
-        email=email, password="StrongPass1!", first_name="Pha", last_name="Mac",
-        user_type=UserType.PHARMACIST, is_active=True,
+        email=email,
+        password="StrongPass1!",
+        first_name="Pha",
+        last_name="Mac",
+        user_type=UserType.PHARMACIST,
+        is_active=True,
     )
     UserProfile.objects.create(user=user)
     PharmacistProfile.objects.create(user=user, verification_status=VerificationStatus.APPROVED)
@@ -87,8 +99,12 @@ def _make_pharmacist(email="cpt_pharmacist@example.com"):
 
 def _make_laboratorian(email="cpt_lab@example.com"):
     user = User.objects.create_user(
-        email=email, password="StrongPass1!", first_name="Lab", last_name="Tech",
-        user_type=UserType.LABORATORIAN, is_active=True,
+        email=email,
+        password="StrongPass1!",
+        first_name="Lab",
+        last_name="Tech",
+        user_type=UserType.LABORATORIAN,
+        is_active=True,
     )
     UserProfile.objects.create(user=user)
     LaboratorianProfile.objects.create(user=user, verification_status=VerificationStatus.APPROVED)
@@ -97,8 +113,13 @@ def _make_laboratorian(email="cpt_lab@example.com"):
 
 def _make_staff(email="cpt_staff@example.com"):
     user = User.objects.create_user(
-        email=email, password="StrongPass1!", first_name="Sta", last_name="Ff",
-        user_type=UserType.DOCTOR, is_active=True, is_staff=True,
+        email=email,
+        password="StrongPass1!",
+        first_name="Sta",
+        last_name="Ff",
+        user_type=UserType.DOCTOR,
+        is_active=True,
+        is_staff=True,
     )
     UserProfile.objects.create(user=user)
     DoctorProfile.objects.create(
@@ -112,6 +133,7 @@ def _make_staff(email="cpt_staff@example.com"):
 # ---------------------------------------------------------------------------
 # Health endpoint
 # ---------------------------------------------------------------------------
+
 
 class HealthEndpointContractTest(TestCase):
     """Verify the health endpoint meets the v0.1.0 contract."""
@@ -142,6 +164,7 @@ class HealthEndpointContractTest(TestCase):
 # Unauthenticated 401 checks
 # ---------------------------------------------------------------------------
 
+
 class UnauthenticatedAccessTest(TestCase):
     """Critical endpoints must return 401 for unauthenticated requests."""
 
@@ -152,7 +175,11 @@ class UnauthenticatedAccessTest(TestCase):
         if data:
             kwargs["data"] = data
         resp = fn(path, **kwargs)
-        self.assertEqual(resp.status_code, 401, f"Expected 401 on {method.upper()} {path}, got {resp.status_code}")
+        self.assertEqual(
+            resp.status_code,
+            401,
+            f"Expected 401 on {method.upper()} {path}, got {resp.status_code}",
+        )
 
     def test_consultations_list_requires_auth(self):
         self._assert_401("get", "/api/consultations/my/")
@@ -186,6 +213,7 @@ class UnauthenticatedAccessTest(TestCase):
 # Patient cannot use RAG (cross-module boundary)
 # ---------------------------------------------------------------------------
 
+
 class PatientCannotAccessRAGTest(TestCase):
     """Patients must never be able to call any RAG endpoint."""
 
@@ -218,6 +246,7 @@ class PatientCannotAccessRAGTest(TestCase):
 # Pharmacist cross-module isolation
 # ---------------------------------------------------------------------------
 
+
 class PharmacistCrossModuleIsolationTest(TestCase):
     """Pharmacists must not access consultations, messages, or lab orders."""
 
@@ -236,9 +265,7 @@ class PharmacistCrossModuleIsolationTest(TestCase):
         )
 
     def test_pharmacist_cannot_list_consultation_messages(self):
-        resp = self.pharm_client.get(
-            f"/api/consultations/{self.consultation.pk}/messages/"
-        )
+        resp = self.pharm_client.get(f"/api/consultations/{self.consultation.pk}/messages/")
         self.assertIn(resp.status_code, [403, 404])
 
     def test_pharmacist_cannot_list_lab_orders(self):
@@ -254,6 +281,7 @@ class PharmacistCrossModuleIsolationTest(TestCase):
 # ---------------------------------------------------------------------------
 # Laboratorian cross-module isolation
 # ---------------------------------------------------------------------------
+
 
 class LaboratorianCrossModuleIsolationTest(TestCase):
     """Laboratorians must not access prescriptions, messages, or RAG."""
@@ -277,9 +305,7 @@ class LaboratorianCrossModuleIsolationTest(TestCase):
         self.assertIn(resp.status_code, [403, 404])
 
     def test_laboratorian_cannot_list_consultation_messages(self):
-        resp = self.lab_client.get(
-            f"/api/consultations/{self.consultation.pk}/messages/"
-        )
+        resp = self.lab_client.get(f"/api/consultations/{self.consultation.pk}/messages/")
         self.assertIn(resp.status_code, [403, 404])
 
     def test_laboratorian_cannot_call_rag(self):
@@ -294,6 +320,7 @@ class LaboratorianCrossModuleIsolationTest(TestCase):
 # ---------------------------------------------------------------------------
 # RAG admin endpoints deny non-staff
 # ---------------------------------------------------------------------------
+
 
 class RAGAdminEndpointsRequireStaffTest(TestCase):
     """RAG analytics and export are staff-only."""

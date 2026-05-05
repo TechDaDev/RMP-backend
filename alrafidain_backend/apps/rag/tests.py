@@ -29,7 +29,7 @@ from apps.common.choices import (
 from apps.knowledge_base.models import KnowledgeChunk, KnowledgeDocument
 from apps.profiles.models import DoctorProfile, PatientProfile, UserProfile
 
-from .models import RAGQuery, RAGResponse, RAGRetrievedChunk
+from .models import RAGQuery, RAGRetrievedChunk
 from .permissions import (
     can_access_consultation_rag,
     can_access_lab_result_rag,
@@ -246,7 +246,10 @@ class RunDoctorRagQuerySuccessTest(TestCase):
         mock_client = MagicMock()
         mock_client.chat.return_value = MOCK_LLM_RESPONSE
 
-        with patch("apps.knowledge_base.services.semantic_search_approved_chunks", return_value=[self.real_hit]):
+        with patch(
+            "apps.knowledge_base.services.semantic_search_approved_chunks",
+            return_value=[self.real_hit],
+        ):
             rag_query, rag_response = run_doctor_rag_query(
                 doctor=self.doctor,
                 query_text="Explain hypertension management.",
@@ -276,7 +279,10 @@ class RunDoctorRagQuerySuccessTest(TestCase):
         mock_client = MagicMock()
         mock_client.chat.side_effect = Exception("API unreachable")
 
-        with patch("apps.knowledge_base.services.semantic_search_approved_chunks", return_value=[self.real_hit]):
+        with patch(
+            "apps.knowledge_base.services.semantic_search_approved_chunks",
+            return_value=[self.real_hit],
+        ):
             rag_query, rag_response = run_doctor_rag_query(
                 doctor=self.doctor,
                 query_text="Explain diabetes.",
@@ -440,8 +446,8 @@ class DoctorGeneralRAGQueryViewTest(TestCase):
 @patch("apps.knowledge_base.services.semantic_search_approved_chunks")
 class ConsultationRAGSupportViewTest(TestCase):
     def setUp(self):
-        from apps.consultations.models import Consultation
         from apps.common.choices import ConsultationStatus
+        from apps.consultations.models import Consultation
 
         self.doctor = create_doctor(email="doc_consult@example.com")
         self.other_doctor = create_doctor(email="other_consult@example.com")
@@ -485,14 +491,13 @@ class ConsultationRAGSupportViewTest(TestCase):
 @patch("apps.knowledge_base.services.semantic_search_approved_chunks")
 class LabResultRAGSupportViewTest(TestCase):
     def setUp(self):
-        from apps.consultations.models import Consultation
-        from apps.common.choices import ConsultationStatus
-        from apps.lab_orders.models import LabResult, LabOrder, LabOrderItem
         from apps.common.choices import (
-            LabOrderItemStatus,
+            ConsultationStatus,
             LabResultStatus,
             LabResultValueType,
         )
+        from apps.consultations.models import Consultation
+        from apps.lab_orders.models import LabOrder, LabOrderItem, LabResult
         from apps.profiles.models import LaboratorianProfile
 
         self.doctor = create_doctor(email="doc_lab@example.com")
@@ -611,14 +616,19 @@ class RAGResponseSafetyInvariantsTest(TestCase):
 # Phase 12D — AI Evaluation and Doctor Feedback tests
 # ===========================================================================
 
-from apps.common.choices import RAGFeedbackRating, RAGFeedbackReviewStatus, RAGSourceRelevance  # noqa: E402
-from .models import RAGResponseFeedback, RAGRetrievedChunkFeedback  # noqa: E402
-from .services import submit_rag_response_feedback, review_rag_feedback  # noqa: E402
+from apps.common.choices import (  # noqa: E402
+    RAGFeedbackRating,
+    RAGFeedbackReviewStatus,
+    RAGSourceRelevance,
+)
 
+from .models import RAGResponseFeedback, RAGRetrievedChunkFeedback  # noqa: E402
+from .services import review_rag_feedback, submit_rag_response_feedback  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers: create a RAGQuery + RAGResponse fixture for Phase 12D tests
 # ---------------------------------------------------------------------------
+
 
 def _create_rag_response(doctor):
     """Create a minimal RAGQuery + RAGResponse pair using real DB objects."""
@@ -636,7 +646,9 @@ def _create_rag_response_with_chunk(doctor):
     real_hit = _create_real_chunk(doctor)
     mock_client = MagicMock()
     mock_client.chat.return_value = MOCK_LLM_RESPONSE
-    with patch("apps.knowledge_base.services.semantic_search_approved_chunks", return_value=[real_hit]):
+    with patch(
+        "apps.knowledge_base.services.semantic_search_approved_chunks", return_value=[real_hit]
+    ):
         rag_query, rag_response = run_doctor_rag_query(
             doctor=doctor,
             query_text="Phase 12D chunk feedback test.",
@@ -649,6 +661,7 @@ def _create_rag_response_with_chunk(doctor):
 # ---------------------------------------------------------------------------
 # Model tests
 # ---------------------------------------------------------------------------
+
 
 class RAGResponseFeedbackModelTest(TestCase):
     def setUp(self):
@@ -700,6 +713,7 @@ class RAGResponseFeedbackModelTest(TestCase):
             rating=RAGFeedbackRating.HELPFUL,
         )
         from django.db import IntegrityError
+
         with self.assertRaises(IntegrityError):
             RAGResponseFeedback.objects.create(
                 rag_response=self.rag_response,
@@ -735,6 +749,7 @@ class RAGRetrievedChunkFeedbackModelTest(TestCase):
             relevance=RAGSourceRelevance.RELEVANT,
         )
         from django.db import IntegrityError
+
         with self.assertRaises(IntegrityError):
             RAGRetrievedChunkFeedback.objects.create(
                 feedback=self.feedback,
@@ -746,6 +761,7 @@ class RAGRetrievedChunkFeedbackModelTest(TestCase):
 # ---------------------------------------------------------------------------
 # Service tests
 # ---------------------------------------------------------------------------
+
 
 class SubmitRagFeedbackServiceTest(TestCase):
     def setUp(self):
@@ -771,9 +787,7 @@ class SubmitRagFeedbackServiceTest(TestCase):
             doctor=self.doctor,
             rating=RAGFeedbackRating.HELPFUL,
         )
-        self.assertTrue(
-            AuditLog.objects.filter(action="rag_feedback_submitted").exists()
-        )
+        self.assertTrue(AuditLog.objects.filter(action="rag_feedback_submitted").exists())
 
     def test_other_doctor_cannot_submit_feedback(self):
         with self.assertRaises(PermissionError):
@@ -897,14 +911,13 @@ class ReviewRagFeedbackServiceTest(TestCase):
             reviewer=self.staff,
             review_status=RAGFeedbackReviewStatus.ESCALATED,
         )
-        self.assertTrue(
-            AuditLog.objects.filter(action="rag_feedback_reviewed").exists()
-        )
+        self.assertTrue(AuditLog.objects.filter(action="rag_feedback_reviewed").exists())
 
 
 # ---------------------------------------------------------------------------
 # API view tests
 # ---------------------------------------------------------------------------
+
 
 class RAGResponseFeedbackCreateViewTest(TestCase):
     def setUp(self):
@@ -950,6 +963,7 @@ class RAGResponseFeedbackCreateViewTest(TestCase):
 
     def test_invalid_rag_response_id_returns_404(self):
         import uuid
+
         client = auth_client(self.doctor)
         resp = client.post(
             f"/api/rag/responses/{uuid.uuid4()}/feedback/",
@@ -961,7 +975,9 @@ class RAGResponseFeedbackCreateViewTest(TestCase):
     def test_duplicate_feedback_returns_400(self):
         client = auth_client(self.doctor)
         client.post(self.url(), {"rating": RAGFeedbackRating.HELPFUL}, format="json")
-        resp = client.post(self.url(), {"rating": RAGFeedbackRating.PARTIALLY_HELPFUL}, format="json")
+        resp = client.post(
+            self.url(), {"rating": RAGFeedbackRating.PARTIALLY_HELPFUL}, format="json"
+        )
         self.assertEqual(resp.status_code, 400)
 
     def test_unsafe_feedback_sets_is_safe_false(self):
@@ -1110,7 +1126,8 @@ class AdminRAGFeedbackListViewTest(TestCase):
     def test_filter_by_is_safe(self):
         _, rag2 = _create_rag_response(self.doctor)
         RAGResponseFeedback.objects.create(
-            rag_response=rag2, doctor=self.doctor,
+            rag_response=rag2,
+            doctor=self.doctor,
             rating=RAGFeedbackRating.UNSAFE,
         )
         client = auth_client(self.staff)
@@ -1121,7 +1138,8 @@ class AdminRAGFeedbackListViewTest(TestCase):
     def test_filter_by_needs_admin_review(self):
         _, rag3 = _create_rag_response(self.doctor)
         RAGResponseFeedback.objects.create(
-            rag_response=rag3, doctor=self.doctor,
+            rag_response=rag3,
+            doctor=self.doctor,
             rating=RAGFeedbackRating.UNSAFE,
         )
         client = auth_client(self.staff)
@@ -1215,12 +1233,11 @@ class AdminRAGFeedbackReviewViewTest(TestCase):
             {"review_status": RAGFeedbackReviewStatus.REVIEWED},
             format="json",
         )
-        self.assertTrue(
-            AuditLog.objects.filter(action="rag_feedback_reviewed").exists()
-        )
+        self.assertTrue(AuditLog.objects.filter(action="rag_feedback_reviewed").exists())
 
     def test_invalid_feedback_id_returns_404(self):
         import uuid
+
         client = auth_client(self.staff)
         resp = client.post(
             f"/api/rag/admin/feedback/{uuid.uuid4()}/review/",
@@ -1265,6 +1282,7 @@ def _create_staff():
 # ---------------------------------------------------------------------------
 # Unit tests – analytics functions
 # ---------------------------------------------------------------------------
+
 
 class RAGAnalyticsFunctionsTest(TestCase):
     def test_feedback_metrics_empty_db(self):
@@ -1311,6 +1329,7 @@ class RAGAnalyticsFunctionsTest(TestCase):
 # Unit tests – hash_identifier
 # ---------------------------------------------------------------------------
 
+
 class RAGExportHashTest(TestCase):
     def test_hash_identifier_is_deterministic(self):
         h1 = hash_identifier("abc-123", salt="test-salt")
@@ -1331,6 +1350,7 @@ class RAGExportHashTest(TestCase):
 # ---------------------------------------------------------------------------
 # Unit tests – exporters
 # ---------------------------------------------------------------------------
+
 
 class RAGExporterTest(TestCase):
     def setUp(self):
@@ -1405,6 +1425,7 @@ class RAGExporterTest(TestCase):
 # View tests – AdminRAGAnalyticsSummaryView
 # ---------------------------------------------------------------------------
 
+
 class AdminRAGAnalyticsSummaryViewTest(TestCase):
     def setUp(self):
         self.staff = _create_staff()
@@ -1437,6 +1458,7 @@ class AdminRAGAnalyticsSummaryViewTest(TestCase):
 # View tests – AdminRAGDatasetExportView
 # ---------------------------------------------------------------------------
 
+
 class AdminRAGDatasetExportViewTest(TestCase):
     def setUp(self):
         self.staff = _create_staff()
@@ -1458,7 +1480,6 @@ class AdminRAGDatasetExportViewTest(TestCase):
         self.assertEqual(resp.data["format"], "json")
 
     def test_staff_can_export_csv(self):
-        from django.http import HttpResponse
         client = auth_client(self.staff)
         resp = client.post(
             "/api/rag/admin/exports/dataset/",
@@ -1511,16 +1532,20 @@ class AdminRAGDatasetExportViewTest(TestCase):
 # Management command tests
 # ---------------------------------------------------------------------------
 
+
 class ExportRagDatasetCommandTest(TestCase):
     def setUp(self):
         import tempfile
+
         self.tmpdir = tempfile.mkdtemp()
         doctor = create_doctor(email="cmd_dr@example.com")
         _create_rag_response(doctor)
 
     def test_command_creates_json_file(self):
         import os
+
         from django.core.management import call_command
+
         output_path = os.path.join(self.tmpdir, "test_export.json")
         call_command("export_rag_dataset", "--output", output_path, "--format", "json")
         self.assertTrue(os.path.exists(output_path))
@@ -1530,7 +1555,9 @@ class ExportRagDatasetCommandTest(TestCase):
 
     def test_command_creates_csv_file(self):
         import os
+
         from django.core.management import call_command
+
         output_path = os.path.join(self.tmpdir, "test_export.csv")
         call_command("export_rag_dataset", "--output", output_path, "--format", "csv")
         self.assertTrue(os.path.exists(output_path))
@@ -1539,9 +1566,11 @@ class ExportRagDatasetCommandTest(TestCase):
         self.assertIn("rag_query_id", content)
 
     def test_command_defaults_anonymize_true(self):
-        import os
         import json
+        import os
+
         from django.core.management import call_command
+
         output_path = os.path.join(self.tmpdir, "test_anon.json")
         call_command("export_rag_dataset", "--output", output_path, "--format", "json")
         with open(output_path) as f:

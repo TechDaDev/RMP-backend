@@ -2,7 +2,6 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
-from config.settings import base as base_settings
 
 from apps.accounts.views import (
     ActivateAccountView,
@@ -36,6 +35,7 @@ from apps.lab_orders.views import LaboratorianLabOrderScanView
 from apps.notifications.models import Notification
 from apps.prescriptions.views import PharmacistPrescriptionScanView
 from apps.profiles.models import DoctorProfile, LaboratorianProfile, PatientProfile, UserProfile
+from config.settings import base as base_settings
 
 User = get_user_model()
 
@@ -73,7 +73,10 @@ class OTPResendPrivacyRegressionTests(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data.get("message"), "If the email exists and is inactive, an OTP has been sent.")
+        self.assertEqual(
+            response.data.get("message"),
+            "If the email exists and is inactive, an OTP has been sent.",
+        )
 
     def test_resend_otp_returns_generic_response_for_active_account(self):
         user = User.objects.create_user(
@@ -93,7 +96,10 @@ class OTPResendPrivacyRegressionTests(TestCase):
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data.get("message"), "If the email exists and is inactive, an OTP has been sent.")
+        self.assertEqual(
+            response.data.get("message"),
+            "If the email exists and is inactive, an OTP has been sent.",
+        )
 
 
 class LabResultNotificationPrivacyRegressionTests(TestCase):
@@ -132,7 +138,9 @@ class LabResultNotificationPrivacyRegressionTests(TestCase):
             specialty=MedicalSpecialty.GENERAL_MEDICINE,
             verification_status=VerificationStatus.APPROVED,
         )
-        LaboratorianProfile.objects.create(user=self.lab, verification_status=VerificationStatus.APPROVED)
+        LaboratorianProfile.objects.create(
+            user=self.lab, verification_status=VerificationStatus.APPROVED
+        )
 
         self.consultation = Consultation.objects.create(
             patient=self.patient,
