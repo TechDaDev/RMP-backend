@@ -1,5 +1,22 @@
 # RAG Plan — Al-Rafidain Medical Platform
 
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Safety Principles](#safety-principles)
+- [Phase 12A — Knowledge Base Foundation](#phase-12a--knowledge-base-foundation--current)
+- [Phase 12B — pgvector Embeddings and Retrieval](#phase-12b--pgvector-embeddings-and-retrieval--complete)
+- [Phase 12C — DeepSeek RAG Doctor Support](#phase-12c--deepseek-rag-doctor-support)
+- [Phase 12D — AI Evaluation and Feedback](#phase-12d--ai-evaluation-and-feedback--complete)
+- [Phase 12E — Analytics and Training Dataset Preparation](#phase-12e--analytics-and-training-dataset-preparation--complete)
+- [Technology Decisions](#technology-decisions)
+- [Document Lifecycle](#document-lifecycle)
+- [References](#references)
+
+---
+
 ## Overview
 
 This document describes the phased plan to add Retrieval-Augmented Generation (RAG) AI support to the Al-Rafidain Medical Platform.

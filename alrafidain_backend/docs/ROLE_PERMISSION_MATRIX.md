@@ -2,6 +2,28 @@
 
 _Phase 13 — API Contract Freeze — Al-Rafidain Medical Platform_
 
+---
+
+## Table of Contents
+
+- [Role Definitions](#role-definitions)
+- [Accounts](#accounts)
+- [Profiles](#profiles)
+- [Consultations](#consultations)
+- [Messaging](#messaging)
+- [Prescriptions](#prescriptions)
+- [Lab Orders](#lab-orders)
+- [Lab Results](#lab-results)
+- [Patient Records](#patient-records)
+- [Notifications](#notifications)
+- [Knowledge Base](#knowledge-base)
+- [RAG (Doctor AI Queries)](#rag-doctor-ai-queries)
+- [RAG Feedback](#rag-feedback)
+- [RAG Analytics & Export](#rag-analytics--export)
+- [Summary: What Each Role Cannot Do](#summary-what-each-role-cannot-do)
+
+---
+
 ## Role Definitions
 
 | Role | Description |

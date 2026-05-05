@@ -5,6 +5,17 @@ All seed commands are **idempotent** — safe to run multiple times.
 
 ---
 
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Individual Commands](#individual-commands)
+  - [Seed Symptom Data](#seed-symptom-data)
+  - [Seed Lab Test Catalog](#seed-lab-test-catalog)
+  - [Seed Demo Users](#seed-demo-users)
+- [Testing Seed Commands](#testing-seed-commands)
+
+---
+
 ## Quick Start
 
 Run all seed commands at once:

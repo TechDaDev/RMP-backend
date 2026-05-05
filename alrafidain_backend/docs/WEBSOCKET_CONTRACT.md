@@ -8,6 +8,26 @@ This document defines the WebSocket contracts for the Al-Rafidain Medical Platfo
 
 ---
 
+## Table of Contents
+
+- [Architecture](#architecture)
+- [Connection URLs](#connection-urls)
+  - [User Notifications Socket](#user-notifications-socket)
+  - [Consultation Messages Socket](#consultation-messages-socket)
+- [Event Types](#event-types)
+- [Permission Rules](#permission-rules)
+- [Client Integration Guide](#client-integration-guide)
+- [Important: Message Creation](#important-message-creation)
+- [Reconnection Strategy](#reconnection-strategy)
+- [Token Handling](#token-handling)
+- [Error Handling](#error-handling)
+- [Production Deployment](#production-deployment)
+- [Limitations (MVP Phase)](#limitations-mvp-phase)
+- [Support and Debugging](#support-and-debugging)
+- [Versioning](#versioning)
+
+---
+
 ## Architecture
 
 ### REST + WebSocket Model

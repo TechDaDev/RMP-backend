@@ -2,6 +2,24 @@
 
 ---
 
+## Table of Contents
+
+- [Local Development Setup](#local-development-setup)
+- [Port 5432 vs 5433 Issue](#port-5432-vs-5433-issue)
+- [Environment Variables](#environment-variables)
+- [Running Migrations](#running-migrations)
+- [Running Tests](#running-tests)
+- [Django System Check](#django-system-check)
+- [Seeding Data](#seeding-data)
+- [Generating Database Diagrams](#generating-database-diagrams)
+- [API Documentation](#api-documentation)
+- [Security and Privacy Notes](#security-and-privacy-notes)
+- [Running the Development Server](#running-the-development-server)
+- [Common Troubleshooting](#common-troubleshooting)
+- [Knowledge Base Module (Phase 12A)](#knowledge-base-module-phase-12a)
+
+---
+
 ## Local Development Setup
 
 ### Prerequisites

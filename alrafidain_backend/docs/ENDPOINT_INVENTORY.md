@@ -11,6 +11,27 @@ Legend:
 
 ---
 
+## Table of Contents
+
+- [Health / Schema / Docs](#health--schema--docs)
+- [Accounts](#accounts)
+- [Profiles](#profiles)
+- [Consultations](#consultations)
+- [Messaging](#messaging)
+- [Prescriptions](#prescriptions)
+- [Lab Orders](#lab-orders)
+- [Lab Results](#lab-results)
+- [Patient Records](#patient-records)
+- [Notifications](#notifications)
+- [Knowledge Base](#knowledge-base)
+- [RAG — Doctor AI Queries](#rag--doctor-ai-queries)
+- [RAG Feedback](#rag-feedback)
+- [RAG Admin — Feedback Review](#rag-admin--feedback-review)
+- [RAG Admin — Analytics & Export](#rag-admin--analytics--export)
+- [Total API Endpoint Count](#total-api-endpoint-count)
+
+---
+
 ## Health / Schema / Docs
 
 | Method | Path | View | Auth | Roles | Status | Notes |

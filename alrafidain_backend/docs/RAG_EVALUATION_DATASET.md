@@ -9,6 +9,18 @@ This document describes the structure and privacy guarantees of the anonymized R
 
 ---
 
+## Table of Contents
+
+- [Top-level fields (per record)](#top-level-fields-per-record)
+- [`feedback` object](#feedback-object)
+- [`sources` array (per element)](#sources-array-per-element)
+- [JSON example](#json-example)
+- [CSV format](#csv-format)
+- [Privacy guarantees](#privacy-guarantees)
+- [Limitations](#limitations)
+
+---
+
 ## Top-level fields (per record)
 
 | Field | Type | Description |

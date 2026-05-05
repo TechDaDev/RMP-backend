@@ -6,6 +6,21 @@ This document defines the standard response envelope used by custom API views in
 
 ---
 
+## Table of Contents
+
+- [Standard Success Response](#standard-success-response)
+- [Standard Error Response](#standard-error-response)
+- [Validation Error Format](#validation-error-format)
+- [Authentication Error Format](#authentication-error-format)
+- [Pagination Format](#pagination-format)
+- [RAG Endpoints — Exception (Non-standard Shape)](#rag-endpoints--exception-non-standard-shape)
+- [Health Endpoint (200 OK)](#health-endpoint-200-ok)
+- [File Upload Notes](#file-upload-notes)
+- [CSV Export Exception](#csv-export-exception)
+- [Summary Table](#summary-table)
+
+---
+
 ## Standard Success Response
 
 All custom views in: `accounts`, `profiles`, `consultations`, `messaging`, `prescriptions`, `lab_orders`, `lab_results`, `patient_records`, `notifications`, `knowledge_base`

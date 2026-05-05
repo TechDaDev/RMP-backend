@@ -1,5 +1,29 @@
 # Security Notes
 
+---
+
+## Table of Contents
+
+- [Security Model Overview](#security-model-overview)
+- [Authentication and JWT](#authentication-and-jwt)
+- [WebSocket Transport Security](#websocket-transport-security)
+- [Role-Based Access Rules](#role-based-access-rules)
+- [Professional Verification](#professional-verification)
+- [Consultation Privacy](#consultation-privacy)
+- [Prescription QR Privacy](#prescription-qr-privacy)
+- [Lab Order QR Privacy](#lab-order-qr-privacy)
+- [Lab Result Release Rules](#lab-result-release-rules)
+- [Patient Medical Record Access](#patient-medical-record-access)
+- [Notification Privacy](#notification-privacy)
+- [Realtime Event Privacy](#realtime-event-privacy)
+- [Audit Logging](#audit-logging)
+- [Rate Limiting](#rate-limiting)
+- [Known MVP Limitations](#known-mvp-limitations)
+- [Future Security Work](#future-security-work)
+- [Phase 12E — Dataset Export Privacy & Security](#phase-12e--dataset-export-privacy--security)
+
+---
+
 ## Security Model Overview
 This backend applies layered security using JWT authentication, role-based access control, object-level permission checks in service/view logic, and audit logging for sensitive actions.
 

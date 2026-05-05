@@ -24,6 +24,26 @@ All responses follow the standard envelope:
 
 ---
 
+## Table of Contents
+
+- [Privacy and Role Restrictions](#privacy-and-role-restrictions)
+- [Authentication](#authentication)
+- [Profiles](#profiles)
+- [Consultations](#consultations)
+- [Messaging](#messaging)
+- [Prescriptions](#prescriptions)
+- [Notifications](#notifications)
+- [Patient Records](#patient-records)
+- [Lab Orders](#lab-orders)
+- [Lab Results](#lab-results)
+- [Audit / Admin Notes](#audit--admin-notes)
+- [Knowledge Base (Phase 12A)](#knowledge-base-phase-12a)
+- [Phase 12C — RAG Doctor Support Endpoints](#phase-12c--rag-doctor-support-endpoints)
+- [Phase 12D — AI Evaluation and Doctor Feedback](#phase-12d--ai-evaluation-and-doctor-feedback)
+- [Phase 12E — Analytics and Training Dataset Preparation](#phase-12e--analytics-and-training-dataset-preparation)
+
+---
+
 ## Privacy and Role Restrictions
 
 | Rule | Detail |
