@@ -6,7 +6,7 @@ from rest_framework import status
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.views import APIView
 
-from apps.audit.services import create_audit_log
+from apps.audit.services import create_audit_log, record_security_event
 from apps.common.job_utils import create_background_job
 from apps.common.permissions import CanAccessKnowledgeBase
 from apps.common.responses import error_response, success_response
@@ -73,6 +73,15 @@ class KnowledgeDocumentUploadView(APIView):
             data=request.data, context={"request": request}
         )
         if not serializer.is_valid():
+            record_security_event(
+                actor=request.user,
+                action="knowledge_document_upload_rejected",
+                request=request,
+                metadata={
+                    "reason_code": "validation_failed",
+                    "error_fields": sorted(serializer.errors.keys()),
+                },
+            )
             return error_response(errors=serializer.errors)
 
         document = serializer.save()

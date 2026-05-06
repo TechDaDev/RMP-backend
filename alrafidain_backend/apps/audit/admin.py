@@ -19,4 +19,19 @@ class AuditLogAdmin(admin.ModelAdmin):
         "user_agent",
         "created_at",
         "updated_at",
+        "previous_hash",
+        "current_hash",
     ]
+
+    actions = None
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        if obj is not None:
+            return False
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return False

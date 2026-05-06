@@ -5,7 +5,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.audit.services import create_audit_log
+from apps.audit.services import create_audit_log, record_security_event
 from apps.common.responses import error_response, success_response
 from apps.common.throttles import LoginRateThrottle, OTPRateThrottle, PasswordResetRateThrottle
 
@@ -68,9 +68,12 @@ class LoginView(APIView):
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         if not serializer.is_valid():
-            create_audit_log(
+            record_security_event(
                 action="login_failed",
-                metadata={"email": request.data.get("email", "")},
+                metadata={
+                    "reason_code": "invalid_credentials",
+                    "email": request.data.get("email", ""),
+                },
                 request=request,
             )
             return error_response(

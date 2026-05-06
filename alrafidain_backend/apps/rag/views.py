@@ -4,6 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.audit.services import create_audit_log, record_security_event
 from apps.common.choices import RAGServiceContext
 from apps.common.permissions import CanExportRagDataset
 
@@ -310,9 +311,13 @@ class AdminRAGAnalyticsSummaryView(APIView):
 
     def get(self, request):
         if not (request.user.is_staff or request.user.is_superuser):
+            record_security_event(
+                actor=request.user,
+                action="rag_analytics_access_denied",
+                request=request,
+                metadata={"reason_code": "staff_only"},
+            )
             return Response({"detail": "Staff only."}, status=403)
-
-        from apps.audit.services import create_audit_log
 
         from .analytics import get_rag_analytics_summary
 
@@ -335,6 +340,12 @@ class AdminRAGDatasetExportView(APIView):
 
     def post(self, request):
         if not (request.user.is_staff or request.user.is_superuser):
+            record_security_event(
+                actor=request.user,
+                action="rag_dataset_export_access_denied",
+                request=request,
+                metadata={"reason_code": "staff_only"},
+            )
             return Response({"detail": "Staff only."}, status=403)
 
         serializer = RAGDatasetExportSerializer(data=request.data)
@@ -344,8 +355,6 @@ class AdminRAGDatasetExportView(APIView):
         fmt: str = d["format"]
         include_text: bool = d["include_text"]
         anonymize: bool = d["anonymize"]
-
-        from apps.audit.services import create_audit_log
 
         from .exporters import export_rag_evaluation_dataset
 

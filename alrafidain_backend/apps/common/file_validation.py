@@ -20,8 +20,7 @@ def validate_file_size(file_obj, max_size_mb: int):
 def validate_file_extension(file_obj, allowed_extensions):
     ext = os.path.splitext(getattr(file_obj, "name", ""))[1].lower()
     normalized = {
-        e.lower() if str(e).startswith(".") else f".{str(e).lower()}"
-        for e in allowed_extensions
+        e.lower() if str(e).startswith(".") else f".{str(e).lower()}" for e in allowed_extensions
     }
     if ext not in normalized:
         allowed = ", ".join(sorted(normalized))
@@ -41,8 +40,7 @@ def validate_content_type(file_obj, allowed_content_types):
     if not content_type or content_type not in allowed:
         allowed_text = ", ".join(sorted(allowed))
         raise serializers.ValidationError(
-            "Unsupported file content type. "
-            f"Allowed content types: {allowed_text}."
+            f"Unsupported file content type. Allowed content types: {allowed_text}."
         )
 
 
