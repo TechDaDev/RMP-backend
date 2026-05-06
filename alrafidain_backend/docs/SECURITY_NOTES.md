@@ -158,4 +158,55 @@ This backend applies layered security using JWT authentication, role-based acces
 
 1. Generate a random `EXPORT_HASH_SALT` with `openssl rand -hex 32`.
 2. Store it in your secret manager and inject via environment.
-3. Rotate the salt if a previous salt is suspected to be compromised (hashes will change on next export).
+---
+
+## Known Dependency Vulnerability — CVE-2026-42304 (Twisted 25.5.0)
+
+**Status**: Accepted temporary risk, pending upstream stable release.  
+**Last reviewed**: 2026-05-06  
+
+### Dependency path
+
+```
+requirements/base.in
+  └── daphne (direct)
+        └── twisted 25.5.0 (transitive)
+```
+
+### CVE details
+
+| Field | Value |
+|---|---|
+| CVE | CVE-2026-42304 |
+| Affected | twisted 25.5.0 |
+| Reported fix | 26.4.0rc2 (release candidate — not stable) |
+| Latest stable on PyPI | 25.5.0 |
+| Source | pip-audit |
+
+### Reachability assessment
+
+- **REACHABLE IN PRODUCTION** — Twisted is used by Daphne, which is the ASGI server for HTTP + WebSocket traffic.
+- The project requires WebSockets for realtime consultation messaging (`ws/consultations/<id>/messages/`) and user events (`ws/user/`). Daphne cannot be removed without losing this functionality.
+- Daphne is deployed on a **separate internal port** (8001) behind a reverse proxy (Nginx/Caddy/Ingress), which provides TLS termination and traffic filtering.
+- Clients do not connect directly to Daphne; all connections pass through the reverse proxy.
+
+### Why upgrade was not performed
+
+- The only known fix is `26.4.0rc2`, a release candidate not suited for production without explicit testing.
+- `pip index versions twisted` confirms no stable version newer than 25.5.0 is available on PyPI as of 2026-05-06.
+- Upgrading to an RC without stability guarantees is a higher risk than the documented mitigations below.
+
+### Mitigations in place
+
+1. Daphne is bound to an internal interface/port only; not directly internet-facing.
+2. TLS termination is handled at the reverse proxy (wss:// required in production per WebSocket security notes).
+3. JWT authentication is required on all WebSocket endpoints; unauthenticated connections are rejected at the Channels middleware layer.
+4. Rate limiting and connection caps are recommended at the reverse proxy level (see Known MVP Limitations).
+5. Request-ID correlation is active for all ASGI traffic for incident traceability.
+
+### Remediation action
+
+- **Monitor** the upstream Twisted project for a stable 26.x.x release.
+- **Pin** `twisted>=26.x.x` in `requirements/base.in` when a stable fix is released and tests confirm compatibility.
+- **Do not suppress** this finding in pip-audit; keep it visible for operator awareness.
+- Review this entry again when the next stable Twisted release is published.3. Rotate the salt if a previous salt is suspected to be compromised (hashes will change on next export).
