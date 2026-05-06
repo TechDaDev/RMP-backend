@@ -148,6 +148,8 @@ class _LabOrderPatientBaseSerializer(serializers.ModelSerializer):
         ]
 
     def get_test_count(self, obj):
+        if hasattr(obj, "test_count"):
+            return obj.test_count
         return obj.items.count()
 
     def get_guidance(self, _obj):

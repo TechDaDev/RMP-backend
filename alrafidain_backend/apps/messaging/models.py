@@ -31,6 +31,11 @@ class ConsultationMessage(BaseModel):
 
     class Meta:
         ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["consultation", "created_at"]),
+            models.Index(fields=["consultation", "is_read", "created_at"]),
+            models.Index(fields=["sender", "-created_at"]),
+        ]
 
     def clean(self):
         allowed_send_statuses = [ConsultationStatus.ACCEPTED, ConsultationStatus.DOCTOR_RESPONDED]
@@ -85,6 +90,12 @@ class MessageAttachment(BaseModel):
         on_delete=models.CASCADE,
         related_name="message_attachments",
     )
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["message", "created_at"]),
+            models.Index(fields=["uploaded_by", "-created_at"]),
+        ]
 
     def clean(self):
         if (

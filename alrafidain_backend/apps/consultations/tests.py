@@ -1,5 +1,7 @@
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -389,3 +391,45 @@ class ConsultationFlowTests(TestCase):
         c = Consultation.objects.first()
         resp = self.patient2_client.get(f"/api/consultations/{c.id}/")
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class ConsultationQueryPerformanceTests(TestCase):
+    def setUp(self):
+        self.patient = create_user("perf-patient@example.com", UserType.PATIENT)
+        self.doctor = create_user("perf-doctor@example.com", UserType.DOCTOR)
+        self.client = APIClient()
+        self.client.force_authenticate(self.patient)
+
+        category = SymptomCategory.objects.create(name="Perf", is_active=True)
+        symptom = Symptom.objects.create(category=category, name="Perf symptom", is_active=True)
+
+        for i in range(3):
+            consultation = Consultation.objects.create(
+                patient=self.patient,
+                assigned_doctor=self.doctor,
+                status=ConsultationStatus.ACCEPTED,
+                selected_specialty=MedicalSpecialty.CARDIOLOGY,
+                duration=ConsultationDuration.ONE_TO_THREE_DAYS,
+                severity=SeverityLevel.MODERATE,
+            )
+            ConsultationSymptom.objects.create(consultation=consultation, symptom=symptom)
+            ConsultationResponse.objects.create(
+                consultation=consultation,
+                doctor=self.doctor,
+                response_text=f"Response {i}",
+                recommendation_type=DoctorRecommendationType.GENERAL_ADVICE,
+            )
+
+        self.consultation = Consultation.objects.order_by("created_at").first()
+
+    def test_my_consultations_list_uses_bounded_queries(self):
+        with CaptureQueriesContext(connection) as context:
+            response = self.client.get("/api/consultations/my/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertLessEqual(len(context), 3)
+
+    def test_consultation_detail_uses_bounded_queries(self):
+        with CaptureQueriesContext(connection) as context:
+            response = self.client.get(f"/api/consultations/{self.consultation.id}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertLessEqual(len(context), 7)

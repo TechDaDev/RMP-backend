@@ -69,6 +69,9 @@ class MedicalRecordEntry(BaseModel):
             models.Index(fields=["medical_record", "is_active"]),
             models.Index(fields=["medical_record", "category"]),
             models.Index(fields=["verification_status"]),
+            models.Index(fields=["medical_record", "is_active", "-created_at"]),
+            models.Index(fields=["source_user", "-created_at"]),
+            models.Index(fields=["verified_by", "-created_at"]),
         ]
 
     def __str__(self):

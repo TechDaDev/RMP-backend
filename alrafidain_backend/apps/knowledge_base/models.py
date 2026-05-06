@@ -66,6 +66,13 @@ class KnowledgeDocument(BaseModel):
         ordering = ["-created_at"]
         verbose_name = "Knowledge Document"
         verbose_name_plural = "Knowledge Documents"
+        indexes = [
+            models.Index(fields=["approval_status", "-created_at"]),
+            models.Index(fields=["processing_status", "-created_at"]),
+            models.Index(fields=["document_type", "-created_at"]),
+            models.Index(fields=["specialty", "-created_at"]),
+            models.Index(fields=["is_active", "-created_at"]),
+        ]
 
     def __str__(self):
         return self.title
@@ -118,6 +125,10 @@ class KnowledgeChunk(BaseModel):
         unique_together = [("document", "chunk_index")]
         verbose_name = "Knowledge Chunk"
         verbose_name_plural = "Knowledge Chunks"
+        indexes = [
+            models.Index(fields=["document", "is_active", "chunk_index"]),
+            models.Index(fields=["is_active", "-created_at"]),
+        ]
 
     def __str__(self):
         return f"{self.document.title} — chunk {self.chunk_index}"
@@ -138,6 +149,10 @@ class KnowledgeProcessingLog(BaseModel):
         ordering = ["-created_at"]
         verbose_name = "Knowledge Processing Log"
         verbose_name_plural = "Knowledge Processing Logs"
+        indexes = [
+            models.Index(fields=["document", "-created_at"]),
+            models.Index(fields=["action", "status", "-created_at"]),
+        ]
 
     def __str__(self):
         return f"{self.document.title} — {self.action} ({self.status})"

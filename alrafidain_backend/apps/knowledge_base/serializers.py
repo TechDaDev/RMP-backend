@@ -71,6 +71,8 @@ class KnowledgeDocumentSerializer(serializers.ModelSerializer):
         ]
 
     def get_chunk_count(self, obj):
+        if hasattr(obj, "chunk_count"):
+            return obj.chunk_count
         return obj.chunks.filter(is_active=True).count()
 
 
@@ -111,6 +113,8 @@ class KnowledgeDocumentDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_chunk_count(self, obj):
+        if hasattr(obj, "chunk_count"):
+            return obj.chunk_count
         return obj.chunks.filter(is_active=True).count()
 
     def get_approved_by_email(self, obj):

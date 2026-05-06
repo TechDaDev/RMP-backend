@@ -29,6 +29,8 @@ class Notification(BaseModel):
         indexes = [
             models.Index(fields=["recipient", "is_read"]),
             models.Index(fields=["recipient", "notification_type"]),
+            models.Index(fields=["recipient", "-created_at"]),
+            models.Index(fields=["recipient", "is_read", "-created_at"]),
         ]
 
     def __str__(self):

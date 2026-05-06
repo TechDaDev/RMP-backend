@@ -71,6 +71,12 @@ class LabOrder(BaseModel):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["patient", "-created_at"]),
+            models.Index(fields=["doctor", "-created_at"]),
+            models.Index(fields=["status", "-created_at"]),
+            models.Index(fields=["expires_at"]),
+        ]
 
     def __str__(self):
         return f"LabOrder {self.id} [{self.status}]"
@@ -193,6 +199,9 @@ class LabOrderItem(BaseModel):
 
     class Meta:
         ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["lab_order", "status", "created_at"]),
+        ]
 
     def __str__(self):
         return f"{self.test_name} [{self.status}]"
@@ -219,6 +228,10 @@ class LabCompletionRecord(BaseModel):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["lab_order", "-created_at"]),
+            models.Index(fields=["laboratorian", "-created_at"]),
+        ]
 
     def __str__(self):
         return f"LabCompletionRecord {self.id} [{self.status}]"
@@ -308,6 +321,13 @@ class LabResult(BaseModel):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["patient", "-created_at"]),
+            models.Index(fields=["doctor", "-created_at"]),
+            models.Index(fields=["laboratorian", "-created_at"]),
+            models.Index(fields=["status", "-created_at"]),
+            models.Index(fields=["released_at"]),
+        ]
 
     def __str__(self):
         return f"LabResult {self.id} [{self.status}]"
@@ -366,6 +386,9 @@ class LabResultCorrection(BaseModel):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["lab_result", "-created_at"]),
+        ]
 
     def __str__(self):
         return f"LabResultCorrection {self.id}"

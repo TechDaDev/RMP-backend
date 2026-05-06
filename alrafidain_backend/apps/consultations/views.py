@@ -93,9 +93,13 @@ class MyConsultationListView(APIView):
 
     def get(self, request):
         if request.user.user_type == UserType.PATIENT:
-            queryset = Consultation.objects.filter(patient=request.user)
+            queryset = Consultation.objects.filter(patient=request.user).select_related(
+                "patient", "assigned_doctor"
+            )
         elif request.user.user_type == UserType.DOCTOR:
-            queryset = Consultation.objects.filter(assigned_doctor=request.user)
+            queryset = Consultation.objects.filter(assigned_doctor=request.user).select_related(
+                "patient", "assigned_doctor"
+            )
         else:
             return error_response(
                 message="You do not have consultation access.",
@@ -112,7 +116,14 @@ class ConsultationDetailView(APIView):
 
     @extend_schema(summary="Get consultation detail")
     def get(self, request, consultation_id):
-        consultation = get_object_or_404(Consultation, id=consultation_id)
+        consultation = get_object_or_404(
+            Consultation.objects.select_related("patient", "assigned_doctor").prefetch_related(
+                "responses__doctor",
+                "attachments__uploaded_by",
+                "consultation_symptoms__symptom__category",
+            ),
+            id=consultation_id,
+        )
 
         if is_consultation_patient(request.user, consultation):
             return success_response(data=ConsultationPatientDetailSerializer(consultation).data)
@@ -143,7 +154,7 @@ class DoctorPendingConsultationListView(APIView):
             status=ConsultationStatus.SUBMITTED,
             assigned_doctor__isnull=True,
             selected_specialty=specialty,
-        )
+        ).select_related("patient", "assigned_doctor")
 
         if specialty == MedicalSpecialty.OTHER:
             queryset = queryset.filter(selected_specialty=MedicalSpecialty.OTHER)
@@ -161,7 +172,9 @@ class DoctorAssignedConsultationListView(APIView):
                 message="Only approved doctors can access assigned consultations.",
                 status_code=status.HTTP_403_FORBIDDEN,
             )
-        queryset = Consultation.objects.filter(assigned_doctor=request.user)
+        queryset = Consultation.objects.filter(assigned_doctor=request.user).select_related(
+            "patient", "assigned_doctor"
+        )
         return success_response(data=ConsultationListSerializer(queryset, many=True).data)
 
 

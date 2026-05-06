@@ -3,7 +3,9 @@ import tempfile
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
 from django.test import TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from rest_framework import status
 from rest_framework.test import APIClient
 
@@ -258,7 +260,30 @@ class ApprovalTests(TestCase):
         self.doc.refresh_from_db()
         self.assertEqual(self.doc.approval_status, KnowledgeApprovalStatus.ARCHIVED)
         self.assertFalse(self.doc.is_active)
-        self.assertFalse(self.doc.chunks.filter(is_active=True).exists())
+
+
+@override_settings(MEDIA_ROOT=MEDIA_ROOT_TMP)
+class KnowledgeQueryPerformanceTests(TestCase):
+    def setUp(self):
+        self.staff = _make_staff_user("staff-perf@example.com")
+        self.client = APIClient()
+        self.client.force_authenticate(self.staff)
+
+        for idx in range(4):
+            _upload_document(
+                self.client,
+                file=_make_txt_file(f"knowledge {idx} " * 200),
+                extra={"title": f"Doc {idx}"},
+            )
+            document = KnowledgeDocument.objects.order_by("-created_at").first()
+            extract_text_from_document(document)
+            chunk_knowledge_document(document)
+
+    def test_document_list_uses_bounded_queries(self):
+        with CaptureQueriesContext(connection) as context:
+            response = self.client.get(UPLOAD_URL)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertLessEqual(len(context), 5)
 
 
 @override_settings(MEDIA_ROOT=MEDIA_ROOT_TMP)

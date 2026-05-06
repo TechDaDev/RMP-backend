@@ -1,5 +1,7 @@
 from django.contrib.auth import get_user_model
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -434,3 +436,24 @@ class MessagingNotificationIntegrationTest(TestCase):
                 title="New doctor message",
             ).exists()
         )
+
+
+class NotificationQueryPerformanceTest(TestCase):
+    def setUp(self):
+        self.user = create_patient(email="perf-notify@example.com")
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+        for idx in range(15):
+            create_notification(
+                self.user,
+                NotificationType.SYSTEM,
+                f"N{idx}",
+                "msg",
+            )
+
+    def test_notification_list_uses_bounded_queries(self):
+        with CaptureQueriesContext(connection) as context:
+            response = self.client.get("/api/notifications/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertLessEqual(len(context), 4)

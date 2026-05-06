@@ -1,6 +1,8 @@
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -278,6 +280,49 @@ class MessagingTests(TestCase):
         att = MessageAttachment.objects.latest("created_at")
         self.assertEqual(att.uploaded_by_id, self.patient.id)
         self.assertEqual(att.original_name, "lab-result.txt")
+
+
+class MessagingQueryPerformanceTests(TestCase):
+    def setUp(self):
+        self.patient = create_user("mp-p@example.com", UserType.PATIENT)
+        self.doctor = create_user("mp-d@example.com", UserType.DOCTOR)
+        self.consultation = create_consultation(
+            self.patient, self.doctor, ConsultationStatus.ACCEPTED
+        )
+        self.patient_client = auth_client(self.patient)
+        self.doctor_client = auth_client(self.doctor)
+        self.client = APIClient()
+        self.client.force_authenticate(self.patient)
+
+        for idx in range(6):
+            sender = self.patient if idx % 2 == 0 else self.doctor
+            role = MessageSenderRole.PATIENT if idx % 2 == 0 else MessageSenderRole.DOCTOR
+            message = ConsultationMessage.objects.create(
+                consultation=self.consultation,
+                sender=sender,
+                sender_role=role,
+                body=f"message {idx}",
+            )
+            MessageAttachment.objects.create(
+                message=message,
+                file=SimpleUploadedFile(
+                    f"note-{idx}.txt",
+                    b"x",
+                    content_type="text/plain",
+                ),
+                original_name=f"note-{idx}.txt",
+                uploaded_by=sender,
+            )
+
+    def msg_url(self, consultation=None):
+        consultation = consultation or self.consultation
+        return f"/api/consultations/{consultation.id}/messages/"
+
+    def test_message_list_uses_bounded_queries(self):
+        with CaptureQueriesContext(connection) as context:
+            response = self.client.get(f"/api/consultations/{self.consultation.id}/messages/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertLessEqual(len(context), 8)
 
     def test_audit_log_metadata_includes_attachment_count(self):
         file_obj = SimpleUploadedFile("a.txt", b"a", content_type="text/plain")

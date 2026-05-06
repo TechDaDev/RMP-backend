@@ -130,6 +130,12 @@ class Consultation(BaseModel):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["patient", "-created_at"]),
+            models.Index(fields=["assigned_doctor", "-created_at"]),
+            models.Index(fields=["status", "-created_at"]),
+            models.Index(fields=["selected_specialty", "status", "-created_at"]),
+        ]
 
     def clean(self):
         if self.patient and self.patient.user_type != UserType.PATIENT:
@@ -244,6 +250,12 @@ class ConsultationResponse(BaseModel):
     )
     response_text = models.TextField()
     recommendation_type = models.CharField(max_length=40, choices=DoctorRecommendationType.choices)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["consultation", "-created_at"]),
+            models.Index(fields=["doctor", "-created_at"]),
+        ]
 
     def clean(self):
         if (

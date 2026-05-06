@@ -65,8 +65,11 @@ class ConsultationMessageListView(APIView):
         # Mark incoming unread messages as read when listing.
         mark_messages_as_read(consultation, request.user)
 
-        queryset = ConsultationMessage.objects.filter(consultation=consultation).order_by(
-            "created_at"
+        queryset = (
+            ConsultationMessage.objects.filter(consultation=consultation)
+            .select_related("sender")
+            .prefetch_related("attachments__uploaded_by")
+            .order_by("created_at")
         )
         return success_response(data=ConsultationMessageSerializer(queryset, many=True).data)
 

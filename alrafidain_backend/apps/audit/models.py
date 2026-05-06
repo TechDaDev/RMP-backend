@@ -23,6 +23,11 @@ class AuditLog(BaseModel):
         verbose_name = "Audit Log"
         verbose_name_plural = "Audit Logs"
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["actor", "-created_at"]),
+            models.Index(fields=["action", "-created_at"]),
+            models.Index(fields=["target_type", "target_id", "-created_at"]),
+        ]
 
     def __str__(self):
         actor = self.actor.email if self.actor_id else "anonymous"

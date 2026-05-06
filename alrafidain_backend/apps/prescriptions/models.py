@@ -49,6 +49,12 @@ class Prescription(BaseModel):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["patient", "-created_at"]),
+            models.Index(fields=["doctor", "-created_at"]),
+            models.Index(fields=["status", "-created_at"]),
+            models.Index(fields=["expires_at"]),
+        ]
 
     def __str__(self):
         return f"Prescription {self.id} [{self.status}]"
@@ -161,6 +167,9 @@ class PrescriptionItem(BaseModel):
 
     class Meta:
         ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["prescription", "status", "created_at"]),
+        ]
 
     def __str__(self):
         return f"{self.medication_name} [{self.status}]"
@@ -188,6 +197,10 @@ class DispensingRecord(BaseModel):
 
     class Meta:
         ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["prescription", "-created_at"]),
+            models.Index(fields=["pharmacist", "-created_at"]),
+        ]
 
     def __str__(self):
         return f"DispensingRecord {self.id} [{self.status}]"

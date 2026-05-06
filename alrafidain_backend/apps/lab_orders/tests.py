@@ -2,7 +2,9 @@ import json
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -259,6 +261,49 @@ class LabOrderCreationTests(TestCase):
     def test_cannot_create_with_zero_items(self):
         response = auth_client(self.doctor).post(self._url(), {"items": []}, format="json")
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class LabOrderQueryPerformanceTests(TestCase):
+    def setUp(self):
+        self.patient = create_patient("perf-patient@example.com")
+        self.doctor = create_doctor("perf-doctor@example.com")
+        self.consultation = create_consultation(
+            self.patient,
+            self.doctor,
+            ConsultationStatus.ACCEPTED,
+        )
+        self.catalog = create_catalog_test("Perf CBC")
+        self.client = APIClient()
+        self.client.force_authenticate(self.patient)
+        for _ in range(5):
+            consultation = create_consultation(
+                self.patient,
+                self.doctor,
+                ConsultationStatus.ACCEPTED,
+            )
+            create_lab_order_with_items(self.patient, self.doctor, consultation, item_count=3)
+
+    def _url(self):
+        return f"/api/consultations/{self.consultation.id}/lab-orders/"
+
+    def _payload(self):
+        return {
+            "items": [
+                {
+                    "test": str(self.catalog.id),
+                    "test_name": "Perf CBC",
+                    "category": LabTestCategory.HEMATOLOGY,
+                    "sample_type": "Blood",
+                    "instructions": "Fasting not required",
+                }
+            ]
+        }
+
+    def test_patient_lab_order_list_uses_bounded_queries(self):
+        with CaptureQueriesContext(connection) as context:
+            response = self.client.get("/api/lab-orders/my/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertLessEqual(len(context), 4)
 
     def test_lab_order_creates_secure_qr_token(self):
         response = auth_client(self.doctor).post(self._url(), self._payload(), format="json")

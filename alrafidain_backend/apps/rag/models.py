@@ -32,6 +32,11 @@ class RAGQuery(BaseModel):
         ordering = ["-created_at"]
         verbose_name = "RAG Query"
         verbose_name_plural = "RAG Queries"
+        indexes = [
+            models.Index(fields=["requested_by", "-created_at"]),
+            models.Index(fields=["service_context", "-created_at"]),
+            models.Index(fields=["service_context", "object_id", "-created_at"]),
+        ]
 
     def __str__(self):
         return f"RAGQuery {self.id} [{self.service_context}] by {self.requested_by_id}"
@@ -56,6 +61,10 @@ class RAGRetrievedChunk(BaseModel):
         ordering = ["rag_query", "rank"]
         verbose_name = "RAG Retrieved Chunk"
         verbose_name_plural = "RAG Retrieved Chunks"
+        indexes = [
+            models.Index(fields=["rag_query", "rank"]),
+            models.Index(fields=["chunk", "-created_at"]),
+        ]
 
     def __str__(self):
         return f"RAGChunk rank={self.rank} score={self.score:.4f}"
@@ -143,6 +152,12 @@ class RAGResponseFeedback(BaseModel):
         ordering = ["-created_at"]
         verbose_name = "RAG Response Feedback"
         verbose_name_plural = "RAG Response Feedbacks"
+        indexes = [
+            models.Index(fields=["doctor", "-created_at"]),
+            models.Index(fields=["review_status", "-created_at"]),
+            models.Index(fields=["needs_admin_review", "-created_at"]),
+            models.Index(fields=["rating", "-created_at"]),
+        ]
 
     def __str__(self):
         return f"RAGFeedback {self.id} [{self.rating}] by {self.doctor_id}"
@@ -181,6 +196,9 @@ class RAGRetrievedChunkFeedback(BaseModel):
         unique_together = [("feedback", "retrieved_chunk")]
         verbose_name = "RAG Retrieved Chunk Feedback"
         verbose_name_plural = "RAG Retrieved Chunk Feedbacks"
+        indexes = [
+            models.Index(fields=["feedback", "retrieved_chunk"]),
+        ]
 
     def __str__(self):
         return f"ChunkFeedback [{self.relevance}] for chunk {self.retrieved_chunk_id}"

@@ -1,3 +1,4 @@
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, extend_schema
 from rest_framework import status
@@ -42,7 +43,9 @@ class KnowledgeDocumentUploadView(APIView):
     permission_classes = [CanAccessKnowledgeBase]
 
     def get(self, request):
-        qs = KnowledgeDocument.objects.select_related("uploaded_by", "approved_by")
+        qs = KnowledgeDocument.objects.select_related("uploaded_by", "approved_by").annotate(
+            chunk_count=Count("chunks", filter=Q(chunks__is_active=True), distinct=True)
+        )
         params = request.query_params
 
         for field in (
@@ -101,8 +104,10 @@ class KnowledgeDocumentDetailView(RetrieveAPIView):
     lookup_url_kwarg = "document_id"
 
     def get_queryset(self):
-        return KnowledgeDocument.objects.prefetch_related("processing_logs").select_related(
-            "uploaded_by", "approved_by"
+        return (
+            KnowledgeDocument.objects.prefetch_related("processing_logs")
+            .select_related("uploaded_by", "approved_by")
+            .annotate(chunk_count=Count("chunks", filter=Q(chunks__is_active=True), distinct=True))
         )
 
     def retrieve(self, request, *args, **kwargs):

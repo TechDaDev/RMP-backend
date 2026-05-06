@@ -1,3 +1,4 @@
+from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -118,8 +119,11 @@ class PatientLabOrderListView(ListAPIView):
     def get_queryset(self):
         if self.request.user.user_type != UserType.PATIENT:
             return LabOrder.objects.none()
-        return LabOrder.objects.filter(patient=self.request.user).select_related(
-            "doctor", "consultation"
+        return (
+            LabOrder.objects.filter(patient=self.request.user)
+            .select_related("doctor", "consultation")
+            .annotate(test_count=Count("items", distinct=True))
+            .order_by("-created_at")
         )
 
     def list(self, request, *args, **kwargs):

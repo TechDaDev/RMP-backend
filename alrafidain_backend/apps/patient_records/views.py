@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
@@ -30,6 +31,22 @@ from .services import (
 User = get_user_model()
 
 
+def _optimized_record_queryset():
+    return PatientMedicalRecord.objects.select_related(
+        "patient",
+        "blood_group_record__source_user",
+        "blood_group_record__verified_by",
+    ).prefetch_related(
+        Prefetch(
+            "entries",
+            queryset=MedicalRecordEntry.objects.filter(is_active=True)
+            .select_related("source_user", "verified_by")
+            .order_by("-created_at"),
+            to_attr="active_entries",
+        )
+    )
+
+
 @extend_schema(tags=["Patient Records"])
 class MyMedicalRecordView(APIView):
     permission_classes = [IsAuthenticated]
@@ -42,6 +59,7 @@ class MyMedicalRecordView(APIView):
             )
 
         record = get_or_create_patient_medical_record(request.user)
+        record = _optimized_record_queryset().get(pk=record.pk)
         return success_response(
             "Medical record retrieved.", data=PatientMedicalRecordSerializer(record).data
         )
@@ -63,6 +81,7 @@ class DoctorPatientMedicalRecordView(APIView):
             return error_response("Not found.", status_code=status.HTTP_404_NOT_FOUND)
 
         record = get_or_create_patient_medical_record(patient)
+        record = _optimized_record_queryset().get(pk=record.pk)
         return success_response(
             "Medical record retrieved.", data=PatientMedicalRecordSerializer(record).data
         )

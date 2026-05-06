@@ -124,9 +124,15 @@ class ConsultationDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_symptoms(self, obj):
-        symptom_objs = Symptom.objects.filter(consultation_links__consultation=obj).select_related(
-            "category"
-        )
+        prefetched = getattr(obj, "_prefetched_objects_cache", {})
+        if "consultation_symptoms" in prefetched:
+            symptom_objs = [
+                cs.symptom for cs in prefetched["consultation_symptoms"] if cs.symptom_id
+            ]
+        else:
+            symptom_objs = Symptom.objects.filter(
+                consultation_links__consultation=obj
+            ).select_related("category")
         return SymptomSerializer(symptom_objs, many=True).data
 
 

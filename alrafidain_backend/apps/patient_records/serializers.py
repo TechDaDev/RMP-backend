@@ -103,5 +103,11 @@ class PatientMedicalRecordSerializer(serializers.ModelSerializer):
         return BloodGroupRecordSerializer(blood_group_record).data
 
     def get_entries(self, obj):
-        active_entries = obj.entries.filter(is_active=True).order_by("-created_at")
+        active_entries = getattr(obj, "active_entries", None)
+        if active_entries is None:
+            active_entries = (
+                obj.entries.filter(is_active=True)
+                .select_related("source_user", "verified_by")
+                .order_by("-created_at")
+            )
         return MedicalRecordEntrySerializer(active_entries, many=True).data
