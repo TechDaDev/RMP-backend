@@ -1,7 +1,9 @@
+from django.conf import settings
 from rest_framework import serializers
 
 from apps.accounts.serializers import UserSerializer
 from apps.common.choices import MedicalSpecialty
+from apps.common.file_validation import validate_uploaded_file
 
 from .models import (
     DoctorProfile,
@@ -15,6 +17,15 @@ _VERIFICATION_READ_ONLY = ["verification_status", "verified_at", "verification_n
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    def validate_profile_image(self, value):
+        validate_uploaded_file(
+            value,
+            allowed_extensions=settings.PROFILE_IMAGE_ALLOWED_EXTENSIONS,
+            allowed_content_types=settings.PROFILE_IMAGE_ALLOWED_CONTENT_TYPES,
+            max_size_mb=settings.MAX_PROFILE_IMAGE_UPLOAD_MB,
+        )
+        return value
+
     class Meta:
         model = UserProfile
         fields = [
@@ -48,6 +59,15 @@ class PatientProfileSerializer(serializers.ModelSerializer):
 
 
 class DoctorProfileSerializer(serializers.ModelSerializer):
+    def validate_medical_license_image(self, value):
+        validate_uploaded_file(
+            value,
+            allowed_extensions=settings.PROFILE_IMAGE_ALLOWED_EXTENSIONS,
+            allowed_content_types=settings.PROFILE_IMAGE_ALLOWED_CONTENT_TYPES,
+            max_size_mb=settings.MAX_PROFILE_IMAGE_UPLOAD_MB,
+        )
+        return value
+
     def validate(self, attrs):
         specialty = attrs.get("specialty", getattr(self.instance, "specialty", ""))
         specialty_other = attrs.get(
@@ -84,6 +104,24 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
 
 
 class PharmacistProfileSerializer(serializers.ModelSerializer):
+    def validate_pharmacist_license_image(self, value):
+        validate_uploaded_file(
+            value,
+            allowed_extensions=settings.PROFILE_IMAGE_ALLOWED_EXTENSIONS,
+            allowed_content_types=settings.PROFILE_IMAGE_ALLOWED_CONTENT_TYPES,
+            max_size_mb=settings.MAX_PROFILE_IMAGE_UPLOAD_MB,
+        )
+        return value
+
+    def validate_pharmacy_license_image(self, value):
+        validate_uploaded_file(
+            value,
+            allowed_extensions=settings.PROFILE_IMAGE_ALLOWED_EXTENSIONS,
+            allowed_content_types=settings.PROFILE_IMAGE_ALLOWED_CONTENT_TYPES,
+            max_size_mb=settings.MAX_PROFILE_IMAGE_UPLOAD_MB,
+        )
+        return value
+
     class Meta:
         model = PharmacistProfile
         fields = [
@@ -105,6 +143,24 @@ class PharmacistProfileSerializer(serializers.ModelSerializer):
 
 
 class LaboratorianProfileSerializer(serializers.ModelSerializer):
+    def validate_laboratorian_license_image(self, value):
+        validate_uploaded_file(
+            value,
+            allowed_extensions=settings.PROFILE_IMAGE_ALLOWED_EXTENSIONS,
+            allowed_content_types=settings.PROFILE_IMAGE_ALLOWED_CONTENT_TYPES,
+            max_size_mb=settings.MAX_PROFILE_IMAGE_UPLOAD_MB,
+        )
+        return value
+
+    def validate_laboratory_license_image(self, value):
+        validate_uploaded_file(
+            value,
+            allowed_extensions=settings.PROFILE_IMAGE_ALLOWED_EXTENSIONS,
+            allowed_content_types=settings.PROFILE_IMAGE_ALLOWED_CONTENT_TYPES,
+            max_size_mb=settings.MAX_PROFILE_IMAGE_UPLOAD_MB,
+        )
+        return value
+
     class Meta:
         model = LaboratorianProfile
         fields = [

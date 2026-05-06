@@ -148,6 +148,44 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+MAX_KNOWLEDGE_DOCUMENT_UPLOAD_MB = config("MAX_KNOWLEDGE_DOCUMENT_UPLOAD_MB", default=20, cast=int)
+MAX_CLINICAL_ATTACHMENT_UPLOAD_MB = config(
+    "MAX_CLINICAL_ATTACHMENT_UPLOAD_MB", default=15, cast=int
+)
+MAX_PROFILE_IMAGE_UPLOAD_MB = config("MAX_PROFILE_IMAGE_UPLOAD_MB", default=5, cast=int)
+
+KNOWLEDGE_DOCUMENT_ALLOWED_EXTENSIONS = [".pdf", ".docx", ".txt"]
+KNOWLEDGE_DOCUMENT_ALLOWED_CONTENT_TYPES = [
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain",
+]
+
+CLINICAL_ATTACHMENT_ALLOWED_EXTENSIONS = [
+    ".pdf",
+    ".docx",
+    ".txt",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp",
+]
+CLINICAL_ATTACHMENT_ALLOWED_CONTENT_TYPES = [
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "text/plain",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+]
+
+PROFILE_IMAGE_ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"]
+PROFILE_IMAGE_ALLOWED_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp"]
+
+FILE_SCANNING_ENABLED = config("FILE_SCANNING_ENABLED", default=False, cast=bool)
+FILE_SCANNER_BACKEND = config("FILE_SCANNER_BACKEND", default="")
+PRIVATE_MEDIA_STORAGE = config("PRIVATE_MEDIA_STORAGE", default=False, cast=bool)
+
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {

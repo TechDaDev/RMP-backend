@@ -1,5 +1,4 @@
-import os
-
+from django.conf import settings
 from rest_framework import serializers
 
 from apps.common.choices import (
@@ -8,8 +7,10 @@ from apps.common.choices import (
     KnowledgeDocumentType,
     KnowledgeLanguage,
     KnowledgeProcessingStatus,
+    KnowledgeSecurityStatus,
     MedicalSpecialty,
 )
+from apps.common.file_validation import validate_uploaded_file
 
 from .models import KnowledgeChunk, KnowledgeDocument, KnowledgeProcessingLog
 
@@ -63,6 +64,7 @@ class KnowledgeDocumentSerializer(serializers.ModelSerializer):
             "version",
             "approval_status",
             "processing_status",
+            "security_status",
             "is_active",
             "uploaded_by_email",
             "chunk_count",
@@ -101,6 +103,7 @@ class KnowledgeDocumentDetailSerializer(serializers.ModelSerializer):
             "mime_type",
             "approval_status",
             "processing_status",
+            "security_status",
             "approved_at",
             "rejected_reason",
             "is_active",
@@ -141,11 +144,12 @@ class KnowledgeDocumentUploadSerializer(serializers.ModelSerializer):
         ]
 
     def validate_file(self, value):
-        ext = os.path.splitext(value.name)[1].lower()
-        if ext not in ALLOWED_EXTENSIONS:
-            raise serializers.ValidationError(
-                f"Unsupported file type '{ext}'. Allowed: {', '.join(ALLOWED_EXTENSIONS)}."
-            )
+        validate_uploaded_file(
+            value,
+            allowed_extensions=settings.KNOWLEDGE_DOCUMENT_ALLOWED_EXTENSIONS,
+            allowed_content_types=settings.KNOWLEDGE_DOCUMENT_ALLOWED_CONTENT_TYPES,
+            max_size_mb=settings.MAX_KNOWLEDGE_DOCUMENT_UPLOAD_MB,
+        )
         return value
 
     def create(self, validated_data):
@@ -157,6 +161,7 @@ class KnowledgeDocumentUploadSerializer(serializers.ModelSerializer):
         validated_data["mime_type"] = getattr(file, "content_type", None)
         validated_data["approval_status"] = KnowledgeApprovalStatus.PENDING
         validated_data["processing_status"] = KnowledgeProcessingStatus.UPLOADED
+        validated_data["security_status"] = KnowledgeSecurityStatus.PENDING_SCAN
         return super().create(validated_data)
 
 

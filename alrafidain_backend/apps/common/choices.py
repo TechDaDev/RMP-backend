@@ -232,6 +232,13 @@ class KnowledgeAudience(models.TextChoices):
     MIXED = "mixed", "Mixed"
 
 
+class KnowledgeSecurityStatus(models.TextChoices):
+    PENDING_SCAN = "pending_scan", "Pending Scan"
+    SCAN_CLEAN = "scan_clean", "Scan Clean"
+    SCAN_FAILED = "scan_failed", "Scan Failed"
+    SCAN_SKIPPED = "scan_skipped", "Scan Skipped"
+
+
 class KnowledgeProcessingStatus(models.TextChoices):
     UPLOADED = "uploaded", "Uploaded"
     EXTRACTED = "extracted", "Extracted"

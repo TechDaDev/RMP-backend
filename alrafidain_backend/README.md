@@ -269,3 +269,4 @@ See [docs/RAG_EVALUATION_DATASET.md](docs/RAG_EVALUATION_DATASET.md) for dataset
 - [docs/RAG_PLAN.md](docs/RAG_PLAN.md) — AI/RAG roadmap
 - [docs/RAG_EVALUATION_DATASET.md](docs/RAG_EVALUATION_DATASET.md) — Dataset field reference and privacy notes
 - [docs/SECURITY_NOTES.md](docs/SECURITY_NOTES.md) — Security model, privacy boundaries, throttling, and MVP limitations
+- [docs/FILE_SECURITY.md](docs/FILE_SECURITY.md) — File upload validation, malware scanning, and private storage guidance

@@ -8,6 +8,7 @@ from apps.common.choices import (
     KnowledgeDocumentType,
     KnowledgeLanguage,
     KnowledgeProcessingStatus,
+    KnowledgeSecurityStatus,
     MedicalSpecialty,
 )
 from apps.common.models import BaseModel
@@ -44,6 +45,11 @@ class KnowledgeDocument(BaseModel):
         choices=KnowledgeProcessingStatus.choices,
         default=KnowledgeProcessingStatus.UPLOADED,
     )
+    security_status = models.CharField(
+        max_length=20,
+        choices=KnowledgeSecurityStatus.choices,
+        default=KnowledgeSecurityStatus.SCAN_SKIPPED,
+    )
 
     uploaded_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -69,6 +75,7 @@ class KnowledgeDocument(BaseModel):
         indexes = [
             models.Index(fields=["approval_status", "-created_at"]),
             models.Index(fields=["processing_status", "-created_at"]),
+            models.Index(fields=["security_status", "-created_at"]),
             models.Index(fields=["document_type", "-created_at"]),
             models.Index(fields=["specialty", "-created_at"]),
             models.Index(fields=["is_active", "-created_at"]),

@@ -1,5 +1,8 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
+
+from apps.common.file_validation import validate_uploaded_file
 
 from .models import ConsultationMessage, MessageAttachment
 
@@ -14,6 +17,7 @@ class MessageSenderSummarySerializer(serializers.ModelSerializer):
 
 
 class MessageAttachmentSerializer(serializers.ModelSerializer):
+    file = serializers.FileField(read_only=True, use_url=False)
     uploaded_by = MessageSenderSummarySerializer(read_only=True)
 
     class Meta:
@@ -59,6 +63,15 @@ class ConsultationMessageCreateSerializer(serializers.Serializer):
             attachments = self.context.get("attachments", [])
         if not body and len(attachments) == 0:
             raise serializers.ValidationError("At least body or one attachment is required.")
+
+        for file_obj in attachments:
+            validate_uploaded_file(
+                file_obj,
+                allowed_extensions=settings.CLINICAL_ATTACHMENT_ALLOWED_EXTENSIONS,
+                allowed_content_types=settings.CLINICAL_ATTACHMENT_ALLOWED_CONTENT_TYPES,
+                max_size_mb=settings.MAX_CLINICAL_ATTACHMENT_UPLOAD_MB,
+            )
+
         attrs["body"] = body
         attrs["attachments"] = attachments
         return attrs

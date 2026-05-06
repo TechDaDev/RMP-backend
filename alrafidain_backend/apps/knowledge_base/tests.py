@@ -18,6 +18,7 @@ from apps.common.choices import (
     KnowledgeDocumentType,
     KnowledgeLanguage,
     KnowledgeProcessingStatus,
+    KnowledgeSecurityStatus,
 )
 from apps.common.models import BackgroundJob
 
@@ -429,3 +430,96 @@ class SecurityTests(TestCase):
         self.client.force_authenticate(None)
         response = _upload_document(self.client)
         self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class FileUploadValidationTests(TestCase):
+    """Tests for file extension/size/content-type validation on upload."""
+
+    def setUp(self):
+        self.staff = _make_staff_user()
+        self.client = APIClient()
+        self.client.force_authenticate(self.staff)
+
+    @override_settings(MEDIA_ROOT=MEDIA_ROOT_TMP)
+    def test_rejected_extension_returns_400(self):
+        bad_file = SimpleUploadedFile(
+            "malware.exe", b"MZ\x90\x00", content_type="application/octet-stream"
+        )
+        response = _upload_document(self.client, file=bad_file)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @override_settings(MEDIA_ROOT=MEDIA_ROOT_TMP)
+    def test_oversized_file_returns_400(self):
+        big_content = b"x" * (21 * 1024 * 1024)
+        big_file = SimpleUploadedFile("big.txt", big_content, content_type="text/plain")
+        response = _upload_document(self.client, file=big_file)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @override_settings(MEDIA_ROOT=MEDIA_ROOT_TMP)
+    def test_mismatched_content_type_returns_400(self):
+        bad_file = SimpleUploadedFile(
+            "tricky.txt", b"data", content_type="application/x-msdownload"
+        )
+        response = _upload_document(self.client, file=bad_file)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @override_settings(MEDIA_ROOT=MEDIA_ROOT_TMP)
+    def test_security_status_starts_as_pending_scan(self):
+        response = _upload_document(self.client, file=_make_txt_file())
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        doc = KnowledgeDocument.objects.get(pk=response.data["data"]["id"])
+        self.assertEqual(doc.security_status, KnowledgeSecurityStatus.PENDING_SCAN)
+
+
+class ScanBoundaryTests(TestCase):
+    """Tests for malware scan boundary in process_knowledge_document_task."""
+
+    def setUp(self):
+        self.staff = _make_staff_user()
+        self.client = APIClient()
+        self.client.force_authenticate(self.staff)
+
+    @override_settings(MEDIA_ROOT=MEDIA_ROOT_TMP, FILE_SCANNING_ENABLED=False)
+    def test_scan_skipped_does_not_block_processing(self):
+        """When scanning is disabled, task sets scan_skipped and continues."""
+        from apps.common.file_scanner import ScanResult
+
+        with patch("apps.common.file_scanner.scan_uploaded_file") as mock_scan:
+            mock_scan.return_value = ScanResult(status="scan_skipped", details="")
+            with patch("apps.knowledge_base.services.process_knowledge_document") as mock_proc:
+                mock_proc.return_value = None
+                doc = KnowledgeDocument.objects.create(
+                    title="test",
+                    document_type=KnowledgeDocumentType.MEDICAL_BOOK,
+                    language=KnowledgeLanguage.ARABIC,
+                    audience=KnowledgeAudience.DOCTOR,
+                    uploaded_by=self.staff,
+                    file=SimpleUploadedFile("t.txt", b"hello world", content_type="text/plain"),
+                )
+                process_knowledge_document_task(str(doc.pk))
+                mock_proc.assert_called_once()
+                doc.refresh_from_db()
+                self.assertEqual(doc.security_status, KnowledgeSecurityStatus.SCAN_SKIPPED)
+
+    @override_settings(MEDIA_ROOT=MEDIA_ROOT_TMP, FILE_SCANNING_ENABLED=True)
+    def test_scan_failed_blocks_processing(self):
+        """When scan returns scan_failed, task blocks processing and sets SCAN_FAILED status."""
+        from apps.common.file_scanner import ScanResult
+
+        with patch("apps.common.file_scanner.scan_uploaded_file") as mock_scan:
+            mock_scan.return_value = ScanResult(status="scan_failed", details="threat detected")
+            with patch("apps.knowledge_base.services.process_knowledge_document") as mock_proc:
+                doc = KnowledgeDocument.objects.create(
+                    title="infected",
+                    document_type=KnowledgeDocumentType.MEDICAL_BOOK,
+                    language=KnowledgeLanguage.ARABIC,
+                    audience=KnowledgeAudience.DOCTOR,
+                    uploaded_by=self.staff,
+                    file=SimpleUploadedFile("bad.txt", b"virus", content_type="text/plain"),
+                )
+                result = process_knowledge_document_task(str(doc.pk))
+                mock_proc.assert_not_called()
+                doc.refresh_from_db()
+                self.assertEqual(doc.security_status, KnowledgeSecurityStatus.SCAN_FAILED)
+                self.assertEqual(doc.processing_status, KnowledgeProcessingStatus.FAILED)
+                self.assertEqual(result["status"], "blocked")

@@ -1,3 +1,4 @@
+from django.conf import settings
 from rest_framework import serializers
 
 from apps.common.choices import (
@@ -6,6 +7,7 @@ from apps.common.choices import (
     LabResultFlag,
     LabResultValueType,
 )
+from apps.common.file_validation import validate_uploaded_file
 
 from .models import (
     LabCompletionRecord,
@@ -272,6 +274,7 @@ class LabResultSerializer(serializers.ModelSerializer):
 
 
 class LabResultPatientSerializer(serializers.ModelSerializer):
+    result_file = serializers.FileField(read_only=True, use_url=False)
     test_label = serializers.SerializerMethodField()
 
     class Meta:
@@ -308,6 +311,15 @@ class LabResultCreateSerializer(serializers.Serializer):
     flag = serializers.ChoiceField(choices=LabResultFlag.choices, required=False)
     result_file = serializers.FileField(required=False)
     laboratorian_notes = serializers.CharField(required=False, allow_blank=True)
+
+    def validate_result_file(self, value):
+        validate_uploaded_file(
+            value,
+            allowed_extensions=settings.CLINICAL_ATTACHMENT_ALLOWED_EXTENSIONS,
+            allowed_content_types=settings.CLINICAL_ATTACHMENT_ALLOWED_CONTENT_TYPES,
+            max_size_mb=settings.MAX_CLINICAL_ATTACHMENT_UPLOAD_MB,
+        )
+        return value
 
     def validate(self, attrs):
         value_type = attrs.get("value_type")
