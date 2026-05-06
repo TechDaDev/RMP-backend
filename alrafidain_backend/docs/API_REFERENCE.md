@@ -3,7 +3,10 @@
 Base URL: `/api/`  
 API Docs UI: `/api/docs/`  
 OpenAPI Schema: `/api/schema/`  
-Health Check: `/api/health/`
+Health (compat): `/api/health/`  
+Health live: `/api/health/live/`  
+Health ready: `/api/health/ready/`  
+Health deps: `/api/health/deps/`
 
 All authenticated endpoints require:
 

@@ -277,3 +277,50 @@ CHANNEL_LAYERS = {
         },
     },
 }
+
+SENTRY_DSN = config("SENTRY_DSN", default="")
+SENTRY_TRACES_SAMPLE_RATE = config("SENTRY_TRACES_SAMPLE_RATE", default=0.0, cast=float)
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {
+        "request_id": {
+            "()": "apps.common.logging.RequestIDLogFilter",
+        },
+    },
+    "formatters": {
+        "standard": {
+            "format": "%(asctime)s %(levelname)s %(name)s request_id=%(request_id)s %(message)s",
+        },
+        "verbose": {
+            "format": (
+                "%(asctime)s %(levelname)s %(name)s %(filename)s:%(lineno)d "
+                "request_id=%(request_id)s %(message)s"
+            ),
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "filters": ["request_id"],
+            "formatter": "standard",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": config("LOG_LEVEL", default="INFO"),
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],
+            "level": config("DJANGO_LOG_LEVEL", default="INFO"),
+            "propagate": False,
+        },
+        "apps": {
+            "handlers": ["console"],
+            "level": config("APP_LOG_LEVEL", default="INFO"),
+            "propagate": False,
+        },
+    },
+}

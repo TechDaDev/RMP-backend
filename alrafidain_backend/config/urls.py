@@ -1,24 +1,17 @@
 from django.contrib import admin
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny
-from rest_framework.response import Response
 
-from config.version import API_VERSION
-
-
-@api_view(["GET"])
-@permission_classes([AllowAny])
-def health_check(_request):
-    return Response({"status": "ok", "service": "alrafidain-backend", "version": API_VERSION})
-
+from apps.common.health import health_deps, health_live, health_ready
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="docs"),
-    path("api/health/", health_check, name="health"),
+    path("api/health/", health_live, name="health"),
+    path("api/health/live/", health_live, name="health-live"),
+    path("api/health/ready/", health_ready, name="health-ready"),
+    path("api/health/deps/", health_deps, name="health-deps"),
     path("api/accounts/", include("apps.accounts.urls")),
     path("api/profiles/", include("apps.profiles.urls")),
     path("api/consultations/", include("apps.consultations.urls")),

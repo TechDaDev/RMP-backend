@@ -270,3 +270,6 @@ See [docs/RAG_EVALUATION_DATASET.md](docs/RAG_EVALUATION_DATASET.md) for dataset
 - [docs/RAG_EVALUATION_DATASET.md](docs/RAG_EVALUATION_DATASET.md) — Dataset field reference and privacy notes
 - [docs/SECURITY_NOTES.md](docs/SECURITY_NOTES.md) — Security model, privacy boundaries, throttling, and MVP limitations
 - [docs/FILE_SECURITY.md](docs/FILE_SECURITY.md) — File upload validation, malware scanning, and private storage guidance
+- [docs/OPERATIONS.md](docs/OPERATIONS.md) — Runtime process model, health endpoints, and ops checks
+- [docs/BACKUP_RESTORE.md](docs/BACKUP_RESTORE.md) — Database and media backup/restore guidance
+- [docs/DEPLOYMENT_CHECKLIST.md](docs/DEPLOYMENT_CHECKLIST.md) — Production deployment hardening checklist

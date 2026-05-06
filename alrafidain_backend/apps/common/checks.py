@@ -19,4 +19,3 @@ def private_media_storage_check(app_configs, **kwargs):
             )
         ]
     return []
-    return []

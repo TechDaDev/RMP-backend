@@ -36,7 +36,10 @@ Legend:
 
 | Method | Path | View | Auth | Roles | Status | Notes |
 |---|---|---|---|---|---|---|
-| GET | `/api/health/` | `config.urls.health_check` | No | All | stable | Returns `{"status","service","version"}` |
+| GET | `/api/health/` | `apps.common.health.health_live` | No | All | stable | Compatibility alias for liveness probe |
+| GET | `/api/health/live/` | `apps.common.health.health_live` | No | All | stable | Liveness probe; no dependency checks |
+| GET | `/api/health/ready/` | `apps.common.health.health_ready` | No | All | stable | Readiness probe; validates database connectivity |
+| GET | `/api/health/deps/` | `apps.common.health.health_deps` | No | All | stable | Dependency component statuses (database/redis/storage) |
 | GET | `/api/schema/` | `SpectacularAPIView` | No | All | internal | Raw OpenAPI YAML schema download |
 | GET | `/api/docs/` | `SpectacularSwaggerView` | No | All | internal | Swagger UI |
 
@@ -235,7 +238,7 @@ Legend:
 
 | Group | Endpoints |
 |---|---|
-| Health/Schema | 3 |
+| Health/Schema | 6 |
 | Accounts | 7 |
 | Profiles | 6 |
 | Consultations | 10 |
@@ -250,4 +253,4 @@ Legend:
 | RAG Feedback | 2 |
 | RAG Admin Feedback | 2 |
 | RAG Admin Analytics/Export | 2 |
-| **Total** | **83** |
+| **Total** | **86** |
