@@ -248,6 +248,12 @@ DEEPSEEK_TIMEOUT_SECONDS = config("DEEPSEEK_TIMEOUT_SECONDS", default=60, cast=i
 
 RAG_DEFAULT_TOP_K = config("RAG_DEFAULT_TOP_K", default=6, cast=int)
 RAG_MAX_TOP_K = config("RAG_MAX_TOP_K", default=12, cast=int)
+RAG_MIN_CONFIDENCE = config("RAG_MIN_CONFIDENCE", default=0.45, cast=float)
+RAG_REQUIRE_SOURCES = config("RAG_REQUIRE_SOURCES", default=True, cast=bool)
+RAG_MAX_CONTEXT_CHUNKS = config("RAG_MAX_CONTEXT_CHUNKS", default=5, cast=int)
+RAG_MAX_QUERY_LENGTH = config("RAG_MAX_QUERY_LENGTH", default=2000, cast=int)
+RAG_MAX_ANSWER_LENGTH = config("RAG_MAX_ANSWER_LENGTH", default=4000, cast=int)
+RAG_EXPORT_MAX_ROWS = config("RAG_EXPORT_MAX_ROWS", default=10000, cast=int)
 
 # ── Phase 12E — Dataset export salt ────────────────────────────────────
 # Used to hash doctor/object IDs in exported datasets.

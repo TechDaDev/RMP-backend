@@ -9,6 +9,9 @@ from django.utils import timezone
 
 from apps.audit.services import create_audit_log
 from apps.common.choices import (
+    KnowledgeApprovalStatus,
+    KnowledgeProcessingStatus,
+    KnowledgeSecurityStatus,
     RAGFeedbackRating,
     RAGFeedbackReviewStatus,
     RAGResponseStatus,
@@ -17,6 +20,81 @@ from apps.common.choices import (
 
 from .permissions import is_approved_doctor
 from .prompting import build_doctor_rag_prompt
+
+SAFE_FALLBACK_MESSAGE = (
+    "I could not find enough approved source material to answer this safely. "
+    "Please review the patient context and approved knowledge sources manually."
+)
+
+
+def _is_source_enforced_by_text(response_text: str) -> bool:
+    normalized = (response_text or "").lower()
+    return any(token in normalized for token in ("source", "sources", "citation", "[1]"))
+
+
+def _compute_confidence(hits: list[dict]) -> float:
+    if not hits:
+        return 0.0
+    scored = [float(h.get("score") or 0.0) for h in hits[:3]]
+    if not scored:
+        return 0.0
+    avg_score = sum(scored) / len(scored)
+    return round(max(0.0, min(1.0, avg_score)), 4)
+
+
+def _filter_safe_hits(hits: list[dict]) -> list[dict]:
+    safe_hits: list[dict] = []
+    for hit in hits:
+        chunk = hit.get("chunk")
+        document = getattr(chunk, "document", None)
+        if document is None:
+            continue
+
+        if getattr(document, "approval_status", None) != KnowledgeApprovalStatus.APPROVED:
+            continue
+        if getattr(document, "is_active", False) is not True:
+            continue
+        if getattr(chunk, "is_active", False) is not True:
+            continue
+        if getattr(document, "processing_status", None) not in {
+            KnowledgeProcessingStatus.EXTRACTED,
+            KnowledgeProcessingStatus.CHUNKED,
+        }:
+            continue
+        if getattr(document, "security_status", None) not in {
+            KnowledgeSecurityStatus.SCAN_CLEAN,
+            KnowledgeSecurityStatus.SCAN_SKIPPED,
+        }:
+            continue
+        safe_hits.append(hit)
+    return safe_hits
+
+
+def _build_safety_metadata(
+    hits: list[dict], confidence: float, fallback_reason: str | None
+) -> dict:
+    source_docs: dict[str, str] = {}
+    chunk_ids: list[str] = []
+    retrieval_scores: list[float] = []
+
+    for hit in hits[:20]:
+        chunk = hit.get("chunk")
+        doc = getattr(chunk, "document", None)
+        if chunk is not None:
+            chunk_ids.append(str(getattr(chunk, "pk", "")))
+        if doc is not None:
+            source_docs[str(getattr(doc, "pk", ""))] = str(getattr(doc, "title", ""))
+        retrieval_scores.append(float(hit.get("score") or 0.0))
+
+    return {
+        "confidence": confidence,
+        "fallback_reason": fallback_reason,
+        "source_count": len(hits),
+        "chunk_ids": chunk_ids,
+        "document_ids": list(source_docs.keys()),
+        "document_titles": list(source_docs.values()),
+        "retrieval_scores": [round(v, 6) for v in retrieval_scores[:20]],
+    }
 
 
 def doctor_can_use_rag(user) -> bool:
@@ -60,7 +138,11 @@ def run_doctor_rag_query(
         filters = {}
     if top_k is None:
         top_k = getattr(settings, "RAG_DEFAULT_TOP_K", 6)
-    top_k = min(top_k, getattr(settings, "RAG_MAX_TOP_K", 12))
+    top_k = min(
+        top_k,
+        getattr(settings, "RAG_MAX_TOP_K", 12),
+        getattr(settings, "RAG_MAX_CONTEXT_CHUNKS", 5),
+    )
 
     # 1. Persist query
     rag_query = RAGQuery.objects.create(
@@ -84,21 +166,32 @@ def run_doctor_rag_query(
         actor=doctor,
         request=request,
     )
+    safe_hits = _filter_safe_hits(hits)
+    require_sources = getattr(settings, "RAG_REQUIRE_SOURCES", True)
+    min_confidence = float(getattr(settings, "RAG_MIN_CONFIDENCE", 0.45))
+    confidence = _compute_confidence(safe_hits)
 
     model_name = getattr(settings, "DEEPSEEK_MODEL", "deepseek-chat")
 
-    # 3. No-context path
-    if not hits:
+    fallback_reason = None
+    if not safe_hits:
+        fallback_reason = "no_approved_context"
+    elif require_sources and len(safe_hits) == 0:
+        fallback_reason = "sources_required"
+    elif confidence < min_confidence:
+        fallback_reason = "low_confidence"
+
+    # 3. No-context / low-confidence path
+    if fallback_reason is not None:
+        safety_metadata = _build_safety_metadata(safe_hits, confidence, fallback_reason)
         rag_response = RAGResponse.objects.create(
             rag_query=rag_query,
-            response_text=(
-                "No approved medical knowledge was found for your query. "
-                "Please refine your question or contact a specialist."
-            ),
+            response_text=SAFE_FALLBACK_MESSAGE,
             provider="deepseek",
             model_name=model_name,
             status=RAGResponseStatus.NO_CONTEXT,
             safety_level=RAGSafetyLevel.DOCTOR_ONLY,
+            raw_response={"safety": safety_metadata},
         )
         create_audit_log(
             actor=doctor,
@@ -107,7 +200,9 @@ def run_doctor_rag_query(
                 "rag_query_id": str(rag_query.pk),
                 "service_context": service_context,
                 "status": RAGResponseStatus.NO_CONTEXT,
-                "chunk_count": 0,
+                "chunk_count": len(safe_hits),
+                "confidence": confidence,
+                "fallback_reason": fallback_reason,
             },
             request=request,
         )
@@ -123,14 +218,14 @@ def run_doctor_rag_query(
                 score=hit["score"],
                 distance=hit.get("distance"),
             )
-            for hit in hits
+            for hit in safe_hits
         ]
     )
 
     # 5. Build prompt
     messages = build_doctor_rag_prompt(
         query_text=query_text,
-        retrieved_chunks=hits,
+        retrieved_chunks=safe_hits,
         service_context=service_context,
         object_summary=object_summary,
     )
@@ -149,16 +244,30 @@ def run_doctor_rag_query(
 
     try:
         result = llm_client.chat(messages)
-        response_text = result["content"]
+        response_text = (result.get("content") or "")[
+            : getattr(settings, "RAG_MAX_ANSWER_LENGTH", 4000)
+        ]
         raw_response = result.get("raw", {})
         usage = result.get("usage", {})
         token_input = usage.get("prompt_tokens")
         token_output = usage.get("completion_tokens")
         model_name = result.get("model", model_name)
+
+        if require_sources and not _is_source_enforced_by_text(response_text):
+            status = RAGResponseStatus.NO_CONTEXT
+            response_text = SAFE_FALLBACK_MESSAGE
+            fallback_reason = "missing_citations"
     except Exception as exc:
         status = RAGResponseStatus.FAILED
         response_text = "LLM call failed. Please try again."
         error_message = str(exc)
+        fallback_reason = "llm_error"
+
+    safety_metadata = _build_safety_metadata(safe_hits, confidence, fallback_reason)
+    if isinstance(raw_response, dict):
+        raw_response = {**raw_response, "safety": safety_metadata}
+    else:
+        raw_response = {"safety": safety_metadata}
 
     # 7. Persist response
     rag_response = RAGResponse.objects.create(
@@ -183,7 +292,9 @@ def run_doctor_rag_query(
             "rag_query_id": str(rag_query.pk),
             "service_context": service_context,
             "status": status,
-            "chunk_count": len(hits),
+            "chunk_count": len(safe_hits),
+            "confidence": confidence,
+            "fallback_reason": fallback_reason,
             "model": model_name,
         },
         request=request,

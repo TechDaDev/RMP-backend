@@ -186,6 +186,8 @@ class ChunkingTests(TestCase):
         self.client.force_authenticate(self.staff)
         _upload_document(self.client, file=_make_txt_file("word " * 2000))
         self.doc = KnowledgeDocument.objects.first()
+        self.doc.security_status = KnowledgeSecurityStatus.SCAN_SKIPPED
+        self.doc.save(update_fields=["security_status", "updated_at"])
         extract_text_from_document(self.doc)
         self.doc.refresh_from_db()
 
@@ -303,6 +305,8 @@ class SearchTests(TestCase):
             file=_make_txt_file("CRP C-reactive protein inflammation marker blood test " * 200),
         )
         self.doc = KnowledgeDocument.objects.first()
+        self.doc.security_status = KnowledgeSecurityStatus.SCAN_SKIPPED
+        self.doc.save(update_fields=["security_status", "updated_at"])
         extract_text_from_document(self.doc)
         self.doc.refresh_from_db()
         chunk_knowledge_document(self.doc)

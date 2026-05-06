@@ -1,5 +1,6 @@
 from rest_framework.permissions import BasePermission
 
+from apps.audit.services import record_security_event
 from apps.common.policies import ClinicalAccessPolicy, RoleAccessPolicy
 
 
@@ -76,4 +77,12 @@ class CanAccessKnowledgeBase(BasePermission):
 
 class CanExportRagDataset(BasePermission):
     def has_permission(self, request, view):
-        return RoleAccessPolicy.is_admin_or_staff(request.user)
+        allowed = RoleAccessPolicy.is_admin_or_staff(request.user)
+        if not allowed and getattr(request, "user", None) and request.user.is_authenticated:
+            record_security_event(
+                actor=request.user,
+                action="rag_dataset_export_access_denied",
+                request=request,
+                metadata={"reason_code": "policy_denied"},
+            )
+        return allowed

@@ -355,14 +355,31 @@ class AdminRAGDatasetExportView(APIView):
         fmt: str = d["format"]
         include_text: bool = d["include_text"]
         anonymize: bool = d["anonymize"]
+        max_rows: int = d["max_rows"]
 
         from .exporters import export_rag_evaluation_dataset
 
-        content = export_rag_evaluation_dataset(
-            format=fmt,
-            include_text=include_text,
-            anonymize=anonymize,
-        )
+        try:
+            content = export_rag_evaluation_dataset(
+                format=fmt,
+                include_text=include_text,
+                anonymize=anonymize,
+                max_rows=max_rows,
+            )
+        except ValueError as exc:
+            record_security_event(
+                actor=request.user,
+                action="rag_dataset_export_rejected",
+                request=request,
+                metadata={
+                    "reason_code": "invalid_export_scope",
+                    "format": fmt,
+                    "include_text": include_text,
+                    "anonymize": anonymize,
+                    "max_rows": max_rows,
+                },
+            )
+            return Response({"detail": str(exc)}, status=400)
 
         record_count = len(content) if fmt == "json" else max(0, content.count("\n") - 1)
 

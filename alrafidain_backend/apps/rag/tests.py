@@ -8,7 +8,7 @@ All pgvector semantic search calls are mocked (CosineDistance not supported in S
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -18,6 +18,8 @@ from apps.common.choices import (
     KnowledgeAudience,
     KnowledgeDocumentType,
     KnowledgeLanguage,
+    KnowledgeProcessingStatus,
+    KnowledgeSecurityStatus,
     LabTestCategory,
     MedicalSpecialty,
     RAGResponseStatus,
@@ -123,6 +125,8 @@ def _create_real_chunk(uploader):
         language=KnowledgeLanguage.ENGLISH,
         audience=KnowledgeAudience.DOCTOR,
         approval_status=KnowledgeApprovalStatus.APPROVED,
+        processing_status=KnowledgeProcessingStatus.CHUNKED,
+        security_status=KnowledgeSecurityStatus.SCAN_SKIPPED,
         uploaded_by=uploader,
         is_active=True,
     )
@@ -135,6 +139,35 @@ def _create_real_chunk(uploader):
         is_active=True,
     )
     return {"chunk": chunk, "score": 0.87, "distance": 0.13, "rank": 1}
+
+
+def _create_real_chunk_with_document(
+    uploader,
+    *,
+    approval_status=KnowledgeApprovalStatus.APPROVED,
+    processing_status=KnowledgeProcessingStatus.CHUNKED,
+    security_status=KnowledgeSecurityStatus.SCAN_SKIPPED,
+):
+    doc = KnowledgeDocument.objects.create(
+        title="Filtered Medical Document",
+        document_type=KnowledgeDocumentType.CLINICAL_GUIDELINE,
+        language=KnowledgeLanguage.ENGLISH,
+        audience=KnowledgeAudience.DOCTOR,
+        approval_status=approval_status,
+        processing_status=processing_status,
+        security_status=security_status,
+        uploaded_by=uploader,
+        is_active=True,
+    )
+    chunk = KnowledgeChunk.objects.create(
+        document=doc,
+        chunk_index=0,
+        text="Filter test chunk.",
+        page_number=1,
+        section_title="Safety",
+        is_active=True,
+    )
+    return {"chunk": chunk, "score": 0.55, "distance": 0.45, "rank": 1}
 
 
 # ---------------------------------------------------------------------------
@@ -265,6 +298,121 @@ class RunDoctorRagQuerySuccessTest(TestCase):
         self.assertEqual(rag_response.token_output, 50)
         self.assertEqual(RAGRetrievedChunk.objects.count(), 1)
         mock_client.chat.assert_called_once()
+
+    def test_retrieval_excludes_unapproved_documents(self):
+        approved_hit = _create_real_chunk_with_document(
+            self.doctor,
+            approval_status=KnowledgeApprovalStatus.APPROVED,
+            processing_status=KnowledgeProcessingStatus.CHUNKED,
+            security_status=KnowledgeSecurityStatus.SCAN_SKIPPED,
+        )
+        unapproved_hit = _create_real_chunk_with_document(
+            self.doctor,
+            approval_status=KnowledgeApprovalStatus.PENDING,
+            processing_status=KnowledgeProcessingStatus.CHUNKED,
+            security_status=KnowledgeSecurityStatus.SCAN_SKIPPED,
+        )
+
+        mock_client = MagicMock()
+        mock_client.chat.return_value = MOCK_LLM_RESPONSE
+
+        with patch(
+            "apps.knowledge_base.services.semantic_search_approved_chunks",
+            return_value=[approved_hit, unapproved_hit],
+        ):
+            _, rag_response = run_doctor_rag_query(
+                doctor=self.doctor,
+                query_text="approved only",
+                service_context=RAGServiceContext.GENERAL_DOCTOR_QUERY,
+                llm_client=mock_client,
+            )
+
+        self.assertEqual(rag_response.status, RAGResponseStatus.SUCCESS)
+        self.assertEqual(rag_response.rag_query.retrieved_chunks.count(), 1)
+
+    def test_retrieval_excludes_failed_and_scan_failed_documents(self):
+        safe_hit = _create_real_chunk_with_document(
+            self.doctor,
+            approval_status=KnowledgeApprovalStatus.APPROVED,
+            processing_status=KnowledgeProcessingStatus.CHUNKED,
+            security_status=KnowledgeSecurityStatus.SCAN_CLEAN,
+        )
+        failed_hit = _create_real_chunk_with_document(
+            self.doctor,
+            approval_status=KnowledgeApprovalStatus.APPROVED,
+            processing_status=KnowledgeProcessingStatus.FAILED,
+            security_status=KnowledgeSecurityStatus.SCAN_CLEAN,
+        )
+        scan_failed_hit = _create_real_chunk_with_document(
+            self.doctor,
+            approval_status=KnowledgeApprovalStatus.APPROVED,
+            processing_status=KnowledgeProcessingStatus.CHUNKED,
+            security_status=KnowledgeSecurityStatus.SCAN_FAILED,
+        )
+
+        mock_client = MagicMock()
+        mock_client.chat.return_value = MOCK_LLM_RESPONSE
+
+        with patch(
+            "apps.knowledge_base.services.semantic_search_approved_chunks",
+            return_value=[safe_hit, failed_hit, scan_failed_hit],
+        ):
+            _, rag_response = run_doctor_rag_query(
+                doctor=self.doctor,
+                query_text="safe chunks only",
+                service_context=RAGServiceContext.GENERAL_DOCTOR_QUERY,
+                llm_client=mock_client,
+            )
+
+        self.assertEqual(rag_response.status, RAGResponseStatus.SUCCESS)
+        self.assertEqual(rag_response.rag_query.retrieved_chunks.count(), 1)
+
+    @override_settings(RAG_MIN_CONFIDENCE=0.9)
+    def test_low_confidence_triggers_fallback(self):
+        low_conf_hit = _create_real_chunk_with_document(self.doctor)
+        low_conf_hit["score"] = 0.1
+
+        mock_client = MagicMock()
+        mock_client.chat.return_value = MOCK_LLM_RESPONSE
+
+        with patch(
+            "apps.knowledge_base.services.semantic_search_approved_chunks",
+            return_value=[low_conf_hit],
+        ):
+            _, rag_response = run_doctor_rag_query(
+                doctor=self.doctor,
+                query_text="low confidence",
+                service_context=RAGServiceContext.GENERAL_DOCTOR_QUERY,
+                llm_client=mock_client,
+            )
+
+        self.assertEqual(rag_response.status, RAGResponseStatus.NO_CONTEXT)
+        self.assertIn(
+            "could not find enough approved source material", rag_response.response_text.lower()
+        )
+        self.assertEqual(rag_response.raw_response["safety"]["fallback_reason"], "low_confidence")
+        mock_client.chat.assert_not_called()
+
+    def test_valid_retrieval_populates_source_metadata(self):
+        safe_hit = _create_real_chunk_with_document(self.doctor)
+
+        mock_client = MagicMock()
+        mock_client.chat.return_value = MOCK_LLM_RESPONSE
+
+        with patch(
+            "apps.knowledge_base.services.semantic_search_approved_chunks",
+            return_value=[safe_hit],
+        ):
+            _, rag_response = run_doctor_rag_query(
+                doctor=self.doctor,
+                query_text="source metadata",
+                service_context=RAGServiceContext.GENERAL_DOCTOR_QUERY,
+                llm_client=mock_client,
+            )
+
+        self.assertEqual(rag_response.status, RAGResponseStatus.SUCCESS)
+        self.assertEqual(rag_response.raw_response["safety"]["source_count"], 1)
+        self.assertEqual(len(rag_response.raw_response["safety"]["chunk_ids"]), 1)
 
     def test_unapproved_doctor_raises_permission_error(self):
         unapproved = create_doctor(email="unapp@example.com", approved=False)
@@ -420,6 +568,12 @@ class DoctorGeneralRAGQueryViewTest(TestCase):
     def test_top_k_exceeding_max_returns_400(self, mock_search):
         client = auth_client(self.doctor)
         resp = client.post(self.URL, {"question": "Test?", "top_k": 999}, format="json")
+        self.assertEqual(resp.status_code, 400)
+
+    @override_settings(RAG_MAX_QUERY_LENGTH=20)
+    def test_query_length_limit_returns_400(self, mock_search):
+        client = auth_client(self.doctor)
+        resp = client.post(self.URL, {"question": "x" * 21, "top_k": 3}, format="json")
         self.assertEqual(resp.status_code, 400)
 
     def test_pending_doctor_receives_403(self, mock_search):
@@ -1497,6 +1651,7 @@ class AdminRAGDatasetExportViewTest(TestCase):
             format="json",
         )
         self.assertEqual(resp.status_code, 403)
+        self.assertTrue(AuditLog.objects.filter(action="rag_dataset_export_access_denied").exists())
 
     def test_unauthenticated_gets_401(self):
         resp = self.client.post(
@@ -1514,6 +1669,48 @@ class AdminRAGDatasetExportViewTest(TestCase):
             format="json",
         )
         self.assertTrue(AuditLog.objects.filter(action="rag_dataset_exported").exists())
+
+    @override_settings(RAG_EXPORT_MAX_ROWS=1)
+    def test_export_row_limit_returns_400(self):
+        doctor = create_doctor(email="exp_limit_dr@example.com")
+        _create_rag_response(doctor)
+
+        client = auth_client(self.staff)
+        resp = client.post(
+            "/api/rag/admin/exports/dataset/",
+            {"format": "json", "max_rows": 1},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+        self.assertIn("row limit", resp.data["detail"].lower())
+        self.assertTrue(AuditLog.objects.filter(action="rag_dataset_export_rejected").exists())
+
+    @override_settings(EXPORT_HASH_SALT="phase7-salt")
+    def test_export_anonymization_uses_salt(self):
+        client = auth_client(self.staff)
+        resp = client.post(
+            "/api/rag/admin/exports/dataset/",
+            {"format": "json", "anonymize": True},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 200)
+        for rec in resp.data["data"]:
+            query = RAGQuery.objects.get(pk=rec["rag_query_id"])
+            expected = hash_identifier(str(query.requested_by_id))
+            self.assertEqual(rec["doctor_id_hash"], expected)
+            self.assertNotEqual(rec["doctor_id_hash"], str(self.staff.pk))
+
+    def test_export_audit_metadata_does_not_include_raw_content(self):
+        client = auth_client(self.staff)
+        client.post(
+            "/api/rag/admin/exports/dataset/",
+            {"format": "json", "include_text": False, "anonymize": True},
+            format="json",
+        )
+        log = AuditLog.objects.filter(action="rag_dataset_exported").latest("created_at")
+        self.assertNotIn("data", log.metadata)
+        self.assertNotIn("query_text", log.metadata)
+        self.assertNotIn("response_text", log.metadata)
 
     def test_json_export_default_anonymized(self):
         client = auth_client(self.staff)

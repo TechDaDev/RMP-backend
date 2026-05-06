@@ -111,14 +111,11 @@ def _build_record(
         chunk = rc.chunk
         doc = chunk.document
 
+        # Look for source-level feedback on this chunk
         source_relevance = None
-        try:
-            # Look for source-level feedback on this chunk
-            cf = rc.feedback_items.first()
-            if cf:
-                source_relevance = cf.relevance
-        except Exception:
-            pass
+        cf = rc.feedback_items.first()
+        if cf:
+            source_relevance = cf.relevance
 
         sources.append(
             {
@@ -140,6 +137,7 @@ def export_rag_evaluation_dataset(
     format: str = "json",
     include_text: bool = False,
     anonymize: bool = True,
+    max_rows: int | None = None,
 ) -> str | list[dict]:
     """
     Export RAG evaluation dataset.
@@ -159,7 +157,12 @@ def export_rag_evaluation_dataset(
     if format not in ("json", "csv"):
         raise ValueError(f"Unsupported export format: {format!r}. Use 'json' or 'csv'.")
 
+    from django.conf import settings as django_settings
+
     from .models import RAGResponse
+
+    if max_rows is None:
+        max_rows = getattr(django_settings, "RAG_EXPORT_MAX_ROWS", 10000)
 
     responses = (
         RAGResponse.objects.select_related(
@@ -172,6 +175,13 @@ def export_rag_evaluation_dataset(
         )
         .order_by("rag_query__created_at")
     )
+
+    total_rows = responses.count()
+    if total_rows > max_rows:
+        raise ValueError(
+            f"Export exceeds allowed row limit ({total_rows} > {max_rows}). "
+            "Please narrow filters or lower scope."
+        )
 
     records = [_build_record(r, include_text=include_text, anonymize=anonymize) for r in responses]
 

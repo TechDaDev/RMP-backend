@@ -32,6 +32,14 @@ class DoctorRAGQuerySerializer(serializers.Serializer):
             raise serializers.ValidationError(f"top_k may not exceed {max_k}.")
         return value
 
+    def validate_question(self, value):
+        max_query_len = getattr(settings, "RAG_MAX_QUERY_LENGTH", 2000)
+        if len(value) > max_query_len:
+            raise serializers.ValidationError(
+                f"question may not exceed {max_query_len} characters."
+            )
+        return value
+
     def get_fields(self):
         fields = super().get_fields()
         default_k = getattr(settings, "RAG_DEFAULT_TOP_K", 6)
@@ -70,6 +78,9 @@ class RAGResponseSerializer(serializers.ModelSerializer):
         many=True,
         read_only=True,
     )
+    confidence_score = serializers.SerializerMethodField()
+    fallback_reason = serializers.SerializerMethodField()
+    source_count = serializers.SerializerMethodField()
 
     class Meta:
         model = RAGResponse
@@ -83,6 +94,9 @@ class RAGResponseSerializer(serializers.ModelSerializer):
             "safety_level",
             "doctor_review_required",
             "patient_visible",
+            "confidence_score",
+            "fallback_reason",
+            "source_count",
             "sources",
             "model_name",
             "token_input",
@@ -90,6 +104,20 @@ class RAGResponseSerializer(serializers.ModelSerializer):
             "created_at",
         ]
         read_only_fields = fields
+
+    def get_confidence_score(self, obj):
+        safety = (obj.raw_response or {}).get("safety", {})
+        return safety.get("confidence")
+
+    def get_fallback_reason(self, obj):
+        safety = (obj.raw_response or {}).get("safety", {})
+        return safety.get("fallback_reason")
+
+    def get_source_count(self, obj):
+        safety = (obj.raw_response or {}).get("safety", {})
+        if "source_count" in safety:
+            return safety.get("source_count")
+        return obj.rag_query.retrieved_chunks.count()
 
 
 class ConsultationRAGSupportSerializer(serializers.Serializer):
@@ -102,6 +130,16 @@ class ConsultationRAGSupportSerializer(serializers.Serializer):
         max_k = getattr(settings, "RAG_MAX_TOP_K", 12)
         if value > max_k:
             raise serializers.ValidationError(f"top_k may not exceed {max_k}.")
+        return value
+
+    def validate_question(self, value):
+        if not value:
+            return value
+        max_query_len = getattr(settings, "RAG_MAX_QUERY_LENGTH", 2000)
+        if len(value) > max_query_len:
+            raise serializers.ValidationError(
+                f"question may not exceed {max_query_len} characters."
+            )
         return value
 
     def get_fields(self):
@@ -121,6 +159,16 @@ class LabResultRAGSupportSerializer(serializers.Serializer):
         max_k = getattr(settings, "RAG_MAX_TOP_K", 12)
         if value > max_k:
             raise serializers.ValidationError(f"top_k may not exceed {max_k}.")
+        return value
+
+    def validate_question(self, value):
+        if not value:
+            return value
+        max_query_len = getattr(settings, "RAG_MAX_QUERY_LENGTH", 2000)
+        if len(value) > max_query_len:
+            raise serializers.ValidationError(
+                f"question may not exceed {max_query_len} characters."
+            )
         return value
 
     def get_fields(self):
@@ -259,3 +307,15 @@ class RAGDatasetExportSerializer(serializers.Serializer):
         default=True,
         help_text="Hash doctor/object IDs. On by default.",
     )
+    max_rows = serializers.IntegerField(required=False, min_value=1)
+
+    def validate_max_rows(self, value):
+        hard_max = getattr(settings, "RAG_EXPORT_MAX_ROWS", 10000)
+        if value > hard_max:
+            raise serializers.ValidationError(f"max_rows may not exceed {hard_max}.")
+        return value
+
+    def get_fields(self):
+        fields = super().get_fields()
+        fields["max_rows"].default = getattr(settings, "RAG_EXPORT_MAX_ROWS", 10000)
+        return fields

@@ -6,7 +6,11 @@ from typing import TYPE_CHECKING
 from django.utils import timezone
 
 from apps.audit.services import create_audit_log
-from apps.common.choices import KnowledgeApprovalStatus, KnowledgeProcessingStatus
+from apps.common.choices import (
+    KnowledgeApprovalStatus,
+    KnowledgeProcessingStatus,
+    KnowledgeSecurityStatus,
+)
 
 if TYPE_CHECKING:
     from .models import KnowledgeDocument
@@ -289,6 +293,14 @@ def search_approved_chunks(
     qs = KnowledgeChunk.objects.filter(
         is_active=True,
         document__approval_status=KnowledgeApprovalStatus.APPROVED,
+        document__processing_status__in=[
+            KnowledgeProcessingStatus.EXTRACTED,
+            KnowledgeProcessingStatus.CHUNKED,
+        ],
+        document__security_status__in=[
+            KnowledgeSecurityStatus.SCAN_CLEAN,
+            KnowledgeSecurityStatus.SCAN_SKIPPED,
+        ],
         document__is_active=True,
     ).select_related("document")
 
@@ -447,6 +459,14 @@ def semantic_search_approved_chunks(
         is_active=True,
         embedding__isnull=False,
         document__approval_status=KnowledgeApprovalStatus.APPROVED,
+        document__processing_status__in=[
+            KnowledgeProcessingStatus.EXTRACTED,
+            KnowledgeProcessingStatus.CHUNKED,
+        ],
+        document__security_status__in=[
+            KnowledgeSecurityStatus.SCAN_CLEAN,
+            KnowledgeSecurityStatus.SCAN_SKIPPED,
+        ],
         document__is_active=True,
     ).select_related("document")
 
