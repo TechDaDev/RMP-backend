@@ -1,8 +1,16 @@
+import logging
 from collections import defaultdict
 
-from apps.common.choices import MedicalSpecialty
+from django.db import transaction
+from django.utils import timezone
+
+from apps.audit.services import create_audit_log
+from apps.common.choices import ConsultationStatus, MedicalSpecialty, NotificationType
+from apps.notifications.services import create_notification
 
 from .models import Symptom, SymptomSpecialtyRule
+
+logger = logging.getLogger(__name__)
 
 
 def recommend_specialty_from_symptoms(symptom_ids):
@@ -30,3 +38,119 @@ def recommend_specialty_from_symptoms(symptom_ids):
         "scores": dict(scores),
         "has_red_flag": has_red_flag,
     }
+
+
+@transaction.atomic
+def accept_consultation(*, consultation, doctor, request=None):
+    consultation.assigned_doctor = doctor
+    consultation.status = ConsultationStatus.ACCEPTED
+    consultation.accepted_at = timezone.now()
+    consultation.save(update_fields=["assigned_doctor", "status", "accepted_at", "updated_at"])
+
+    create_audit_log(
+        actor=doctor,
+        action="consultation_accepted",
+        target=consultation,
+        request=request,
+    )
+    create_notification(
+        recipient=consultation.patient,
+        notification_type=NotificationType.CONSULTATION,
+        title="Consultation accepted",
+        message="A doctor has accepted your consultation.",
+        data={
+            "consultation_id": str(consultation.id),
+            "doctor_id": str(doctor.id),
+            "status": ConsultationStatus.ACCEPTED,
+        },
+    )
+
+    def broadcast_update():
+        from apps.realtime.services import broadcast_consultation_updated
+
+        try:
+            broadcast_consultation_updated(consultation)
+        except Exception as exc:
+            logger.error("Failed to broadcast consultation.updated event: %s", exc)
+
+    transaction.on_commit(broadcast_update)
+    return consultation
+
+
+@transaction.atomic
+def add_consultation_response(
+    *, consultation, doctor, response_text, recommendation_type, request=None
+):
+    from .models import ConsultationResponse
+
+    response = ConsultationResponse.objects.create(
+        consultation=consultation,
+        doctor=doctor,
+        response_text=response_text,
+        recommendation_type=recommendation_type,
+    )
+
+    consultation.status = ConsultationStatus.DOCTOR_RESPONDED
+    consultation.save(update_fields=["status", "updated_at"])
+
+    create_audit_log(
+        actor=doctor,
+        action="consultation_response_created",
+        target=consultation,
+        metadata={"response_id": str(response.id)},
+        request=request,
+    )
+    create_notification(
+        recipient=consultation.patient,
+        notification_type=NotificationType.CONSULTATION,
+        title="Doctor response added",
+        message="Your doctor has added a response to your consultation.",
+        data={
+            "consultation_id": str(consultation.id),
+            "status": ConsultationStatus.DOCTOR_RESPONDED,
+        },
+    )
+
+    def broadcast_update():
+        from apps.realtime.services import broadcast_consultation_updated
+
+        try:
+            consultation.refresh_from_db()
+            broadcast_consultation_updated(consultation)
+        except Exception as exc:
+            logger.error("Failed to broadcast consultation.updated event: %s", exc)
+
+    transaction.on_commit(broadcast_update)
+    return response
+
+
+@transaction.atomic
+def close_consultation(*, consultation, doctor, request=None):
+    consultation.status = ConsultationStatus.CLOSED
+    consultation.closed_at = timezone.now()
+    consultation.save(update_fields=["status", "closed_at", "updated_at"])
+
+    create_audit_log(
+        actor=doctor,
+        action="consultation_closed",
+        target=consultation,
+        request=request,
+    )
+    create_notification(
+        recipient=consultation.patient,
+        notification_type=NotificationType.CONSULTATION,
+        title="Consultation closed",
+        message="Your consultation has been closed.",
+        data={"consultation_id": str(consultation.id), "status": ConsultationStatus.CLOSED},
+    )
+
+    def broadcast_update():
+        from apps.realtime.services import broadcast_consultation_updated
+
+        try:
+            broadcast_consultation_updated(consultation)
+        except Exception as exc:
+            logger.error("Failed to broadcast consultation.updated event: %s", exc)
+
+    transaction.on_commit(broadcast_update)
+    return consultation

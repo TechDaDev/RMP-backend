@@ -143,6 +143,46 @@ def get_remaining_tests_for_laboratorian(lab_order):
 
 
 @transaction.atomic
+def cancel_lab_order(*, lab_order, doctor, request=None):
+    lab_order = LabOrder.objects.select_for_update().get(pk=lab_order.pk)
+
+    if lab_order.doctor_id != doctor.id:
+        raise PermissionError("You are not the ordering doctor for this lab order.")
+
+    if lab_order.items.filter(status=LabOrderItemStatus.COMPLETED).exists():
+        raise ValueError("Cannot cancel lab order after any item has been completed.")
+
+    if lab_order.status == LabOrderStatus.CANCELLED:
+        raise ValueError("Lab order is already cancelled.")
+
+    now = timezone.now()
+    lab_order.status = LabOrderStatus.CANCELLED
+    lab_order.cancelled_at = now
+    lab_order.save(update_fields=["status", "cancelled_at", "updated_at"])
+
+    lab_order.items.filter(status=LabOrderItemStatus.PENDING).update(
+        status=LabOrderItemStatus.CANCELLED,
+        cancelled_at=now,
+    )
+
+    create_audit_log(
+        actor=doctor,
+        action="lab_order_cancelled",
+        target=lab_order,
+        metadata={
+            "lab_order_id": str(lab_order.id),
+            "consultation_id": str(lab_order.consultation_id),
+            "patient_id": str(lab_order.patient_id),
+            "doctor_id": str(doctor.id),
+            "status": lab_order.status,
+        },
+        request=request,
+    )
+
+    return lab_order
+
+
+@transaction.atomic
 def complete_lab_order_items(lab_order, laboratorian, items_payload, request=None):
     if not is_approved_laboratorian(laboratorian):
         raise PermissionError("Only approved laboratorians can complete tests.")
@@ -288,7 +328,7 @@ def _result_payload_snapshot(lab_result):
 def _json_safe_dict(data: dict) -> dict:
     out = {}
     for key, value in data.items():
-        if isinstance(value, Decimal) or isinstance(value, UUID):
+        if isinstance(value, (Decimal, UUID)):
             out[key] = str(value)
         else:
             out[key] = value

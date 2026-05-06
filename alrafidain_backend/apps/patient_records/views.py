@@ -21,6 +21,7 @@ from .serializers import (
 from .services import (
     confirm_medical_record_entry,
     create_medical_record_entry,
+    deactivate_medical_record_entry,
     doctor_can_access_patient_record,
     get_or_create_patient_medical_record,
     set_blood_group,
@@ -201,26 +202,10 @@ class MedicalRecordEntryDeactivateView(APIView):
                 "This role cannot deactivate entries.", status_code=status.HTTP_403_FORBIDDEN
             )
 
-        entry.is_active = False
-        notes = serializer.validated_data.get("notes")
-        if notes:
-            entry.notes = notes
-        entry.save(update_fields=["is_active", "notes", "updated_at"])
-
-        from apps.audit.services import create_audit_log
-
-        create_audit_log(
+        entry = deactivate_medical_record_entry(
+            entry=entry,
             actor=request.user,
-            action="medical_record_entry_deactivated",
-            target=entry,
-            metadata={
-                "record_id": str(entry.medical_record_id),
-                "entry_id": str(entry.id),
-                "patient_id": str(entry.medical_record.patient_id),
-                "actor_id": str(request.user.id),
-                "category": entry.category,
-                "verification_status": entry.verification_status,
-            },
+            notes=serializer.validated_data.get("notes"),
             request=request,
         )
 

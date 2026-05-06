@@ -1,4 +1,5 @@
 from apps.common.choices import ConsultationStatus, UserType
+from apps.common.policies import ClinicalAccessPolicy
 
 READABLE_STATUSES = [
     ConsultationStatus.ACCEPTED,
@@ -17,7 +18,7 @@ def can_access_consultation_messages(user, consultation) -> bool:
         return False
     if user.user_type not in [UserType.PATIENT, UserType.DOCTOR]:
         return False
-    return user.id in [consultation.patient_id, consultation.assigned_doctor_id]
+    return ClinicalAccessPolicy.can_user_access_consultation(user, consultation)
 
 
 def can_read_messages(user, consultation) -> bool:

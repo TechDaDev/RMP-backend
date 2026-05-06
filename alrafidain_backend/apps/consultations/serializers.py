@@ -15,7 +15,7 @@ from .models import (
     SymptomSpecialtyRule,
 )
 from .permissions import is_approved_doctor, is_assigned_doctor, is_patient
-from .services import recommend_specialty_from_symptoms
+from .services import add_consultation_response, recommend_specialty_from_symptoms
 
 
 class SymptomCategorySerializer(serializers.ModelSerializer):
@@ -327,21 +327,10 @@ class ConsultationResponseCreateSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         consultation = self.context["consultation"]
         request = self.context["request"]
-
-        response = ConsultationResponse.objects.create(
+        return add_consultation_response(
             consultation=consultation,
             doctor=request.user,
-            **validated_data,
-        )
-
-        consultation.status = ConsultationStatus.DOCTOR_RESPONDED
-        consultation.save(update_fields=["status", "updated_at"])
-
-        create_audit_log(
-            actor=request.user,
-            action="consultation_response_created",
-            target=consultation,
-            metadata={"response_id": str(response.id)},
+            response_text=validated_data["response_text"],
+            recommendation_type=validated_data["recommendation_type"],
             request=request,
         )
-        return response

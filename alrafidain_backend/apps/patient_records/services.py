@@ -1,37 +1,21 @@
 from django.contrib.auth import get_user_model
+from django.db import transaction
 from django.utils import timezone
 
 from apps.audit.services import create_audit_log
 from apps.common.choices import (
-    ConsultationStatus,
     MedicalRecordSourceRole,
     MedicalRecordVerificationStatus,
     NotificationType,
     UserType,
     VerificationStatus,
 )
-from apps.consultations.models import Consultation
+from apps.common.policies import ClinicalAccessPolicy
 from apps.notifications.services import create_notification
 
 from .models import BloodGroupRecord, MedicalRecordEntry, PatientMedicalRecord
 
 User = get_user_model()
-
-
-ALLOWED_DOCTOR_RECORD_STATUSES = [
-    ConsultationStatus.ACCEPTED,
-    ConsultationStatus.DOCTOR_RESPONDED,
-    ConsultationStatus.CLOSED,
-]
-
-
-def _is_approved_doctor(user) -> bool:
-    if not user or not user.is_authenticated or user.user_type != UserType.DOCTOR:
-        return False
-    try:
-        return user.doctor_profile.verification_status == VerificationStatus.APPROVED
-    except Exception:
-        return False
 
 
 def _is_approved_laboratorian(user) -> bool:
@@ -66,16 +50,7 @@ def get_or_create_patient_medical_record(patient):
 
 
 def doctor_can_access_patient_record(doctor, patient) -> bool:
-    if not _is_approved_doctor(doctor):
-        return False
-    if not patient or patient.user_type != UserType.PATIENT:
-        return False
-
-    return Consultation.objects.filter(
-        patient=patient,
-        assigned_doctor=doctor,
-        status__in=ALLOWED_DOCTOR_RECORD_STATUSES,
-    ).exists()
+    return ClinicalAccessPolicy.can_doctor_access_patient(doctor, patient)
 
 
 def create_medical_record_entry(
@@ -272,3 +247,28 @@ def set_blood_group(record, user, blood_group, notes=None, request=None):
     )
 
     return blood_group_record
+
+
+@transaction.atomic
+def deactivate_medical_record_entry(entry, actor, notes=None, request=None):
+    entry.is_active = False
+    if notes:
+        entry.notes = notes
+    entry.save(update_fields=["is_active", "notes", "updated_at"])
+
+    create_audit_log(
+        actor=actor,
+        action="medical_record_entry_deactivated",
+        target=entry,
+        metadata={
+            "record_id": str(entry.medical_record_id),
+            "entry_id": str(entry.id),
+            "patient_id": str(entry.medical_record.patient_id),
+            "actor_id": str(actor.id),
+            "category": entry.category,
+            "verification_status": entry.verification_status,
+        },
+        request=request,
+    )
+
+    return entry

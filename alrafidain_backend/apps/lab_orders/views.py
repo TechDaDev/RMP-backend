@@ -1,13 +1,11 @@
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.generics import CreateAPIView, ListAPIView, RetrieveAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
-from apps.audit.services import create_audit_log
-from apps.common.choices import LabOrderItemStatus, LabOrderStatus, LabResultStatus, UserType
+from apps.common.choices import LabResultStatus, UserType
 from apps.common.responses import error_response, success_response
 from apps.common.throttles import QRScanRateThrottle
 from apps.consultations.models import Consultation
@@ -37,6 +35,7 @@ from .serializers import (
     LabTestCatalogSerializer,
 )
 from .services import (
+    cancel_lab_order,
     complete_lab_order_items,
     correct_lab_result,
     create_lab_order,
@@ -174,39 +173,10 @@ class DoctorCancelLabOrderView(APIView):
         if not is_lab_order_doctor(request.user, lab_order):
             return error_response("Not found.", status_code=status.HTTP_404_NOT_FOUND)
 
-        if lab_order.items.filter(status=LabOrderItemStatus.COMPLETED).exists():
-            return error_response(
-                "Cannot cancel lab order after any item has been completed.",
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-        if lab_order.status == LabOrderStatus.CANCELLED:
-            return error_response(
-                "Lab order is already cancelled.", status_code=status.HTTP_400_BAD_REQUEST
-            )
-
-        now = timezone.now()
-        lab_order.status = LabOrderStatus.CANCELLED
-        lab_order.cancelled_at = now
-        lab_order.save(update_fields=["status", "cancelled_at", "updated_at"])
-
-        lab_order.items.filter(status=LabOrderItemStatus.PENDING).update(
-            status=LabOrderItemStatus.CANCELLED,
-            cancelled_at=now,
-        )
-
-        create_audit_log(
-            actor=request.user,
-            action="lab_order_cancelled",
-            target=lab_order,
-            metadata={
-                "lab_order_id": str(lab_order.id),
-                "consultation_id": str(lab_order.consultation_id),
-                "patient_id": str(lab_order.patient_id),
-                "doctor_id": str(request.user.id),
-                "status": lab_order.status,
-            },
-            request=request,
-        )
+        try:
+            lab_order = cancel_lab_order(lab_order=lab_order, doctor=request.user, request=request)
+        except (ValueError, PermissionError) as exc:
+            return error_response(str(exc), status_code=status.HTTP_400_BAD_REQUEST)
 
         return success_response(
             "Lab order cancelled.", data=LabOrderDoctorDetailSerializer(lab_order).data
@@ -361,11 +331,12 @@ class PatientLabResultListView(ListAPIView):
     serializer_class = LabResultPatientSerializer
 
     def get_queryset(self):
-        if request_user := getattr(self.request, "user", None):
-            if request_user.user_type == UserType.PATIENT:
-                return LabResult.objects.filter(
-                    patient=request_user, status=LabResultStatus.RELEASED
-                ).select_related("lab_order_item")
+        if (request_user := getattr(self.request, "user", None)) and (
+            request_user.user_type == UserType.PATIENT
+        ):
+            return LabResult.objects.filter(
+                patient=request_user, status=LabResultStatus.RELEASED
+            ).select_related("lab_order_item")
         return LabResult.objects.none()
 
     def list(self, request, *args, **kwargs):

@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
 from apps.audit.services import create_audit_log
-from apps.common.choices import PrescriptionStatus, UserType
+from apps.common.choices import UserType
 from apps.common.responses import error_response, success_response
 from apps.common.throttles import QRScanRateThrottle
 from apps.consultations.models import Consultation
@@ -23,6 +23,7 @@ from .serializers import (
     PrescriptionPharmacistScanSerializer,
 )
 from .services import (
+    cancel_prescription,
     create_prescription,
     dispense_prescription_items,
     get_prescription_by_qr_token,
@@ -140,38 +141,15 @@ class DoctorCancelPrescriptionView(APIView):
         if not is_prescription_doctor(request.user, prescription):
             return error_response("Not found.", status_code=status.HTTP_404_NOT_FOUND)
 
-        if prescription.items.filter(status="dispensed").exists():
-            return error_response(
-                "Cannot cancel prescription after any item has been dispensed.",
-                status_code=status.HTTP_400_BAD_REQUEST,
+        try:
+            prescription = cancel_prescription(
+                prescription=prescription,
+                doctor=request.user,
+                request=request,
             )
-        if prescription.status == PrescriptionStatus.CANCELLED:
-            return error_response(
-                "Prescription is already cancelled.", status_code=status.HTTP_400_BAD_REQUEST
-            )
+        except (ValueError, PermissionError) as exc:
+            return error_response(str(exc), status_code=status.HTTP_400_BAD_REQUEST)
 
-        from django.utils import timezone
-
-        now = timezone.now()
-        prescription.status = PrescriptionStatus.CANCELLED
-        prescription.cancelled_at = now
-        prescription.save(update_fields=["status", "cancelled_at", "updated_at"])
-
-        prescription.items.filter(status="pending").update(status="cancelled", cancelled_at=now)
-
-        create_audit_log(
-            actor=request.user,
-            action="prescription_cancelled",
-            target=prescription,
-            metadata={
-                "prescription_id": str(prescription.id),
-                "consultation_id": str(prescription.consultation_id),
-                "patient_id": str(prescription.patient_id),
-                "doctor_id": str(request.user.id),
-                "status": PrescriptionStatus.CANCELLED,
-            },
-            request=request,
-        )
         return success_response(
             "Prescription cancelled.", data=PrescriptionDoctorDetailSerializer(prescription).data
         )

@@ -2,19 +2,12 @@
 RAG permissions helpers.
 """
 
-from apps.common.choices import UserType, VerificationStatus
+from apps.common.policies import RoleAccessPolicy
 
 
 def is_approved_doctor(user) -> bool:
     """Return True if user is an authenticated, approved doctor."""
-    if not user or not user.is_authenticated:
-        return False
-    if user.user_type != UserType.DOCTOR:
-        return False
-    try:
-        return user.doctor_profile.verification_status == VerificationStatus.APPROVED
-    except Exception:
-        return False
+    return RoleAccessPolicy.is_verified_doctor(user)
 
 
 def can_access_consultation_rag(user, consultation) -> bool:

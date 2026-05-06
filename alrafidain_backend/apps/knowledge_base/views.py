@@ -5,10 +5,10 @@ from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.views import APIView
 
 from apps.audit.services import create_audit_log
+from apps.common.permissions import CanAccessKnowledgeBase
 from apps.common.responses import error_response, success_response
 
 from .models import KnowledgeChunk, KnowledgeDocument
-from .permissions import IsStaffOrSuperuser
 from .serializers import (
     KnowledgeChunkSearchSerializer,
     KnowledgeChunkSerializer,
@@ -39,7 +39,7 @@ class KnowledgeDocumentUploadView(APIView):
     GET  /api/knowledge-base/documents/ — List all documents (staff only).
     """
 
-    permission_classes = [IsStaffOrSuperuser]
+    permission_classes = [CanAccessKnowledgeBase]
 
     def get(self, request):
         qs = KnowledgeDocument.objects.select_related("uploaded_by", "approved_by")
@@ -96,7 +96,7 @@ class KnowledgeDocumentUploadView(APIView):
 class KnowledgeDocumentDetailView(RetrieveAPIView):
     """GET /api/knowledge-base/documents/<uuid:document_id>/ — Get document detail."""
 
-    permission_classes = [IsStaffOrSuperuser]
+    permission_classes = [CanAccessKnowledgeBase]
     serializer_class = KnowledgeDocumentDetailSerializer
     lookup_url_kwarg = "document_id"
 
@@ -114,7 +114,7 @@ class KnowledgeDocumentDetailView(RetrieveAPIView):
 class KnowledgeDocumentProcessView(APIView):
     """POST /api/knowledge-base/documents/<uuid:document_id>/process/ — Extract and chunk."""
 
-    permission_classes = [IsStaffOrSuperuser]
+    permission_classes = [CanAccessKnowledgeBase]
 
     def post(self, request, document_id):
         document = get_object_or_404(KnowledgeDocument, pk=document_id)
@@ -145,7 +145,7 @@ class KnowledgeDocumentProcessView(APIView):
 class KnowledgeDocumentApproveView(APIView):
     """POST /api/knowledge-base/documents/<uuid:document_id>/approve/"""
 
-    permission_classes = [IsStaffOrSuperuser]
+    permission_classes = [CanAccessKnowledgeBase]
 
     def post(self, request, document_id):
         serializer = KnowledgeDocumentApproveSerializer(data=request.data)
@@ -165,7 +165,7 @@ class KnowledgeDocumentApproveView(APIView):
 class KnowledgeDocumentRejectView(APIView):
     """POST /api/knowledge-base/documents/<uuid:document_id>/reject/"""
 
-    permission_classes = [IsStaffOrSuperuser]
+    permission_classes = [CanAccessKnowledgeBase]
 
     def post(self, request, document_id):
         serializer = KnowledgeDocumentRejectSerializer(data=request.data)
@@ -189,7 +189,7 @@ class KnowledgeDocumentRejectView(APIView):
 class KnowledgeDocumentArchiveView(APIView):
     """POST /api/knowledge-base/documents/<uuid:document_id>/archive/"""
 
-    permission_classes = [IsStaffOrSuperuser]
+    permission_classes = [CanAccessKnowledgeBase]
 
     def post(self, request, document_id):
         serializer = KnowledgeDocumentArchiveSerializer(data=request.data)
@@ -209,7 +209,7 @@ class KnowledgeDocumentArchiveView(APIView):
 class KnowledgeChunkListView(ListAPIView):
     """GET /api/knowledge-base/documents/<uuid:document_id>/chunks/"""
 
-    permission_classes = [IsStaffOrSuperuser]
+    permission_classes = [CanAccessKnowledgeBase]
     serializer_class = KnowledgeChunkSerializer
 
     def get_queryset(self):
@@ -234,7 +234,7 @@ class KnowledgeChunkListView(ListAPIView):
 class KnowledgeChunkSearchView(APIView):
     """GET /api/knowledge-base/chunks/search/?q=crp"""
 
-    permission_classes = [IsStaffOrSuperuser]
+    permission_classes = [CanAccessKnowledgeBase]
 
     def get(self, request):
         serializer = KnowledgeChunkSearchSerializer(data=request.query_params)
@@ -258,7 +258,7 @@ class KnowledgeChunkSearchView(APIView):
 class KnowledgeDocumentEmbedView(APIView):
     """POST /api/knowledge-base/documents/<uuid:document_id>/embed/"""
 
-    permission_classes = [IsStaffOrSuperuser]
+    permission_classes = [CanAccessKnowledgeBase]
 
     def post(self, request, document_id):
         document = get_object_or_404(KnowledgeDocument, pk=document_id)
@@ -296,7 +296,7 @@ class KnowledgeDocumentEmbedView(APIView):
 class KnowledgeChunkSemanticSearchView(APIView):
     """GET /api/knowledge-base/chunks/semantic-search/?q=..."""
 
-    permission_classes = [IsStaffOrSuperuser]
+    permission_classes = [CanAccessKnowledgeBase]
 
     def get(self, request):
         serializer = SemanticSearchSerializer(data=request.query_params)

@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.common.choices import RAGServiceContext
+from apps.common.permissions import CanExportRagDataset
 
 from .models import RAGResponse, RAGResponseFeedback
 from .permissions import can_access_consultation_rag, can_access_lab_result_rag
@@ -330,7 +331,7 @@ class AdminRAGAnalyticsSummaryView(APIView):
 class AdminRAGDatasetExportView(APIView):
     """POST /api/rag/admin/exports/dataset/ — export evaluation dataset."""
 
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, CanExportRagDataset]
 
     def post(self, request):
         if not (request.user.is_staff or request.user.is_superuser):

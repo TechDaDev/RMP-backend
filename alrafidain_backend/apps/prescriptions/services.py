@@ -8,30 +8,19 @@ from apps.common.choices import (
     NotificationType,
     PrescriptionItemStatus,
     PrescriptionStatus,
-    UserType,
-    VerificationStatus,
 )
+from apps.common.policies import RoleAccessPolicy
 from apps.notifications.services import create_notification
 
 from .models import DispensingRecord, Prescription, PrescriptionItem
 
 
 def _is_approved_pharmacist(user) -> bool:
-    if not user or not user.is_authenticated or user.user_type != UserType.PHARMACIST:
-        return False
-    try:
-        return user.pharmacist_profile.verification_status == VerificationStatus.APPROVED
-    except Exception:
-        return False
+    return RoleAccessPolicy.is_verified_pharmacist(user)
 
 
 def _is_approved_doctor(user) -> bool:
-    if not user or not user.is_authenticated or user.user_type != UserType.DOCTOR:
-        return False
-    try:
-        return user.doctor_profile.verification_status == VerificationStatus.APPROVED
-    except Exception:
-        return False
+    return RoleAccessPolicy.is_verified_doctor(user)
 
 
 @transaction.atomic
@@ -126,6 +115,45 @@ def get_prescription_by_qr_token(token, pharmacist):
 
 def get_remaining_items_for_pharmacist(prescription):
     return prescription.items.filter(status=PrescriptionItemStatus.PENDING)
+
+
+@transaction.atomic
+def cancel_prescription(*, prescription, doctor, request=None):
+    prescription = Prescription.objects.select_for_update().get(pk=prescription.pk)
+
+    if prescription.doctor_id != doctor.id:
+        raise PermissionError("You are not the prescribing doctor for this prescription.")
+
+    if prescription.items.filter(status=PrescriptionItemStatus.DISPENSED).exists():
+        raise ValueError("Cannot cancel prescription after any item has been dispensed.")
+
+    if prescription.status == PrescriptionStatus.CANCELLED:
+        raise ValueError("Prescription is already cancelled.")
+
+    now = timezone.now()
+    prescription.status = PrescriptionStatus.CANCELLED
+    prescription.cancelled_at = now
+    prescription.save(update_fields=["status", "cancelled_at", "updated_at"])
+
+    prescription.items.filter(status=PrescriptionItemStatus.PENDING).update(
+        status=PrescriptionItemStatus.CANCELLED,
+        cancelled_at=now,
+    )
+
+    create_audit_log(
+        actor=doctor,
+        action="prescription_cancelled",
+        target=prescription,
+        metadata={
+            "prescription_id": str(prescription.id),
+            "consultation_id": str(prescription.consultation_id),
+            "patient_id": str(prescription.patient_id),
+            "doctor_id": str(doctor.id),
+            "status": PrescriptionStatus.CANCELLED,
+        },
+        request=request,
+    )
+    return prescription
 
 
 @transaction.atomic
