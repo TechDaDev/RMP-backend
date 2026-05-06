@@ -1,5 +1,7 @@
 import io
 import tempfile
+import uuid
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -17,6 +19,7 @@ from apps.common.choices import (
     KnowledgeLanguage,
     KnowledgeProcessingStatus,
 )
+from apps.common.models import BackgroundJob
 
 from .models import KnowledgeChunk, KnowledgeDocument, KnowledgeDocumentText, KnowledgeProcessingLog
 from .services import (
@@ -26,6 +29,7 @@ from .services import (
     extract_text_from_document,
     search_approved_chunks,
 )
+from .tasks import process_knowledge_document_task
 
 User = get_user_model()
 
@@ -343,6 +347,52 @@ class SearchTests(TestCase):
             AuditLog.objects.filter(action="knowledge_chunk_search_performed").count(),
             initial_count + 1,
         )
+
+
+@override_settings(MEDIA_ROOT=MEDIA_ROOT_TMP)
+class KnowledgeProcessQueueTests(TestCase):
+    def setUp(self):
+        self.staff = _make_staff_user("staff-queue@example.com")
+        self.client = APIClient()
+        self.client.force_authenticate(self.staff)
+        _upload_document(self.client, file=_make_txt_file("Queue process test content. " * 100))
+        self.doc = KnowledgeDocument.objects.first()
+
+    @patch("apps.knowledge_base.views.process_knowledge_document_task.delay")
+    def test_process_endpoint_queues_background_task(self, delay_mock):
+        url = f"/api/knowledge-base/documents/{self.doc.pk}/process/"
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(url, {}, format="json")
+
+        self.assertEqual(response.status_code, status.HTTP_202_ACCEPTED)
+        self.assertIn("job_id", response.data["data"])
+
+        job = BackgroundJob.objects.get(pk=response.data["data"]["job_id"])
+        self.assertEqual(job.task_name, "knowledge_base.process_document")
+        delay_mock.assert_called_once_with(
+            document_id=str(self.doc.pk),
+            job_id=str(job.pk),
+            actor_id=str(self.staff.pk),
+        )
+
+    @patch("apps.knowledge_base.services.process_knowledge_document")
+    def test_process_task_uses_id_only_and_handles_missing_job(self, process_mock):
+        process_mock.return_value = None
+        result = process_knowledge_document_task.apply(
+            kwargs={
+                "document_id": str(self.doc.pk),
+                "job_id": str(uuid.uuid4()),
+                "actor_id": str(self.staff.pk),
+            }
+        ).get()
+        self.assertEqual(result["status"], "ok")
+        process_mock.assert_called_once()
+
+    def test_process_task_handles_missing_document(self):
+        result = process_knowledge_document_task.apply(
+            kwargs={"document_id": str(uuid.uuid4()), "job_id": str(uuid.uuid4())}
+        ).get()
+        self.assertEqual(result["status"], "skipped")
 
 
 @override_settings(MEDIA_ROOT=MEDIA_ROOT_TMP)

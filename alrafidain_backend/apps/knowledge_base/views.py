@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiParameter, extend_schema
@@ -6,6 +7,7 @@ from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.views import APIView
 
 from apps.audit.services import create_audit_log
+from apps.common.job_utils import create_background_job
 from apps.common.permissions import CanAccessKnowledgeBase
 from apps.common.responses import error_response, success_response
 
@@ -26,11 +28,11 @@ from .services import (
     approve_knowledge_document,
     archive_knowledge_document,
     embed_document_chunks,
-    process_knowledge_document,
     reject_knowledge_document,
     search_approved_chunks,
     semantic_search_approved_chunks,
 )
+from .tasks import process_knowledge_document_task
 
 
 @extend_schema(tags=["Knowledge Base"])
@@ -123,27 +125,29 @@ class KnowledgeDocumentProcessView(APIView):
 
     def post(self, request, document_id):
         document = get_object_or_404(KnowledgeDocument, pk=document_id)
-        try:
-            process_knowledge_document(document)
-        except Exception as exc:
-            return error_response(message=str(exc))
-
-        create_audit_log(
-            actor=request.user,
-            action="knowledge_document_processed",
-            target=document,
-            metadata={
-                "document_id": str(document.pk),
-                "document_type": document.document_type,
-                "language": document.language,
-                "specialty": document.specialty,
-                "approval_status": document.approval_status,
-                "processing_status": document.processing_status,
-                "chunk_count": document.chunks.filter(is_active=True).count(),
-            },
-            request=request,
+        job = create_background_job(
+            task_name="knowledge_base.process_document",
+            created_by=request.user,
+            metadata={"document_id": str(document.pk)},
         )
-        return success_response(data=KnowledgeDocumentDetailSerializer(document).data)
+
+        transaction.on_commit(
+            lambda: process_knowledge_document_task.delay(
+                document_id=str(document.pk),
+                job_id=str(job.pk),
+                actor_id=str(request.user.pk),
+            )
+        )
+
+        return success_response(
+            message="Knowledge document processing queued.",
+            data={
+                "document_id": str(document.pk),
+                "job_id": str(job.pk),
+                "job_status": job.status,
+            },
+            status_code=status.HTTP_202_ACCEPTED,
+        )
 
 
 @extend_schema(tags=["Knowledge Base"])

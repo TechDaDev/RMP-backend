@@ -1,8 +1,10 @@
 from django.db import transaction
 
 from apps.common.choices import NotificationPriority
+from apps.common.job_utils import create_background_job
 
 from .models import Notification
+from .tasks import publish_notification_event_task
 
 
 def create_notification(
@@ -25,25 +27,19 @@ def create_notification(
         data=data or {},
     )
 
-    # Broadcast realtime events (Phase 14)
-    # Use transaction.on_commit to ensure DB commit before broadcast
-    def broadcast_events():
-        from apps.realtime.services import (
-            broadcast_notification_created,
-            broadcast_unread_notification_count,
+    job = create_background_job(
+        task_name="notifications.publish_notification_event",
+        created_by=recipient,
+        metadata={"notification_id": str(notification.id)},
+    )
+
+    # Queue side-effect fanout only after commit.
+    transaction.on_commit(
+        lambda: publish_notification_event_task.delay(
+            notification_id=str(notification.id),
+            job_id=str(job.id),
         )
-
-        try:
-            broadcast_notification_created(notification)
-            broadcast_unread_notification_count(recipient)
-        except Exception as e:
-            # Log but don't break notification creation
-            import logging
-
-            logger = logging.getLogger(__name__)
-            logger.error(f"Failed to broadcast notification event: {e}")
-
-    transaction.on_commit(broadcast_events)
+    )
 
     return notification
 

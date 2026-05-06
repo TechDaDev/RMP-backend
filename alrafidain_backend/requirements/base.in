@@ -1,4 +1,5 @@
 Django>=5.0
+celery[redis]
 djangorestframework
 djangorestframework-simplejwt
 django-filter

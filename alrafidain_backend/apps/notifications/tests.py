@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test import TestCase
@@ -13,12 +15,14 @@ from apps.common.choices import (
     UserType,
     VerificationStatus,
 )
+from apps.common.models import BackgroundJob
 from apps.consultations.models import Consultation
 from apps.prescriptions.models import Prescription, PrescriptionItem
 from apps.profiles.models import DoctorProfile, PatientProfile, PharmacistProfile, UserProfile
 
 from .models import Notification
 from .services import create_notification, notify_many
+from .tasks import publish_notification_event_task
 
 User = get_user_model()
 
@@ -186,6 +190,47 @@ class NotificationModelTest(TestCase):
         self.assertEqual(
             Notification.objects.filter(notification_type=NotificationType.SYSTEM).count(), 2
         )
+
+    @patch("apps.notifications.services.publish_notification_event_task.delay")
+    def test_create_notification_queues_task_on_commit(self, delay_mock):
+        with self.captureOnCommitCallbacks(execute=True):
+            n = create_notification(
+                recipient=self.user,
+                notification_type=NotificationType.SYSTEM,
+                title="Queued",
+                message="Side effect",
+            )
+
+        job = BackgroundJob.objects.get(metadata__notification_id=str(n.id))
+        delay_mock.assert_called_once_with(notification_id=str(n.id), job_id=str(job.id))
+
+
+class NotificationTaskTests(TestCase):
+    def setUp(self):
+        self.user = create_patient(email="task-user@example.com")
+
+    @patch("apps.realtime.services.broadcast_unread_notification_count")
+    @patch("apps.realtime.services.broadcast_notification_created")
+    def test_publish_task_keeps_side_effect_parity(self, created_mock, unread_mock):
+        n = Notification.objects.create(
+            recipient=self.user,
+            notification_type=NotificationType.SYSTEM,
+            title="T",
+            message="M",
+        )
+        result = publish_notification_event_task.apply(kwargs={"notification_id": str(n.id)}).get()
+
+        self.assertEqual(result["status"], "ok")
+        created_mock.assert_called_once()
+        unread_mock.assert_called_once_with(self.user)
+
+    def test_publish_task_handles_missing_notification(self):
+        import uuid
+
+        result = publish_notification_event_task.apply(
+            kwargs={"notification_id": str(uuid.uuid4()), "job_id": str(uuid.uuid4())}
+        ).get()
+        self.assertEqual(result["status"], "skipped")
 
 
 # ─────────────────────────────────────────

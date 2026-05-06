@@ -104,6 +104,23 @@ DATABASES = {
     }
 }
 
+REDIS_URL = config(
+    "REDIS_URL",
+    default=(
+        f"redis://{config('REDIS_HOST', default='127.0.0.1')}:"
+        f"{config('REDIS_PORT', default=6379, cast=int)}/0"
+    ),
+)
+
+CELERY_BROKER_URL = config("CELERY_BROKER_URL", default=REDIS_URL)
+CELERY_RESULT_BACKEND = config("CELERY_RESULT_BACKEND", default=CELERY_BROKER_URL)
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_TIME_LIMIT = 300
+CELERY_TASK_SOFT_TIME_LIMIT = 240
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
@@ -123,6 +140,7 @@ LANGUAGE_CODE = "en-us"
 TIME_ZONE = "Asia/Baghdad"
 USE_I18N = True
 USE_TZ = True
+CELERY_TIMEZONE = TIME_ZONE
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
