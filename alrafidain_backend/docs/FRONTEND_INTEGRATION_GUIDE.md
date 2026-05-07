@@ -236,10 +236,18 @@ Register → OTP verify → Login → Dashboard
 ### 6.1 Request a Consultation
 
 ```http
-POST /api/consultations/request/
-{ "selected_specialty": "general_medicine", "duration": "less_than_24_hours", "severity": "mild" }
+POST /api/consultations/
+{
+  "duration": "less_than_24_hours",
+  "severity": "mild",
+  "has_fever": false,
+  "has_pain": true,
+  "symptom_ids": ["uuid1", "uuid2"]
+}
 ```
 
+The backend assigns `selected_specialty` from the submitted symptoms using deterministic routing rules.
+Do not ask the patient to choose a specialty in the client.
 Returns `consultation_id`. Poll or push-notify for status changes.
 
 ### 6.2 View Consultations

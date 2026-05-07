@@ -444,6 +444,19 @@ paths:
   /api/consultations/symptom-categories/:
     get:
       operationId: consultations_symptom_categories_list
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
       tags:
       - Symptoms
       security:
@@ -453,13 +466,24 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/SymptomCategory'
+                $ref: '#/components/schemas/PaginatedSymptomCategoryList'
           description: ''
   /api/consultations/symptoms/:
     get:
       operationId: consultations_symptoms_list
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
       tags:
       - Symptoms
       security:
@@ -469,15 +493,46 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Symptom'
+                $ref: '#/components/schemas/PaginatedSymptomList'
           description: ''
   /api/health/:
     get:
       operationId: health_retrieve
       tags:
-      - health
+      - Health
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/health/deps/:
+    get:
+      operationId: health_deps_retrieve
+      tags:
+      - Health
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/health/live/:
+    get:
+      operationId: health_live_retrieve
+      tags:
+      - Health
+      security:
+      - jwtAuth: []
+      - {}
+      responses:
+        '200':
+          description: No response body
+  /api/health/ready/:
+    get:
+      operationId: health_ready_retrieve
+      tags:
+      - Health
       security:
       - jwtAuth: []
       - {}
@@ -649,6 +704,18 @@ paths:
           type: string
           format: uuid
         required: true
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
       tags:
       - Knowledge Base
       security:
@@ -658,9 +725,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/KnowledgeChunk'
+                $ref: '#/components/schemas/PaginatedKnowledgeChunkList'
           description: ''
   /api/knowledge-base/documents/{document_id}/embed/:
     post:
@@ -906,6 +971,19 @@ paths:
   /api/lab-orders/my/:
     get:
       operationId: lab_orders_my_list
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
       tags:
       - Lab Orders
       security:
@@ -915,13 +993,24 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/LabOrderPatientList'
+                $ref: '#/components/schemas/PaginatedLabOrderPatientListList'
           description: ''
   /api/lab-orders/my-results/:
     get:
       operationId: lab_orders_my_results_list
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
       tags:
       - Lab Results
       security:
@@ -931,9 +1020,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/LabResultPatient'
+                $ref: '#/components/schemas/PaginatedLabResultPatientList'
           description: ''
   /api/lab-orders/my-results/{lab_result_id}/:
     get:
@@ -1032,6 +1119,19 @@ paths:
   /api/lab-orders/tests/:
     get:
       operationId: lab_orders_tests_list
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
       tags:
       - Lab Orders
       security:
@@ -1041,13 +1141,24 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/LabTestCatalog'
+                $ref: '#/components/schemas/PaginatedLabTestCatalogList'
           description: ''
   /api/lab-results/my/:
     get:
       operationId: lab_results_my_list
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
       tags:
       - Lab Results
       security:
@@ -1057,9 +1168,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/LabResultPatient'
+                $ref: '#/components/schemas/PaginatedLabResultPatientList'
           description: ''
   /api/lab-results/my/{lab_result_id}/:
     get:
@@ -1081,6 +1190,19 @@ paths:
   /api/notifications/:
     get:
       operationId: notifications_list
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
       tags:
       - Notifications
       security:
@@ -1090,9 +1212,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Notification'
+                $ref: '#/components/schemas/PaginatedNotificationList'
           description: ''
   /api/notifications/{notification_id}/mark-read/:
     post:
@@ -1367,6 +1487,19 @@ paths:
   /api/prescriptions/my/:
     get:
       operationId: prescriptions_my_list
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
       tags:
       - Prescriptions
       security:
@@ -1376,9 +1509,7 @@ paths:
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/PrescriptionPatientList'
+                $ref: '#/components/schemas/PaginatedPrescriptionPatientListList'
           description: ''
   /api/prescriptions/my/{prescription_id}/:
     get:
@@ -1668,8 +1799,9 @@ paths:
   /api/rag/consultations/{consultation_id}/support/:
     post:
       operationId: rag_consultations_support_create
-      description: POST /api/rag/consultations/<uuid:consultation_id>/support/ — RAG
-        support for a specific consultation.
+      description: |-
+        POST /api/rag/consultations/<uuid:consultation_id>/support/ —
+        RAG support for a specific consultation.
       parameters:
       - in: path
         name: consultation_id
@@ -2071,14 +2203,14 @@ components:
         previous_visit_for_same_issue:
           type: boolean
         selected_specialty:
+          readOnly: true
           nullable: true
           oneOf:
           - $ref: '#/components/schemas/SpecialtyEnum'
-          - $ref: '#/components/schemas/BlankEnum'
           - $ref: '#/components/schemas/NullEnum'
         selected_specialty_other:
           type: string
-          maxLength: 150
+          readOnly: true
         current_medications_related:
           type: string
         additional_notes:
@@ -2136,6 +2268,8 @@ components:
       - has_emergency_warning
       - id
       - recommended_specialty
+      - selected_specialty
+      - selected_specialty_other
       - severity
       - status
       - symptom_ids
@@ -2484,6 +2618,8 @@ components:
           $ref: '#/components/schemas/ApprovalStatusEnum'
         processing_status:
           $ref: '#/components/schemas/ProcessingStatusEnum'
+        security_status:
+          $ref: '#/components/schemas/SecurityStatusEnum'
         approved_at:
           type: string
           format: date-time
@@ -2917,8 +3053,7 @@ components:
           $ref: '#/components/schemas/FlagEnum'
         result_file:
           type: string
-          format: uri
-          nullable: true
+          readOnly: true
         released_at:
           type: string
           format: date-time
@@ -2932,6 +3067,7 @@ components:
       - id
       - lab_order
       - lab_order_item
+      - result_file
       - test_label
       - value_type
     LabResultPatientStatusEnum:
@@ -3203,6 +3339,190 @@ components:
     NullEnum:
       enum:
       - null
+    PaginatedKnowledgeChunkList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/KnowledgeChunk'
+    PaginatedLabOrderPatientListList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LabOrderPatientList'
+    PaginatedLabResultPatientList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LabResultPatient'
+    PaginatedLabTestCatalogList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/LabTestCatalog'
+    PaginatedNotificationList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Notification'
+    PaginatedPrescriptionPatientListList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PrescriptionPatientList'
+    PaginatedSymptomCategoryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SymptomCategory'
+    PaginatedSymptomList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Symptom'
     PatchedDoctorProfile:
       type: object
       properties:
@@ -3853,6 +4173,18 @@ components:
         * `nasal` - Nasal
         * `rectal` - Rectal
         * `other` - Other
+    SecurityStatusEnum:
+      enum:
+      - pending_scan
+      - scan_clean
+      - scan_failed
+      - scan_skipped
+      type: string
+      description: |-
+        * `pending_scan` - Pending Scan
+        * `scan_clean` - Scan Clean
+        * `scan_failed` - Scan Failed
+        * `scan_skipped` - Scan Skipped
     SetBloodGroup:
       type: object
       properties:

@@ -185,6 +185,8 @@ class ConsultationCreateSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = [
             "id",
+            "selected_specialty",
+            "selected_specialty_other",
             "recommended_specialty",
             "has_emergency_warning",
             "status",
@@ -195,26 +197,23 @@ class ConsultationCreateSerializer(serializers.ModelSerializer):
             "closed_at",
         ]
 
+    def validate_symptom_ids(self, value):
+        unique_ids = list(dict.fromkeys(value))
+        active_symptoms = Symptom.objects.filter(id__in=unique_ids, is_active=True)
+        active_ids = {symptom.id for symptom in active_symptoms}
+        missing_ids = [str(symptom_id) for symptom_id in unique_ids if symptom_id not in active_ids]
+
+        if missing_ids:
+            raise serializers.ValidationError(
+                f"Invalid or inactive symptom IDs: {', '.join(missing_ids)}"
+            )
+
+        return unique_ids
+
     def validate(self, attrs):
         request = self.context.get("request")
         if not is_patient(request.user):
             raise serializers.ValidationError("Only patients can create consultations.")
-
-        selected_specialty = attrs.get("selected_specialty")
-        selected_specialty_other = attrs.get("selected_specialty_other", "")
-        if selected_specialty == MedicalSpecialty.OTHER and not selected_specialty_other:
-            raise serializers.ValidationError(
-                {"selected_specialty_other": "This field is required when specialty is Other."}
-            )
-        if selected_specialty != MedicalSpecialty.OTHER:
-            attrs["selected_specialty_other"] = ""
-
-        symptom_ids = attrs.get("symptom_ids", [])
-        active_count = Symptom.objects.filter(id__in=symptom_ids, is_active=True).count()
-        if active_count == 0:
-            raise serializers.ValidationError(
-                {"symptom_ids": "At least one active symptom must be selected."}
-            )
 
         return attrs
 
@@ -226,7 +225,6 @@ class ConsultationCreateSerializer(serializers.ModelSerializer):
 
         rec = recommend_specialty_from_symptoms(symptom_ids)
         recommended_specialty = rec["recommended_specialty"]
-        selected_specialty = validated_data.pop("selected_specialty", None) or recommended_specialty
         has_emergency_warning = rec["has_red_flag"] or validated_data.get(
             "has_breathing_difficulty", False
         )
@@ -234,7 +232,8 @@ class ConsultationCreateSerializer(serializers.ModelSerializer):
         consultation = Consultation.objects.create(
             patient=request.user,
             recommended_specialty=recommended_specialty,
-            selected_specialty=selected_specialty,
+            selected_specialty=recommended_specialty,
+            selected_specialty_other="",
             has_emergency_warning=has_emergency_warning,
             **validated_data,
         )

@@ -76,7 +76,7 @@ Legend:
 
 | Method | Path | View | Auth | Roles | Serializer | Privacy | Status |
 |---|---|---|---|---|---|---|---|
-| POST | `/api/consultations/` | `ConsultationCreateView` | Yes | patient | `ConsultationCreateSerializer` | Patient only | stable |
+| POST | `/api/consultations/` | `ConsultationCreateView` | Yes | patient | `ConsultationCreateSerializer` | Patient only; specialty is system-assigned from symptoms | stable |
 | GET | `/api/consultations/my/` | `MyConsultationListView` | Yes | patient | `ConsultationListSerializer` | Own consultations only | stable |
 | GET | `/api/consultations/doctor/pending/` | `DoctorPendingConsultationListView` | Yes | doctor (approved) | `ConsultationListSerializer` | Filtered by specialty | stable |
 | GET | `/api/consultations/doctor/assigned/` | `DoctorAssignedConsultationListView` | Yes | doctor (approved) | `ConsultationListSerializer` | Only accepted by this doctor | stable |

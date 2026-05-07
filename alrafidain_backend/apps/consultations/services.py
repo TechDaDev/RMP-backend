@@ -3,6 +3,7 @@ from collections import defaultdict
 
 from django.db import transaction
 from django.utils import timezone
+from rest_framework import serializers
 
 from apps.audit.services import create_audit_log
 from apps.common.choices import ConsultationStatus, MedicalSpecialty, NotificationType
@@ -11,6 +12,28 @@ from apps.notifications.services import create_notification
 from .models import Symptom, SymptomSpecialtyRule
 
 logger = logging.getLogger(__name__)
+
+
+def infer_specialty_from_symptoms(symptoms) -> str:
+    active_symptoms = [symptom for symptom in symptoms if symptom.is_active]
+    active_ids = [symptom.id for symptom in active_symptoms]
+
+    scores = defaultdict(int)
+    rules = SymptomSpecialtyRule.objects.filter(symptom_id__in=active_ids, is_active=True)
+    for rule in rules:
+        scores[rule.specialty] += rule.weight
+
+    if scores:
+        # TODO: Replace deterministic routing with AI-assisted triage once backend AI triage exists.
+        return sorted(scores.items(), key=lambda item: (-item[1], item[0]))[0][0]
+
+    specialty_values = {value for value, _label in MedicalSpecialty.choices}
+    if MedicalSpecialty.GENERAL_MEDICINE in specialty_values:
+        return MedicalSpecialty.GENERAL_MEDICINE
+
+    raise serializers.ValidationError(
+        {"symptom_ids": "Unable to infer consultation specialty from the selected symptoms."}
+    )
 
 
 def recommend_specialty_from_symptoms(symptom_ids):
@@ -23,16 +46,7 @@ def recommend_specialty_from_symptoms(symptom_ids):
         scores[rule.specialty] += rule.weight
 
     has_red_flag = any(symptom.is_red_flag for symptom in symptoms)
-
-    if not scores:
-        return {
-            "recommended_specialty": MedicalSpecialty.GENERAL_MEDICINE,
-            "scores": {},
-            "has_red_flag": has_red_flag,
-        }
-
-    # Deterministic winner: highest score then specialty value ascending
-    recommended_specialty = sorted(scores.items(), key=lambda x: (-x[1], x[0]))[0][0]
+    recommended_specialty = infer_specialty_from_symptoms(symptoms)
     return {
         "recommended_specialty": recommended_specialty,
         "scores": dict(scores),

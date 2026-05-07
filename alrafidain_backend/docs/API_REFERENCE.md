@@ -294,11 +294,13 @@ Create a new consultation.
 
 - **Auth required**: Yes
 - **Allowed roles**: Patient
+- `selected_specialty` is assigned by the backend from the submitted symptoms.
+- Patients must submit at least one valid `symptom_ids` entry.
+- Current routing is deterministic rule-based routing from seeded symptom specialty rules. AI triage is not implemented in this phase.
 
 **Request body:**
 ```json
 {
-  "selected_specialty": "cardiology",
   "duration": "one_to_three_days",
   "severity": "moderate",
   "has_fever": false,

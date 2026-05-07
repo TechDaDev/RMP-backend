@@ -24,7 +24,10 @@ from apps.consultations.models import (
     SymptomCategory,
     SymptomSpecialtyRule,
 )
-from apps.consultations.services import recommend_specialty_from_symptoms
+from apps.consultations.services import (
+    infer_specialty_from_symptoms,
+    recommend_specialty_from_symptoms,
+)
 from apps.profiles.models import DoctorProfile, PatientProfile, UserProfile
 
 User = get_user_model()
@@ -140,6 +143,25 @@ class RecommendationServiceTests(TestCase):
         rec = recommend_specialty_from_symptoms([s4.id])
         self.assertEqual(rec["recommended_specialty"], MedicalSpecialty.GENERAL_MEDICINE)
 
+    def test_infer_specialty_uses_deterministic_tiebreaker(self):
+        tie_a = Symptom.objects.create(category=self.cat, name="Tie A", is_active=True)
+        tie_b = Symptom.objects.create(category=self.cat, name="Tie B", is_active=True)
+        SymptomSpecialtyRule.objects.create(
+            symptom=tie_a,
+            specialty=MedicalSpecialty.CARDIOLOGY,
+            weight=1,
+            is_active=True,
+        )
+        SymptomSpecialtyRule.objects.create(
+            symptom=tie_b,
+            specialty=MedicalSpecialty.DERMATOLOGY,
+            weight=1,
+            is_active=True,
+        )
+
+        inferred = infer_specialty_from_symptoms([tie_a, tie_b])
+        self.assertEqual(inferred, MedicalSpecialty.CARDIOLOGY)
+
 
 class ConsultationFlowTests(TestCase):
     def setUp(self):
@@ -179,7 +201,7 @@ class ConsultationFlowTests(TestCase):
         self.pharmacist_client = auth_client(self.pharmacist)
         self.laboratorian_client = auth_client(self.laboratorian)
 
-    def create_consultation(self, client=None, selected_specialty=None):
+    def create_consultation(self, client=None, **overrides):
         payload = {
             "symptom_ids": [str(self.symptom.id), str(self.symptom2.id)],
             "duration": ConsultationDuration.ONE_TO_THREE_DAYS,
@@ -189,8 +211,7 @@ class ConsultationFlowTests(TestCase):
             "has_breathing_difficulty": False,
             "previous_visit_for_same_issue": False,
         }
-        if selected_specialty is not None:
-            payload["selected_specialty"] = selected_specialty
+        payload.update(overrides)
         return (client or self.patient_client).post("/api/consultations/", payload, format="json")
 
     def test_patient_can_create_consultation(self):
@@ -216,10 +237,28 @@ class ConsultationFlowTests(TestCase):
         self.assertEqual(c.recommended_specialty, MedicalSpecialty.CARDIOLOGY)
         self.assertEqual(c.selected_specialty, MedicalSpecialty.CARDIOLOGY)
 
+    def test_patient_supplied_selected_specialty_is_ignored(self):
+        self.create_consultation(selected_specialty=MedicalSpecialty.DERMATOLOGY)
+        c = Consultation.objects.first()
+        self.assertEqual(c.recommended_specialty, MedicalSpecialty.CARDIOLOGY)
+        self.assertEqual(c.selected_specialty, MedicalSpecialty.CARDIOLOGY)
+
     def test_red_flag_sets_emergency_warning(self):
         self.create_consultation()
         c = Consultation.objects.first()
         self.assertTrue(c.has_emergency_warning)
+
+    def test_missing_symptom_ids_returns_400(self):
+        resp = self.create_consultation(symptom_ids=None)
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_empty_symptom_ids_returns_400(self):
+        resp = self.create_consultation(symptom_ids=[])
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_invalid_symptom_id_returns_400(self):
+        resp = self.create_consultation(symptom_ids=[str(self.symptom.id), str(self.patient.id)])
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_patient_cannot_set_forbidden_fields(self):
         payload = {
@@ -268,7 +307,7 @@ class ConsultationFlowTests(TestCase):
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_doctor_cannot_list_unrelated_specialty(self):
-        self.create_consultation(selected_specialty=MedicalSpecialty.CARDIOLOGY)
+        self.create_consultation()
         self.other_doctor.doctor_profile.specialty = MedicalSpecialty.DERMATOLOGY
         self.other_doctor.doctor_profile.specialty_other = ""
         self.other_doctor.doctor_profile.save()
@@ -365,7 +404,7 @@ class ConsultationFlowTests(TestCase):
         self.assertTrue(AuditLog.objects.filter(action="consultation_closed").exists())
 
     def test_doctor_specialty_other_only_handles_other(self):
-        self.create_consultation(selected_specialty=MedicalSpecialty.CARDIOLOGY)
+        self.create_consultation()
         c = Consultation.objects.first()
         resp = self.other_doctor_client.post(
             f"/api/consultations/{c.id}/accept/", {}, format="json"
