@@ -373,6 +373,29 @@ POST /api/consultations/{consultation_id}/prescriptions/
 }
 ```
 
+Prescription create requirements:
+- Consultation must be assigned to the requesting approved doctor.
+- Consultation status must be `accepted` or `doctor_responded`.
+- `items` must be non-empty.
+- Required per item: `medication_name`, `dosage`, `frequency`, `duration`, `route`.
+- Optional per item: `strength`, `quantity`, `instructions`.
+- Allowed `route` values: `oral`, `topical`, `inhalation`, `injection`, `eye`, `ear`, `nasal`, `rectal`, `other`.
+
+Validation error example (missing route):
+```json
+{
+  "success": false,
+  "message": "Invalid input.",
+  "errors": {
+    "items": [
+      {
+        "route": ["This field is required."]
+      }
+    ]
+  }
+}
+```
+
 ### 7.6 Create Lab Order
 
 ```http

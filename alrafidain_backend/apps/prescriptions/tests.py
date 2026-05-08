@@ -140,6 +140,13 @@ class PrescriptionCreationTests(TestCase):
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         self.assertTrue(Prescription.objects.filter(consultation=self.consultation).exists())
 
+    def test_create_response_includes_prescription_id(self):
+        client = auth_client(self.doctor)
+        resp = client.post(self._url(), {"items": [ITEM_PAYLOAD]}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertIn("id", resp.data["data"])
+        self.assertIsNotNone(resp.data["data"]["id"])
+
     def test_doctor_can_create_for_doctor_responded_consultation(self):
         self.consultation.status = ConsultationStatus.DOCTOR_RESPONDED
         self.consultation.save()
@@ -185,10 +192,69 @@ class PrescriptionCreationTests(TestCase):
         resp = client.post(self._url(), {"items": [ITEM_PAYLOAD]}, format="json")
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_cannot_create_for_closed_consultation(self):
+        self.consultation.status = ConsultationStatus.CLOSED
+        self.consultation.save()
+        client = auth_client(self.doctor)
+        resp = client.post(self._url(), {"items": [ITEM_PAYLOAD]}, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_cannot_create_with_zero_items(self):
         client = auth_client(self.doctor)
         resp = client.post(self._url(), {"items": []}, format="json")
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_missing_route_returns_field_level_error(self):
+        client = auth_client(self.doctor)
+        payload = {
+            "items": [
+                {
+                    "medication_name": "Amoxicillin",
+                    "dosage": "1 capsule",
+                    "frequency": "3x daily",
+                    "duration": "5 days",
+                }
+            ]
+        }
+        resp = client.post(self._url(), payload, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("items", resp.data.get("errors", {}))
+        self.assertIn("route", resp.data["errors"]["items"][0])
+
+    def test_missing_medication_name_returns_field_level_error(self):
+        client = auth_client(self.doctor)
+        payload = {
+            "items": [
+                {
+                    "dosage": "1 capsule",
+                    "frequency": "3x daily",
+                    "duration": "5 days",
+                    "route": "oral",
+                }
+            ]
+        }
+        resp = client.post(self._url(), payload, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("items", resp.data.get("errors", {}))
+        self.assertIn("medication_name", resp.data["errors"]["items"][0])
+
+    def test_invalid_route_returns_field_level_error(self):
+        client = auth_client(self.doctor)
+        payload = {
+            "items": [
+                {
+                    "medication_name": "Amoxicillin",
+                    "dosage": "1 capsule",
+                    "frequency": "3x daily",
+                    "duration": "5 days",
+                    "route": "by mouth",
+                }
+            ]
+        }
+        resp = client.post(self._url(), payload, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("items", resp.data.get("errors", {}))
+        self.assertIn("route", resp.data["errors"]["items"][0])
 
     def test_prescription_has_secure_qr_token(self):
         client = auth_client(self.doctor)

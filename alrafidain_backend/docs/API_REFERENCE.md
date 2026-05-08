@@ -458,6 +458,9 @@ Create a new prescription for a consultation.
 
 - **Auth required**: Yes
 - **Allowed roles**: Doctor (approved, assigned to consultation)
+- **Consultation status required**: `accepted` or `doctor_responded`
+- `items` must be a non-empty array.
+- Unknown top-level fields (for example `notes`) are not part of the create contract and should not be sent.
 
 **Request body:**
 ```json
@@ -474,6 +477,44 @@ Create a new prescription for a consultation.
       "instructions": "After meals"
     }
   ]
+}
+```
+
+**Item field contract:**
+
+- Required per item: `medication_name`, `dosage`, `frequency`, `duration`, `route`
+- Optional per item: `strength`, `quantity`, `instructions`
+- Allowed `route` values: `oral`, `topical`, `inhalation`, `injection`, `eye`, `ear`, `nasal`, `rectal`, `other`
+
+**Validation error examples:**
+
+Missing `route`:
+```json
+{
+  "success": false,
+  "message": "Invalid input.",
+  "errors": {
+    "items": [
+      {
+        "route": ["This field is required."]
+      }
+    ]
+  }
+}
+```
+
+Invalid `route`:
+```json
+{
+  "success": false,
+  "message": "Invalid input.",
+  "errors": {
+    "items": [
+      {
+        "route": ["\"by mouth\" is not a valid choice."]
+      }
+    ]
+  }
 }
 ```
 

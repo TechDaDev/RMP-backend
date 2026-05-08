@@ -184,6 +184,27 @@ Notes:
 | Request payload | `{ items: [ { medication_name, strength, dosage, frequency, duration, route, quantity, instructions } ] }` |
 | Response | doctor-detail prescription shape in success envelope |
 
+Prescription item payload rules:
+
+| Field | Required | Notes |
+|---|---|---|
+| `medication_name` | Yes | string |
+| `dosage` | Yes | string |
+| `frequency` | Yes | string |
+| `duration` | Yes | string |
+| `route` | Yes | enum; must be one of allowed route values |
+| `strength` | No | optional string |
+| `quantity` | No | optional string |
+| `instructions` | No | optional string |
+
+Allowed route values:
+`oral`, `topical`, `inhalation`, `injection`, `eye`, `ear`, `nasal`, `rectal`, `other`
+
+Validation behavior:
+- Missing `route` -> 400 field-level error under `errors.items[0].route`
+- Invalid `route` -> 400 field-level choice error under `errors.items[0].route`
+- Empty `items` -> 400 with `items` validation error
+
 ### Doctor detail and cancel
 
 | Method | Path | Role | Rule |
