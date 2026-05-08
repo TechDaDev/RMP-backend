@@ -1,3 +1,5 @@
+from uuid import UUID
+
 from django.contrib.auth import get_user_model
 from django.db import connection
 from django.test import TestCase
@@ -221,6 +223,36 @@ class ConsultationFlowTests(TestCase):
         self.assertEqual(Consultation.objects.count(), 1)
         c = Consultation.objects.first()
         self.assertEqual(c.patient_id, self.patient.id)
+
+    def test_create_response_contains_consultation_id(self):
+        resp = self.create_consultation()
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        consultation_id = resp.data["data"].get("id")
+        self.assertIsNotNone(consultation_id)
+        self.assertEqual(str(UUID(consultation_id)), consultation_id)
+
+    def test_patient_can_view_created_consultation_detail_immediately(self):
+        create_resp = self.create_consultation()
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED)
+
+        consultation_id = create_resp.data["data"]["id"]
+        detail_resp = self.patient_client.get(f"/api/consultations/{consultation_id}/")
+
+        self.assertEqual(detail_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(detail_resp.data["data"]["id"], consultation_id)
+        self.assertEqual(
+            detail_resp.data["data"]["selected_specialty"],
+            MedicalSpecialty.CARDIOLOGY,
+        )
+
+    def test_patient_can_view_own_pending_consultation_detail(self):
+        self.create_consultation()
+        consultation = Consultation.objects.first()
+        self.assertEqual(consultation.status, ConsultationStatus.SUBMITTED)
+
+        detail_resp = self.patient_client.get(f"/api/consultations/{consultation.id}/")
+        self.assertEqual(detail_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(detail_resp.data["data"]["status"], ConsultationStatus.SUBMITTED)
 
     def test_non_patient_cannot_create_consultation(self):
         resp = self.create_consultation(client=self.pharmacist_client)

@@ -80,7 +80,7 @@ Legend:
 | GET | `/api/consultations/my/` | `MyConsultationListView` | Yes | patient | `ConsultationListSerializer` | Own consultations only | stable |
 | GET | `/api/consultations/doctor/pending/` | `DoctorPendingConsultationListView` | Yes | doctor (approved) | `ConsultationListSerializer` | Filtered by specialty | stable |
 | GET | `/api/consultations/doctor/assigned/` | `DoctorAssignedConsultationListView` | Yes | doctor (approved) | `ConsultationListSerializer` | Only accepted by this doctor | stable |
-| GET | `/api/consultations/<id>/` | `ConsultationDetailView` | Yes | patient \| doctor | `ConsultationDetailSerializer` | Patient sees own; doctor sees assigned | stable |
+| GET | `/api/consultations/<id>/` | `ConsultationDetailView` | Yes | patient \| doctor | `ConsultationDetailSerializer` | Patient sees own in all consultation statuses; doctor sees assigned only | stable |
 | POST | `/api/consultations/<id>/accept/` | `ConsultationAcceptView` | Yes | doctor (approved) | — | — | stable |
 | POST | `/api/consultations/<id>/close/` | `ConsultationCloseView` | Yes | doctor (approved) | — | — | stable |
 | POST | `/api/consultations/<id>/responses/` | `ConsultationResponseCreateView` | Yes | doctor (approved) | `ConsultationResponseSerializer` | — | stable |

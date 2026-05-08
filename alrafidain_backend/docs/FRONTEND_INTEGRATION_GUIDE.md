@@ -248,7 +248,14 @@ POST /api/consultations/
 
 The backend assigns `selected_specialty` from the submitted symptoms using deterministic routing rules.
 Do not ask the patient to choose a specialty in the client.
-Returns `consultation_id`. Poll or push-notify for status changes.
+The create response includes the consultation identifier at `data.id`; use this value for redirect to the detail route.
+
+Patient detail access after creation:
+- `GET /api/consultations/{id}/` is allowed for the owning patient immediately after create.
+- `GET /api/consultations/{id}/` is denied for other patients.
+- Assigned doctors can view detail per consultation access policy.
+
+Future phase note: profile-completion gating before consultation creation will be enforced later (not part of this phase).
 
 ### 6.2 View Consultations
 

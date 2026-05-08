@@ -297,6 +297,7 @@ Create a new consultation.
 - `selected_specialty` is assigned by the backend from the submitted symptoms.
 - Patients must submit at least one valid `symptom_ids` entry.
 - Current routing is deterministic rule-based routing from seeded symptom specialty rules. AI triage is not implemented in this phase.
+- Successful responses include a stable consultation `id` at `data.id` for detail-page routing.
 
 **Request body:**
 ```json
@@ -327,6 +328,11 @@ Get consultation detail.
 
 - **Auth required**: Yes
 - **Allowed roles**: Patient (own), Doctor (assigned)
+- Patients can view their own consultations across valid lifecycle states (submitted, accepted, doctor_responded, closed).
+- Patients cannot view other patients' consultations.
+- Doctors can view consultation detail only when assigned under current policy.
+
+Future phase note: backend profile-completion enforcement before consultation creation is planned but not implemented in this phase.
 
 ---
 
