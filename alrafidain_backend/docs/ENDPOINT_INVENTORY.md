@@ -77,15 +77,15 @@ Legend:
 | Method | Path | View | Auth | Roles | Serializer | Privacy | Status |
 |---|---|---|---|---|---|---|---|
 | POST | `/api/consultations/` | `ConsultationCreateView` | Yes | patient | `ConsultationCreateSerializer` | Patient only; specialty is system-assigned from symptoms | stable |
-| GET | `/api/consultations/my/` | `MyConsultationListView` | Yes | patient | `ConsultationListSerializer` | Own consultations only | stable |
+| GET | `/api/consultations/my/` | `MyConsultationListView` | Yes | patient \| doctor | `ConsultationListSerializer` | Patient: own consultations; Doctor: assigned consultations | stable |
 | GET | `/api/consultations/doctor/pending/` | `DoctorPendingConsultationListView` | Yes | doctor (approved) | `ConsultationListSerializer` | Filtered by specialty | stable |
 | GET | `/api/consultations/doctor/assigned/` | `DoctorAssignedConsultationListView` | Yes | doctor (approved) | `ConsultationListSerializer` | Only accepted by this doctor | stable |
 | GET | `/api/consultations/<id>/` | `ConsultationDetailView` | Yes | patient \| doctor | `ConsultationDetailSerializer` | Patient sees own in all consultation statuses; doctor sees assigned only | stable |
 | POST | `/api/consultations/<id>/accept/` | `ConsultationAcceptView` | Yes | doctor (approved) | — | — | stable |
-| POST | `/api/consultations/<id>/close/` | `ConsultationCloseView` | Yes | doctor (approved) | — | — | stable |
-| POST | `/api/consultations/<id>/responses/` | `ConsultationResponseCreateView` | Yes | doctor (approved) | `ConsultationResponseSerializer` | — | stable |
-| GET | `/api/consultations/symptom-categories/` | `SymptomCategoryListView` | Yes | patient | — | — | stable |
-| GET | `/api/consultations/symptoms/` | `SymptomListView` | Yes | patient | — | — | stable |
+| POST | `/api/consultations/<id>/close/` | `ConsultationCloseView` | Yes | doctor (assigned) | — | Allowed statuses: accepted, doctor_responded | stable |
+| POST | `/api/consultations/<id>/responses/` | `ConsultationResponseCreateView` | Yes | doctor (assigned) | `ConsultationResponseSerializer` | Allowed statuses: accepted, doctor_responded | stable |
+| GET | `/api/consultations/symptom-categories/` | `SymptomCategoryListView` | Yes | authenticated | — | — | stable |
+| GET | `/api/consultations/symptoms/` | `SymptomListView` | Yes | authenticated | — | — | stable |
 
 ---
 
@@ -117,7 +117,7 @@ Legend:
 | Method | Path | View | Auth | Roles | Serializer | Privacy | Status |
 |---|---|---|---|---|---|---|---|
 | POST | `/api/consultations/<id>/lab-orders/` | `LabOrderCreateView` | Yes | doctor (approved) | `LabOrderCreateSerializer` | — | stable |
-| GET | `/api/lab-orders/tests/` | `LabTestCatalogListView` | Yes | doctor \| laboratorian | `LabTestCatalogSerializer` | — | stable |
+| GET | `/api/lab-orders/tests/` | `LabTestCatalogListView` | Yes | authenticated | `LabTestCatalogSerializer` | — | stable |
 | GET | `/api/lab-orders/my/` | `PatientLabOrderListView` | Yes | patient | `PatientLabOrderSerializer` | **No test items** | stable |
 | GET | `/api/lab-orders/my/<id>/` | `PatientLabOrderDetailView` | Yes | patient | `PatientLabOrderDetailSerializer` | **No test items** | stable |
 | GET | `/api/lab-orders/doctor/<id>/` | `DoctorLabOrderDetailView` | Yes | doctor (assigned) | `DoctorLabOrderDetailSerializer` | Full items visible | stable |
@@ -152,11 +152,11 @@ Legend:
 | Method | Path | View | Auth | Roles | Serializer | Privacy | Status |
 |---|---|---|---|---|---|---|---|
 | GET | `/api/patient-records/my/` | `MyMedicalRecordView` | Yes | patient | `PatientMedicalRecordSerializer` | Own record only | stable |
-| GET | `/api/patient-records/<id>/entries/` (POST) | `MedicalRecordEntryCreateView` | Yes | doctor | `MedicalRecordEntrySerializer` | Assigned doctor only | stable |
+| POST | `/api/patient-records/<id>/entries/` | `MedicalRecordEntryCreateView` | Yes | patient \| doctor | `MedicalRecordEntrySerializer` | Patient own record or doctor authorized via consultation relationship | stable |
 | POST | `/api/patient-records/entries/<id>/confirm/` | `MedicalRecordEntryConfirmView` | Yes | doctor (assigned) | — | — | stable |
 | POST | `/api/patient-records/entries/<id>/deactivate/` | `MedicalRecordEntryDeactivateView` | Yes | doctor (assigned) | — | — | stable |
-| GET | `/api/patient-records/patients/<patient_id>/` | `DoctorPatientMedicalRecordView` | Yes | doctor (with active consultation) | `DoctorMedicalRecordSerializer` | Active consultation required | stable |
-| POST | `/api/patient-records/<id>/blood-group/` | `SetBloodGroupView` | Yes | laboratorian (approved) | — | — | stable |
+| GET | `/api/patient-records/patients/<patient_id>/` | `DoctorPatientMedicalRecordView` | Yes | doctor (approved with assigned consultation in accepted/doctor_responded/closed) | `PatientMedicalRecordSerializer` | Relationship required via consultation access policy | stable |
+| POST | `/api/patient-records/<id>/blood-group/` | `SetBloodGroupView` | Yes | patient \| doctor | — | Laboratorian must use verify endpoint | stable |
 | POST | `/api/patient-records/patients/<patient_id>/blood-group/verify/` | `LaboratorianVerifyBloodGroupView` | Yes | laboratorian (approved) | — | — | stable |
 
 ---

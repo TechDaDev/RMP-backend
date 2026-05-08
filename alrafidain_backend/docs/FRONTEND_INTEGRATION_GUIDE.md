@@ -283,16 +283,17 @@ Future phase note: profile-completion gating before consultation creation will b
 GET /api/consultations/my/
 ```
 
-Returns list of consultations with `status` field:  
-`pending` → `accepted` → `closed`
+Returns list of consultations with backend lifecycle values:
+`submitted` → `accepted` → `doctor_responded` → `closed`
 
 ### 6.3 Send Messages (Active Consultation)
 
-Only available when `status == "accepted"`:
+Send is available only when consultation status is `accepted` or `doctor_responded`.
+Read/list is available when status is `accepted`, `doctor_responded`, or `closed`.
 
 ```http
 POST /api/consultations/{consultation_id}/messages/
-{ "message_type": "text", "content": "I have a headache." }
+{ "body": "I have a headache." }
 ```
 
 ### 6.4 View Prescriptions
@@ -306,10 +307,10 @@ GET /api/prescriptions/my/
 ### 6.5 View Lab Results
 
 ```http
-GET /api/lab-orders/my/results/
+GET /api/lab-results/my/
 ```
 
-> **Privacy note**: Results are only visible after the doctor has explicitly released them (`released_to_patient = true`). Unreleased results do not appear in this list.
+> **Privacy note**: Results are only visible after doctor release (`status = released`). Unreleased results do not appear in this list.
 
 ### 6.6 Patient Record
 
@@ -326,10 +327,10 @@ Returns the patient's medical history, allergies, and chronic conditions.
 ### 7.1 View Pending Consultations (Queue)
 
 ```http
-GET /api/consultations/available/
+GET /api/consultations/doctor/pending/
 ```
 
-Returns consultations matching the doctor's specialty that are still `pending`.
+Returns consultations matching the doctor's profile specialty that are still `submitted` and unassigned.
 
 ### 7.2 Accept a Consultation
 
@@ -346,22 +347,28 @@ POST /api/consultations/{consultation_id}/messages/
 
 ### 7.4 View Patient Record (During Consultation)
 
-Only available for the assigned doctor:
+Only available for authorized doctors with assigned consultation access:
 
 ```http
-GET /api/patient-records/doctor/view/
-Body: { "consultation_id": "..." }
+GET /api/patient-records/patients/{patient_id}/
 ```
 
 ### 7.5 Create Prescription
 
 ```http
-POST /api/prescriptions/create/
+POST /api/consultations/{consultation_id}/prescriptions/
 {
-  "consultation": "consultation_id",
-  "notes": "Take with food.",
   "items": [
-    { "medication_name": "Paracetamol", "dosage": "500mg", "frequency": "3x daily" }
+    {
+      "medication_name": "Paracetamol",
+      "strength": "500mg",
+      "dosage": "1 tablet",
+      "frequency": "3x daily",
+      "duration": "3 days",
+      "route": "oral",
+      "quantity": "9 tablets",
+      "instructions": "Take with food"
+    }
   ]
 }
 ```
@@ -369,12 +376,16 @@ POST /api/prescriptions/create/
 ### 7.6 Create Lab Order
 
 ```http
-POST /api/lab-orders/create/
+POST /api/consultations/{consultation_id}/lab-orders/
 {
-  "consultation": "consultation_id",
-  "notes": "Fasting 8 hours.",
   "items": [
-    { "test_name": "CBC", "description": "Complete blood count" }
+    {
+      "test": "lab_test_catalog_uuid",
+      "test_name": "CBC",
+      "category": "hematology",
+      "sample_type": "Blood",
+      "instructions": "Fasting 8 hours"
+    }
   ]
 }
 ```
@@ -410,8 +421,8 @@ Response is raw (no envelope):
 
 Submit feedback:
 ```http
-POST /api/rag/doctor/feedback/
-{ "rag_response": "uuid", "rating": 5, "comment": "Very accurate." }
+POST /api/rag/responses/{id}/feedback/
+{ "rating": "helpful", "comment": "Very accurate." }
 ```
 
 ### 7.9 Close Consultation
@@ -429,7 +440,8 @@ POST /api/consultations/{consultation_id}/close/
 The patient presents a QR code which encodes `qr_token`.
 
 ```http
-GET /api/prescriptions/scan/{qr_token}/
+POST /api/prescriptions/scan/
+{ "qr_token": "..." }
 ```
 
 Returns the prescription details with `items` visible to the pharmacist.
@@ -451,7 +463,8 @@ Marks the prescription as dispensed.
 ### 9.1 Scan Lab Order QR
 
 ```http
-GET /api/lab-orders/scan/{qr_token}/
+POST /api/lab-orders/scan/
+{ "qr_token": "..." }
 ```
 
 Returns lab order details and pending `items`.
@@ -459,11 +472,13 @@ Returns lab order details and pending `items`.
 ### 9.2 Create Lab Result
 
 ```http
-POST /api/lab-orders/{lab_order_id}/results/
+POST /api/lab-orders/items/{lab_order_item_id}/results/
 {
-  "result_summary": "All values within normal range.",
-  "notes": "",
-  "file": <multipart/form-data>     // optional attachment
+  "value_type": "numeric",
+  "numeric_value": "5.7",
+  "unit": "mmol/L",
+  "reference_range": "3.9-6.1",
+  "flag": "normal"
 }
 ```
 

@@ -330,10 +330,14 @@ Create a new consultation.
 
 ### `GET /api/consultations/my/`
 
-List patient's own consultations.
+List consultations for the authenticated user.
 
 - **Auth required**: Yes
-- **Allowed roles**: Patient
+- **Allowed roles**: Patient, Doctor
+
+Behavior:
+- Patient: own consultations (`patient=request.user`)
+- Doctor: assigned consultations (`assigned_doctor=request.user`)
 
 ---
 
@@ -400,7 +404,8 @@ Submit a doctor's medical response.
 Close a consultation.
 
 - **Auth required**: Yes
-- **Allowed roles**: Doctor (assigned), Patient (own)
+- **Allowed roles**: Doctor (assigned)
+- **Allowed statuses**: `accepted`, `doctor_responded`
 
 ---
 
@@ -412,6 +417,7 @@ List messages in a consultation thread. Also marks incoming unread messages as r
 
 - **Auth required**: Yes
 - **Allowed roles**: Patient (own), Doctor (assigned)
+- **Allowed consultation statuses**: `accepted`, `doctor_responded`, `closed`
 
 ---
 
@@ -421,6 +427,7 @@ Send a message in a consultation.
 
 - **Auth required**: Yes
 - **Allowed roles**: Patient (own), Doctor (assigned)
+- **Allowed consultation statuses**: `accepted`, `doctor_responded`
 
 **Request body (multipart for attachments):**
 ```json
@@ -611,7 +618,7 @@ Get the current patient's medical record with entries.
 Get a patient's medical record (doctor view).
 
 - **Auth required**: Yes
-- **Allowed roles**: Doctor (approved, must have an accepted consultation with this patient)
+- **Allowed roles**: Doctor (approved, must have assigned consultation in one of: `accepted`, `doctor_responded`, `closed`)
 
 ---
 
@@ -720,7 +727,10 @@ Create a new lab order linked to a consultation.
 {
   "items": [
     {
-      "lab_test_id": "uuid",
+      "test": "uuid",
+      "test_name": "CBC",
+      "category": "hematology",
+      "sample_type": "Blood",
       "instructions": "Fasting required"
     }
   ]
@@ -912,7 +922,7 @@ Doctor releases a lab result to the patient.
 
 - **Auth required**: Yes
 - **Allowed roles**: Doctor (ordering doctor)
-- **Restriction**: Result must be in `reviewed` status before release
+- **Behavior**: Sets result status to `released` and timestamps `released_at` (also sets `reviewed_at` if empty)
 
 ---
 
