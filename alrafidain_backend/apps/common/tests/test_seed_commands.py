@@ -27,24 +27,26 @@ class SeedSymptomsCommandTests(TestCase):
 
     def test_creates_expected_categories(self):
         run_command("seed_symptoms")
-        self.assertTrue(SymptomCategory.objects.filter(name="General").exists())
-        self.assertTrue(SymptomCategory.objects.filter(name="Emergency").exists())
-        self.assertGreaterEqual(SymptomCategory.objects.count(), 13)
+        self.assertTrue(SymptomCategory.objects.filter(name="General / Constitutional").exists())
+        self.assertTrue(SymptomCategory.objects.filter(name="Emergency / Red Flags").exists())
+        self.assertGreaterEqual(SymptomCategory.objects.count(), 18)
 
     def test_creates_symptoms(self):
         run_command("seed_symptoms")
         self.assertTrue(Symptom.objects.filter(name="Fever").exists())
         self.assertTrue(Symptom.objects.filter(name="Chest pain").exists())
-        self.assertGreaterEqual(Symptom.objects.count(), 20)
+        self.assertGreaterEqual(Symptom.objects.count(), 80)
 
     def test_red_flags_are_set(self):
         run_command("seed_symptoms")
+        # Chest pain (non-severe) is no longer a red flag; Severe chest pain is.
         red_flags = [
-            "Chest pain",
+            "Severe chest pain",
             "Severe shortness of breath",
             "Loss of consciousness",
             "Seizure",
             "Severe bleeding",
+            "Suicidal thoughts",
         ]
         for name in red_flags:
             self.assertTrue(

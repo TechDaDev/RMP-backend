@@ -286,6 +286,20 @@ List all active symptoms (filterable by `?category=<id>` and `?is_red_flag=true`
 - **Auth required**: Yes
 - **Allowed roles**: All
 
+**Catalog design (v2, Phase 4.3A):**
+
+| Dimension | Count |
+|---|---|
+| Categories | 18 |
+| Active symptoms | ~127 |
+| Routing rules | ~259 |
+
+The 18 patient-friendly categories are: Emergency / Red Flags, General / Constitutional, Respiratory, Cardiovascular, Gastrointestinal, Neurological, Musculoskeletal, Skin / Dermatology, Ear, Nose, and Throat, Eye, Urinary / Kidney, Reproductive / Gynecology, Endocrine / Metabolic, Mental Health / Sleep, Pediatric Concerns, Injury / Trauma, Dental / Oral, Allergy / Immunology.
+
+Symptom names use patient-friendly plain language, not disease names.
+Red-flag symptoms (e.g., Severe chest pain, Suicidal thoughts, Head injury) always include `emergency_medicine` routing.
+Specialty assignment is deterministic and weight-based. This is **not** a diagnosis; it is triage support only.
+
 ---
 
 ### `POST /api/consultations/`
@@ -294,10 +308,11 @@ Create a new consultation.
 
 - **Auth required**: Yes
 - **Allowed roles**: Patient
-- `selected_specialty` is assigned by the backend from the submitted symptoms.
+- `selected_specialty` is assigned by the backend from the submitted symptoms using weighted routing rules.
 - Patients must submit at least one valid `symptom_ids` entry.
-- Current routing is deterministic rule-based routing from seeded symptom specialty rules. AI triage is not implemented in this phase.
+- Routing is deterministic (weight-based sum per specialty). AI triage is **not** implemented in this phase.
 - Successful responses include a stable consultation `id` at `data.id` for detail-page routing.
+- The inferred specialty is not a medical diagnosis. The assigned doctor makes the clinical determination.
 
 **Request body:**
 ```json

@@ -235,6 +235,26 @@ Register → OTP verify → Login → Dashboard
 
 ### 6.1 Request a Consultation
 
+**Step 1 — Browse symptom catalog (recommended UX)**
+
+```http
+GET /api/consultations/symptom-categories/
+```
+Returns 18 patient-friendly categories. Display them as a grouped selector.
+
+```http
+GET /api/consultations/symptoms/?category=<id>
+```
+Returns active symptoms for that category. Patients select one or more symptoms (IDs) before submitting.
+
+Alternatively, use `?is_red_flag=true` to surface high-priority emergency prompts.
+
+> **Triage note**: Symptom names use patient-friendly plain language.
+> Specialty assignment is automatic and deterministic (not AI, not diagnosis).
+> Do **not** ask the patient to select a specialty.
+
+**Step 2 — Submit consultation**
+
 ```http
 POST /api/consultations/
 {
@@ -246,7 +266,7 @@ POST /api/consultations/
 }
 ```
 
-The backend assigns `selected_specialty` from the submitted symptoms using deterministic routing rules.
+The backend assigns `selected_specialty` from the submitted symptoms using weighted routing rules.
 Do not ask the patient to choose a specialty in the client.
 The create response includes the consultation identifier at `data.id`; use this value for redirect to the detail route.
 

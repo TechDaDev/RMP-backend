@@ -1,6 +1,8 @@
+from io import StringIO
 from uuid import UUID
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
@@ -504,3 +506,237 @@ class ConsultationQueryPerformanceTests(TestCase):
             response = self.client.get(f"/api/consultations/{self.consultation.id}/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertLessEqual(len(context), 7)
+
+
+class SymptomCatalogIntegrityTests(TestCase):
+    """
+    Verify that seed_symptoms creates a complete, well-routed symptom catalog.
+    All tests use a fresh in-memory DB; seed_symptoms is run once per class.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        call_command("seed_symptoms", verbosity=0)
+
+    # ------------------------------------------------------------------
+    # Volume checks
+    # ------------------------------------------------------------------
+
+    def test_seed_creates_at_least_15_categories(self):
+        count = SymptomCategory.objects.filter(is_active=True).count()
+        self.assertGreaterEqual(count, 15, f"Only {count} active categories after seeding")
+
+    def test_seed_creates_at_least_80_symptoms(self):
+        count = Symptom.objects.filter(is_active=True).count()
+        self.assertGreaterEqual(count, 80, f"Only {count} active symptoms after seeding")
+
+    def test_routing_rules_at_least_equal_active_symptoms(self):
+        sym_count = Symptom.objects.filter(is_active=True).count()
+        rule_count = SymptomSpecialtyRule.objects.filter(is_active=True).count()
+        self.assertGreaterEqual(
+            rule_count,
+            sym_count,
+            f"Rules ({rule_count}) < symptoms ({sym_count}); every symptom needs a rule",
+        )
+
+    # ------------------------------------------------------------------
+    # Structural integrity
+    # ------------------------------------------------------------------
+
+    def test_every_active_symptom_has_a_category(self):
+        orphaned = Symptom.objects.filter(is_active=True, category__isnull=True)
+        self.assertEqual(
+            orphaned.count(),
+            0,
+            f"Orphaned symptoms (no category): {list(orphaned.values_list('name', flat=True))}",
+        )
+
+    def test_every_active_symptom_has_at_least_one_active_routing_rule(self):
+        from django.db.models import Count, Q
+
+        no_rules = (
+            Symptom.objects.annotate(
+                active_rule_count=Count(
+                    "specialty_rules",
+                    filter=Q(specialty_rules__is_active=True),
+                )
+            )
+            .filter(active_rule_count=0, is_active=True)
+            .values_list("name", flat=True)
+        )
+        self.assertEqual(
+            list(no_rules),
+            [],
+            f"Symptoms with no active rule: {list(no_rules)}",
+        )
+
+    # ------------------------------------------------------------------
+    # Red-flag checks
+    # ------------------------------------------------------------------
+
+    def test_red_flag_symptoms_exist(self):
+        count = Symptom.objects.filter(is_active=True, is_red_flag=True).count()
+        self.assertGreater(count, 0, "No red-flag symptoms found after seeding")
+
+    def test_red_flag_symptoms_have_emergency_medicine_routing(self):
+        red_flags = Symptom.objects.filter(is_active=True, is_red_flag=True)
+        missing = []
+        for sym in red_flags:
+            has_emergency = SymptomSpecialtyRule.objects.filter(
+                symptom=sym,
+                specialty=MedicalSpecialty.EMERGENCY_MEDICINE,
+                is_active=True,
+            ).exists()
+            if not has_emergency:
+                missing.append(sym.name)
+        self.assertEqual(
+            missing,
+            [],
+            f"Red-flag symptoms without emergency_medicine routing: {missing}",
+        )
+
+    # ------------------------------------------------------------------
+    # Specialty routing spot-checks
+    # ------------------------------------------------------------------
+
+    def test_respiratory_symptoms_route_to_pulmonology(self):
+        respiratory_cat = SymptomCategory.objects.get(name="Respiratory")
+        respiratory_syms = Symptom.objects.filter(category=respiratory_cat, is_active=True)
+        routes_to_pulmonology = SymptomSpecialtyRule.objects.filter(
+            symptom__in=respiratory_syms,
+            specialty=MedicalSpecialty.PULMONOLOGY,
+            is_active=True,
+        )
+        self.assertTrue(
+            routes_to_pulmonology.exists(),
+            "No Respiratory symptom routes to pulmonology",
+        )
+
+    def test_urinary_symptoms_route_to_urology(self):
+        urinary_cat = SymptomCategory.objects.get(name="Urinary / Kidney")
+        urinary_syms = Symptom.objects.filter(category=urinary_cat, is_active=True)
+        routes_to_urology = SymptomSpecialtyRule.objects.filter(
+            symptom__in=urinary_syms,
+            specialty=MedicalSpecialty.UROLOGY,
+            is_active=True,
+        )
+        self.assertTrue(routes_to_urology.exists(), "No Urinary symptom routes to urology")
+
+    def test_dermatology_symptoms_route_to_dermatology(self):
+        derm_cat = SymptomCategory.objects.get(name="Skin / Dermatology")
+        derm_syms = Symptom.objects.filter(category=derm_cat, is_active=True)
+        routes_to_dermatology = SymptomSpecialtyRule.objects.filter(
+            symptom__in=derm_syms,
+            specialty=MedicalSpecialty.DERMATOLOGY,
+            is_active=True,
+        )
+        self.assertTrue(routes_to_dermatology.exists(), "No Skin symptom routes to dermatology")
+
+    def test_severe_chest_pain_routes_to_emergency_medicine(self):
+        sym = Symptom.objects.get(
+            name="Severe chest pain", category__name="Emergency / Red Flags", is_active=True
+        )
+        has_emergency = SymptomSpecialtyRule.objects.filter(
+            symptom=sym,
+            specialty=MedicalSpecialty.EMERGENCY_MEDICINE,
+            is_active=True,
+        ).exists()
+        self.assertTrue(has_emergency, "Severe chest pain does not route to emergency_medicine")
+
+    def test_suicidal_thoughts_routes_to_emergency_and_psychiatry(self):
+        sym = Symptom.objects.get(
+            name="Suicidal thoughts", category__name="Emergency / Red Flags", is_active=True
+        )
+        emergency_rule = SymptomSpecialtyRule.objects.filter(
+            symptom=sym, specialty=MedicalSpecialty.EMERGENCY_MEDICINE, is_active=True
+        ).exists()
+        psychiatry_rule = SymptomSpecialtyRule.objects.filter(
+            symptom=sym, specialty=MedicalSpecialty.PSYCHIATRY, is_active=True
+        ).exists()
+        self.assertTrue(
+            emergency_rule or psychiatry_rule,
+            "Suicidal thoughts must route to emergency_medicine or psychiatry",
+        )
+        self.assertTrue(emergency_rule, "Suicidal thoughts must route to emergency_medicine")
+        self.assertTrue(psychiatry_rule, "Suicidal thoughts must route to psychiatry")
+
+    # ------------------------------------------------------------------
+    # Routing algorithm integration checks
+    # ------------------------------------------------------------------
+
+    def test_cough_routes_to_pulmonology_as_top_specialty(self):
+        cough = Symptom.objects.get(name="Cough", category__name="Respiratory", is_active=True)
+        result = recommend_specialty_from_symptoms([cough.id])
+        self.assertEqual(
+            result["recommended_specialty"],
+            MedicalSpecialty.PULMONOLOGY,
+            f"Expected pulmonology for Cough, got {result['recommended_specialty']}",
+        )
+
+    def test_severe_chest_pain_routes_to_emergency_as_top_specialty(self):
+        sym = Symptom.objects.get(
+            name="Severe chest pain", category__name="Emergency / Red Flags", is_active=True
+        )
+        result = recommend_specialty_from_symptoms([sym.id])
+        self.assertEqual(
+            result["recommended_specialty"],
+            MedicalSpecialty.EMERGENCY_MEDICINE,
+            f"Expected emergency_medicine for Severe chest pain, "
+            f"got {result['recommended_specialty']}",
+        )
+
+    def test_suicidal_thoughts_routes_to_emergency_as_top_specialty(self):
+        sym = Symptom.objects.get(
+            name="Suicidal thoughts", category__name="Emergency / Red Flags", is_active=True
+        )
+        result = recommend_specialty_from_symptoms([sym.id])
+        self.assertEqual(
+            result["recommended_specialty"],
+            MedicalSpecialty.EMERGENCY_MEDICINE,
+            f"Expected emergency_medicine for Suicidal thoughts, "
+            f"got {result['recommended_specialty']}",
+        )
+
+    def test_painful_urination_routes_to_urology_as_top_specialty(self):
+        sym = Symptom.objects.get(
+            name="Painful urination", category__name="Urinary / Kidney", is_active=True
+        )
+        result = recommend_specialty_from_symptoms([sym.id])
+        self.assertEqual(
+            result["recommended_specialty"],
+            MedicalSpecialty.UROLOGY,
+            f"Expected urology for Painful urination, got {result['recommended_specialty']}",
+        )
+
+    def test_skin_rash_routes_to_dermatology_as_top_specialty(self):
+        sym = Symptom.objects.get(
+            name="Skin rash", category__name="Skin / Dermatology", is_active=True
+        )
+        result = recommend_specialty_from_symptoms([sym.id])
+        self.assertEqual(
+            result["recommended_specialty"],
+            MedicalSpecialty.DERMATOLOGY,
+            f"Expected dermatology for Skin rash, got {result['recommended_specialty']}",
+        )
+
+    def test_red_flag_symptom_combination_sets_has_red_flag(self):
+        severe_cp = Symptom.objects.get(
+            name="Severe chest pain", category__name="Emergency / Red Flags", is_active=True
+        )
+        result = recommend_specialty_from_symptoms([severe_cp.id])
+        self.assertTrue(result["has_red_flag"], "Severe chest pain should set has_red_flag=True")
+
+    # ------------------------------------------------------------------
+    # Audit command integration
+    # ------------------------------------------------------------------
+
+    def test_audit_catalog_passes_after_seed(self):
+        out = StringIO()
+        err = StringIO()
+        try:
+            call_command("audit_symptom_catalog", stdout=out, stderr=err, verbosity=0)
+        except SystemExit as exc:
+            self.fail(
+                f"audit_symptom_catalog exited non-zero ({exc}).\n"
+                f"stdout: {out.getvalue()}\nstderr: {err.getvalue()}"
+            )
