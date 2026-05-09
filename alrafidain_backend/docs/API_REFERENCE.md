@@ -820,7 +820,7 @@ Cancel a lab order (only if no items have been completed yet).
 
 ### `POST /api/lab-orders/scan/`
 
-Laboratorian scans QR token to access pending lab order items.
+Laboratorian scans QR token to access lab order items.
 
 - **Auth required**: Yes
 - **Allowed roles**: Laboratorian (approved)
@@ -832,7 +832,11 @@ Laboratorian scans QR token to access pending lab order items.
 }
 ```
 
-**Response**: Returns `lab_order` metadata and only `pending` items for the scanned order. Also returns `locked: true` if no pending items remain.
+**Response**: Returns `lab_order` metadata including:
+- `remaining_items`: List of pending items still to be completed
+- `completed_items` (NEW): List of already-completed items with metadata (test name, category, status, timestamps, result_id if available)
+- `locked: true` if no pending items remain
+- Audit log entry created
 
 ---
 
@@ -855,7 +859,7 @@ Record completion status for scanned lab order items.
 }
 ```
 
-**Response**: Same shape as scan response (updated `lab_order` + remaining `pending` items).
+**Response**: Same shape as scan response (updated `lab_order` with both `remaining_items` and `completed_items`, status updated).
 
 ---
 

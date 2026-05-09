@@ -501,6 +501,84 @@ class LaboratorianScanTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertTrue(AuditLog.objects.filter(action="lab_order_qr_scanned").exists())
 
+    def test_scan_issued_order_empty_completed_items(self):
+        """Issued order should have empty completed_items list."""
+        response = self._scan(self.lab)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn("lab_order", response.data["data"])
+        self.assertIn("completed_items", response.data["data"]["lab_order"])
+        self.assertEqual(len(response.data["data"]["lab_order"]["completed_items"]), 0)
+
+    def test_scan_partially_completed_returns_completed_items(self):
+        """After completing one item, scan should include it in completed_items."""
+        item = self.lab_order.items.first()
+        item.status = LabOrderItemStatus.COMPLETED
+        item.completed_at = timezone.now()
+        item.save(update_fields=["status", "completed_at", "updated_at"])
+        self.lab_order.update_status_from_items()
+
+        response = self._scan(self.lab)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        completed_items = response.data["data"]["lab_order"]["completed_items"]
+        self.assertEqual(len(completed_items), 1)
+        self.assertEqual(str(completed_items[0]["id"]), str(item.id))
+        self.assertEqual(completed_items[0]["status"], LabOrderItemStatus.COMPLETED)
+        self.assertIsNotNone(completed_items[0]["completed_at"])
+
+    def test_scan_fully_completed_returns_all_completed_items(self):
+        """Fully completed order should return all items in completed_items."""
+        self.lab_order.items.update(
+            status=LabOrderItemStatus.COMPLETED, completed_at=timezone.now()
+        )
+        self.lab_order.update_status_from_items()
+
+        response = self._scan(self.lab)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        completed_items = response.data["data"]["lab_order"]["completed_items"]
+        self.assertEqual(len(completed_items), 2)
+        self.assertTrue(response.data["data"]["locked"])
+
+    def test_scan_cancelled_items_in_completed_items(self):
+        """Cancelled items should be included in completed_items."""
+        item = self.lab_order.items.first()
+        item.status = LabOrderItemStatus.CANCELLED
+        item.cancelled_at = timezone.now()
+        item.save(update_fields=["status", "cancelled_at", "updated_at"])
+        self.lab_order.update_status_from_items()
+
+        response = self._scan(self.lab)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        completed_items = response.data["data"]["lab_order"]["completed_items"]
+        self.assertEqual(len(completed_items), 1)
+        self.assertEqual(completed_items[0]["status"], LabOrderItemStatus.CANCELLED)
+
+    def test_completed_items_structure_no_result_exposure(self):
+        """completed_items should contain safe metadata, not result values."""
+        item = self.lab_order.items.first()
+        item.status = LabOrderItemStatus.COMPLETED
+        item.completed_at = timezone.now()
+        item.save(update_fields=["status", "completed_at", "updated_at"])
+
+        response = self._scan(self.lab)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        completed_item = response.data["data"]["lab_order"]["completed_items"][0]
+
+        # Safe fields should be present
+        self.assertIn("id", completed_item)
+        self.assertIn("test_name", completed_item)
+        self.assertIn("category", completed_item)
+        self.assertIn("sample_type", completed_item)
+        self.assertIn("instructions", completed_item)
+        self.assertIn("status", completed_item)
+        self.assertIn("completed_at", completed_item)
+
+        # result_id is OK (points to a result endpoint, not exposing data)
+        self.assertIn("result_id", completed_item)
+
 
 class CompletionTests(TestCase):
     def setUp(self):

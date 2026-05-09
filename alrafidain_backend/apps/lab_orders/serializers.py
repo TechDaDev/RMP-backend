@@ -99,6 +99,36 @@ class LabOrderRemainingItemSerializer(serializers.ModelSerializer):
         fields = ["id", "test_name", "category", "sample_type", "instructions"]
 
 
+class LabOrderCompletedItemSerializer(serializers.ModelSerializer):
+    result_id = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LabOrderItem
+        fields = [
+            "id",
+            "test_name",
+            "category",
+            "sample_type",
+            "instructions",
+            "status",
+            "completed_at",
+            "cancelled_at",
+            "result_id",
+        ]
+
+    def get_result_id(self, obj):
+        """
+        Return result ID if result exists for this item.
+        Safe to return: laboratorian already has access to items in this order.
+        """
+        if hasattr(obj, "result"):
+            try:
+                return str(obj.result.id) if obj.result else None
+            except Exception:
+                return None
+        return None
+
+
 class LabCompletionRecordSerializer(serializers.ModelSerializer):
     laboratorian = _SafeUserSerializer(read_only=True)
     lab_order_item_id = serializers.UUIDField(source="lab_order_item.id", read_only=True)
@@ -197,10 +227,21 @@ class LabOrderDoctorDetailSerializer(serializers.ModelSerializer):
 class _LabOrderLaboratorianBasicSerializer(serializers.ModelSerializer):
     doctor = _SafeUserSerializer(read_only=True)
     issued_at = serializers.DateTimeField(source="created_at", read_only=True)
+    completed_items = serializers.SerializerMethodField()
 
     class Meta:
         model = LabOrder
-        fields = ["id", "status", "doctor", "issued_at", "expires_at"]
+        fields = ["id", "status", "doctor", "issued_at", "expires_at", "completed_items"]
+
+    def get_completed_items(self, obj):
+        """
+        Return completed and cancelled items (non-pending).
+        Includes item metadata safe for laboratorian view.
+        """
+        from .services import get_completed_tests_for_laboratorian
+
+        completed = get_completed_tests_for_laboratorian(obj)
+        return LabOrderCompletedItemSerializer(completed, many=True).data
 
 
 class LabOrderLaboratorianScanSerializer(serializers.Serializer):

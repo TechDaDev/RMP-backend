@@ -257,7 +257,7 @@ Proposed contract:
 }
 ```
 
-**Response** (success):
+**Response** (success, issued order):
 ```json
 {
   "success": true,
@@ -267,7 +267,8 @@ Proposed contract:
       "status": "issued",
       "doctor": { "id", "email", "full_name" },
       "issued_at": "2026-05-08T...",
-      "expires_at": "2026-05-15T..."
+      "expires_at": "2026-05-15T...",
+      "completed_items": []
     },
     "remaining_items": [
       {
@@ -285,25 +286,127 @@ Proposed contract:
 }
 ```
 
-**Response** (locked order):
+**Response** (partially completed order):
 ```json
 {
   "success": true,
   "data": {
-    "lab_order": { ... },
+    "lab_order": {
+      "id": "uuid",
+      "status": "partially_completed",
+      "doctor": { ... },
+      "issued_at": "2026-05-08T...",
+      "expires_at": "2026-05-15T...",
+      "completed_items": [
+        {
+          "id": "uuid",
+          "test_name": "CBC",
+          "category": "hematology",
+          "sample_type": "Blood",
+          "instructions": "Standard sample handling",
+          "status": "completed",
+          "completed_at": "2026-05-09T...",
+          "cancelled_at": null,
+          "result_id": "uuid or null"
+        }
+      ]
+    },
+    "remaining_items": [
+      {
+        "id": "uuid",
+        "test_name": "HbA1c",
+        "category": "biochemistry",
+        "sample_type": "Serum",
+        "instructions": "..."
+      }
+    ],
+    "locked": false,
+    "message": null
+  },
+  "message": "QR scanned."
+}
+```
+
+**Response** (fully completed order):
+```json
+{
+  "success": true,
+  "data": {
+    "lab_order": {
+      "id": "uuid",
+      "status": "fully_completed",
+      "doctor": { ... },
+      "issued_at": "2026-05-08T...",
+      "expires_at": "2026-05-15T...",
+      "completed_items": [
+        {
+          "id": "uuid",
+          "test_name": "CBC",
+          "category": "hematology",
+          "sample_type": "Blood",
+          "instructions": "...",
+          "status": "completed",
+          "completed_at": "2026-05-09T...",
+          "cancelled_at": null,
+          "result_id": "uuid"
+        },
+        {
+          "id": "uuid",
+          "test_name": "HbA1c",
+          "category": "biochemistry",
+          "sample_type": "Serum",
+          "instructions": "...",
+          "status": "completed",
+          "completed_at": "2026-05-09T...",
+          "cancelled_at": null,
+          "result_id": "uuid"
+        }
+      ]
+    },
     "remaining_items": [],
     "locked": true,
     "message": "This lab order is no longer available for completion."
-  }
+  },
+  "message": "QR scanned."
 }
 ```
+
+### Lab Order Scan Response Fields
+
+**lab_order** object now includes:
+- `id`: Lab order UUID
+- `status`: Current order status (issued, partially_completed, fully_completed, expired, cancelled)
+- `doctor`: Ordering doctor info
+- `issued_at`: When order was created
+- `expires_at`: When order expires (7 days from creation)
+- **`completed_items`** *(NEW)*: Array of completed/cancelled items with metadata (see below)
+
+**completed_items** array (NEW):
+Each item in the array contains:
+- `id`: Lab order item UUID
+- `test_name`: Name of the test (e.g., "CBC", "HbA1c")
+- `category`: Test category (hematology, biochemistry, etc.)
+- `sample_type`: Sample type (Blood, Serum, Urine, etc.)
+- `instructions`: Lab-side instructions for the test
+- `status`: Item status (completed or cancelled)
+- `completed_at`: Timestamp when item was marked done
+- `cancelled_at`: Timestamp when item was cancelled (or null)
+- `result_id`: UUID of the lab result if one exists, or null
+
+**Safety note**: `completed_items` contains lab-safe item metadata only. It does NOT expose:
+- Result values (numeric, text, blood group)
+- Doctor notes
+- Laboratorian private notes
+- Patient-hidden result fields
+
+Result data is retrieved separately via result endpoints.
 
 ### Error Cases
 
 | Case | Status | Cause |
 |---|---|---|
 | Invalid QR token | 400 | Token not found or invalid |
-| Expired order | 200 | Order auto-marked expired, returns locked |
+| Expired order | 200 | Order auto-marked expired, returns locked with completed_items |
 | Unapproved lab user | 403 | Laboratorian verification_status != APPROVED |
 | Not authenticated | 401 | Missing/invalid bearer token |
 

@@ -142,6 +142,17 @@ def get_remaining_tests_for_laboratorian(lab_order):
     return lab_order.items.filter(status=LabOrderItemStatus.PENDING)
 
 
+def get_completed_tests_for_laboratorian(lab_order):
+    """
+    Get all completed and cancelled items for a lab order.
+    Safe to return: laboratorian can see item status and result metadata.
+    Does NOT expose result values, doctor_notes, or patient-hidden fields.
+    """
+    return lab_order.items.filter(
+        status__in=[LabOrderItemStatus.COMPLETED, LabOrderItemStatus.CANCELLED]
+    ).select_related("result")
+
+
 @transaction.atomic
 def cancel_lab_order(*, lab_order, doctor, request=None):
     lab_order = LabOrder.objects.select_for_update().get(pk=lab_order.pk)
