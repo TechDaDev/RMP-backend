@@ -12,10 +12,11 @@ from apps.common.throttles import QRScanRateThrottle
 from apps.consultations.models import Consultation
 from apps.consultations.permissions import is_approved_doctor, is_assigned_doctor
 
-from .models import Prescription
+from .models import DispensingRecord, Prescription
 from .permissions import is_approved_pharmacist, is_prescription_doctor, is_prescription_patient
 from .serializers import (
     DispenseItemsSerializer,
+    PharmacistDispensingHistorySerializer,
     PrescriptionCreateSerializer,
     PrescriptionDoctorDetailSerializer,
     PrescriptionPatientDetailSerializer,
@@ -248,3 +249,48 @@ class PharmacistDispenseItemsView(APIView):
         }
         response_serializer = PrescriptionPharmacistScanSerializer(data)
         return success_response("Items processed.", data=response_serializer.data)
+
+
+@extend_schema(tags=["Prescriptions"])
+class PharmacistDispensingHistoryView(ListAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = PharmacistDispensingHistorySerializer
+
+    def get_queryset(self):
+        return (
+            DispensingRecord.objects.filter(pharmacist=self.request.user)
+            .select_related(
+                "prescription",
+                "prescription_item",
+                "prescription__patient",
+                "prescription__patient__user_profile",
+                "prescription__doctor",
+                "prescription__doctor__doctor_profile",
+            )
+            .order_by("-created_at")
+        )
+
+    def list(self, request, *args, **kwargs):
+        if not is_approved_pharmacist(request.user):
+            return error_response(
+                "Only approved pharmacists can view dispensing history.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        queryset = self.get_queryset()
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            paginated = self.get_paginated_response(serializer.data).data
+            return success_response("Dispensing history retrieved.", data=paginated)
+
+        serializer = self.get_serializer(queryset, many=True)
+        return success_response(
+            "Dispensing history retrieved.",
+            data={
+                "count": len(serializer.data),
+                "next": None,
+                "previous": None,
+                "results": serializer.data,
+            },
+        )

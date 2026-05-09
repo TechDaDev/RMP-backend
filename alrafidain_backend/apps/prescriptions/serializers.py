@@ -1,3 +1,5 @@
+from datetime import date
+
 from rest_framework import serializers
 
 from apps.common.choices import DispensingAttemptStatus, MedicationRoute
@@ -197,3 +199,88 @@ class DispenseItemsSerializer(serializers.Serializer):
         if not value:
             raise serializers.ValidationError("At least one item is required.")
         return value
+
+
+class _PharmacistHistoryPatientSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    full_name = serializers.SerializerMethodField()
+    gender = serializers.SerializerMethodField()
+    age = serializers.SerializerMethodField()
+
+    def get_full_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}".strip() or obj.email
+
+    def get_gender(self, obj):
+        profile = getattr(obj, "user_profile", None)
+        return getattr(profile, "gender", "") or None
+
+    def get_age(self, obj):
+        profile = getattr(obj, "user_profile", None)
+        dob = getattr(profile, "date_of_birth", None)
+        if not dob:
+            return None
+        today = date.today()
+        return today.year - dob.year - ((today.month, today.day) < (dob.month, dob.day))
+
+
+class _PharmacistHistoryDoctorSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    full_name = serializers.SerializerMethodField()
+    specialty = serializers.SerializerMethodField()
+
+    def get_full_name(self, obj):
+        return f"{obj.first_name} {obj.last_name}".strip() or obj.email
+
+    def get_specialty(self, obj):
+        profile = getattr(obj, "doctor_profile", None)
+        return getattr(profile, "specialty", "") or None
+
+
+class PharmacistDispensingHistorySerializer(serializers.ModelSerializer):
+    prescription_id = serializers.UUIDField(source="prescription.id", read_only=True)
+    prescription_status = serializers.CharField(source="prescription.status", read_only=True)
+    item_id = serializers.UUIDField(source="prescription_item.id", read_only=True)
+    medication_name = serializers.CharField(
+        source="prescription_item.medication_name", read_only=True
+    )
+    strength = serializers.CharField(source="prescription_item.strength", read_only=True)
+    dosage = serializers.CharField(source="prescription_item.dosage", read_only=True)
+    frequency = serializers.CharField(source="prescription_item.frequency", read_only=True)
+    duration = serializers.CharField(source="prescription_item.duration", read_only=True)
+    route = serializers.CharField(source="prescription_item.route", read_only=True)
+    quantity = serializers.CharField(source="prescription_item.quantity", read_only=True)
+    dispensed_at = serializers.SerializerMethodField()
+    patient = serializers.SerializerMethodField()
+    doctor = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DispensingRecord
+        fields = [
+            "id",
+            "prescription_id",
+            "prescription_status",
+            "item_id",
+            "medication_name",
+            "strength",
+            "dosage",
+            "frequency",
+            "duration",
+            "route",
+            "quantity",
+            "dispensed_quantity",
+            "status",
+            "dispensed_at",
+            "patient",
+            "doctor",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_dispensed_at(self, obj):
+        return obj.prescription_item.dispensed_at or obj.created_at
+
+    def get_patient(self, obj):
+        return _PharmacistHistoryPatientSerializer(obj.prescription.patient).data
+
+    def get_doctor(self, obj):
+        return _PharmacistHistoryDoctorSerializer(obj.prescription.doctor).data

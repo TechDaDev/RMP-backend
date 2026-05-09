@@ -1532,6 +1532,33 @@ paths:
               schema:
                 $ref: '#/components/schemas/PrescriptionPatientDetail'
           description: ''
+  /api/prescriptions/pharmacist/history/:
+    get:
+      operationId: prescriptions_pharmacist_history_list
+      parameters:
+      - name: limit
+        required: false
+        in: query
+        description: Number of results to return per page.
+        schema:
+          type: integer
+      - name: offset
+        required: false
+        in: query
+        description: The initial index from which to return the results.
+        schema:
+          type: integer
+      tags:
+      - Prescriptions
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPharmacistDispensingHistoryList'
+          description: ''
   /api/prescriptions/scan/:
     post:
       operationId: prescriptions_scan_create
@@ -2325,7 +2352,7 @@ components:
           - $ref: '#/components/schemas/_SafeUser'
           readOnly: true
         status:
-          $ref: '#/components/schemas/DispensingRecordStatusEnum'
+          $ref: '#/components/schemas/StatusFccEnum'
         dispensed_quantity:
           type: string
           maxLength: 100
@@ -2341,14 +2368,6 @@ components:
       - pharmacist
       - prescription_item_id
       - status
-    DispensingRecordStatusEnum:
-      enum:
-      - dispensed
-      - unavailable
-      type: string
-      description: |-
-        * `dispensed` - Dispensed
-        * `unavailable` - Unavailable
     DoctorProfile:
       type: object
       properties:
@@ -3454,6 +3473,29 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Notification'
+    PaginatedPharmacistDispensingHistoryList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=400&limit=100
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?offset=200&limit=100
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PharmacistDispensingHistory'
     PaginatedPrescriptionPatientListList:
       type: object
       required:
@@ -3773,6 +3815,85 @@ components:
       required:
       - created_at
       - id
+      - updated_at
+    PharmacistDispensingHistory:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        prescription_id:
+          type: string
+          format: uuid
+          readOnly: true
+        prescription_status:
+          type: string
+          readOnly: true
+        item_id:
+          type: string
+          format: uuid
+          readOnly: true
+        medication_name:
+          type: string
+          readOnly: true
+        strength:
+          type: string
+          readOnly: true
+        dosage:
+          type: string
+          readOnly: true
+        frequency:
+          type: string
+          readOnly: true
+        duration:
+          type: string
+          readOnly: true
+        route:
+          type: string
+          readOnly: true
+        quantity:
+          type: string
+          readOnly: true
+        dispensed_quantity:
+          type: string
+          maxLength: 100
+        status:
+          $ref: '#/components/schemas/StatusFccEnum'
+        dispensed_at:
+          type: string
+          readOnly: true
+        patient:
+          type: string
+          readOnly: true
+        doctor:
+          type: string
+          readOnly: true
+        created_at:
+          type: string
+          format: date-time
+          readOnly: true
+        updated_at:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - created_at
+      - dispensed_at
+      - doctor
+      - dosage
+      - duration
+      - frequency
+      - id
+      - item_id
+      - medication_name
+      - patient
+      - prescription_id
+      - prescription_status
+      - quantity
+      - route
+      - status
+      - strength
       - updated_at
     PharmacistProfile:
       type: object
@@ -4287,6 +4408,14 @@ components:
       type: string
       description: |-
         * `completed` - Completed
+        * `unavailable` - Unavailable
+    StatusFccEnum:
+      enum:
+      - dispensed
+      - unavailable
+      type: string
+      description: |-
+        * `dispensed` - Dispensed
         * `unavailable` - Unavailable
     Symptom:
       type: object

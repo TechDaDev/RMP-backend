@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
@@ -690,6 +692,216 @@ class DispensingTests(TestCase):
         }
         auth_client(self.pharmacist).post(self._dispense_url(), payload, format="json")
         self.assertTrue(AuditLog.objects.filter(action="prescription_fully_dispensed").exists())
+
+
+class PharmacistHistoryTests(TestCase):
+    def setUp(self):
+        self.patient = create_patient()
+        self.doctor = create_doctor()
+        self.pharmacist = create_pharmacist()
+        self.other_pharmacist = create_pharmacist("other.pharma@example.com")
+        self.unapproved_pharmacist = create_pharmacist("pending.pharma@example.com", approved=False)
+        self.lab = create_laboratorian("lab.history@example.com")
+        self.consultation = create_accepted_consultation(self.patient, self.doctor)
+        self.prescription = Prescription.objects.create(
+            consultation=self.consultation,
+            doctor=self.doctor,
+            patient=self.patient,
+        )
+        self.item1 = PrescriptionItem.objects.create(
+            prescription=self.prescription,
+            medication_name="Amoxicillin",
+            dosage="1 cap",
+            frequency="3x",
+            duration="7d",
+            route="oral",
+        )
+        self.item2 = PrescriptionItem.objects.create(
+            prescription=self.prescription,
+            medication_name="Ibuprofen",
+            dosage="1 tab",
+            frequency="2x",
+            duration="3d",
+            route="oral",
+        )
+
+    def _history_url(self):
+        return "/api/prescriptions/pharmacist/history/"
+
+    def _dispense(self, pharmacist, item, status_value="dispensed"):
+        payload = {
+            "items": [
+                {
+                    "prescription_item_id": str(item.id),
+                    "status": status_value,
+                    "dispensed_quantity": "1 box" if status_value == "dispensed" else "",
+                    "note": "history test note",
+                }
+            ]
+        }
+        return auth_client(pharmacist).post(
+            f"/api/prescriptions/{self.prescription.id}/dispense/", payload, format="json"
+        )
+
+    def test_approved_pharmacist_can_list_own_dispensing_history(self):
+        self._dispense(self.pharmacist, self.item1, "dispensed")
+        resp = auth_client(self.pharmacist).get(self._history_url())
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+    def test_history_is_empty_before_dispensing(self):
+        resp = auth_client(self.pharmacist).get(self._history_url())
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data["data"]["count"], 0)
+        self.assertEqual(resp.data["data"]["results"], [])
+
+    def test_dispense_one_item_then_history_returns_one_record(self):
+        self._dispense(self.pharmacist, self.item1, "dispensed")
+        resp = auth_client(self.pharmacist).get(self._history_url())
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data["data"]["count"], 1)
+
+    def test_dispense_two_items_then_history_returns_two_records(self):
+        payload = {
+            "items": [
+                {
+                    "prescription_item_id": str(self.item1.id),
+                    "status": "dispensed",
+                    "dispensed_quantity": "1 box",
+                },
+                {
+                    "prescription_item_id": str(self.item2.id),
+                    "status": "unavailable",
+                    "note": "Out of stock",
+                },
+            ]
+        }
+        dispense_resp = auth_client(self.pharmacist).post(
+            f"/api/prescriptions/{self.prescription.id}/dispense/", payload, format="json"
+        )
+        self.assertEqual(dispense_resp.status_code, status.HTTP_200_OK)
+        resp = auth_client(self.pharmacist).get(self._history_url())
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data["data"]["count"], 2)
+
+    def test_history_only_includes_records_for_authenticated_pharmacist(self):
+        self._dispense(self.pharmacist, self.item1, "dispensed")
+
+        other_consultation = create_accepted_consultation(self.patient, self.doctor)
+        other_prescription = Prescription.objects.create(
+            consultation=other_consultation,
+            doctor=self.doctor,
+            patient=self.patient,
+        )
+        other_item = PrescriptionItem.objects.create(
+            prescription=other_prescription,
+            medication_name="Paracetamol",
+            dosage="1 tab",
+            frequency="2x",
+            duration="5d",
+            route="oral",
+        )
+        payload = {
+            "items": [
+                {
+                    "prescription_item_id": str(other_item.id),
+                    "status": "dispensed",
+                    "dispensed_quantity": "1 strip",
+                }
+            ]
+        }
+        auth_client(self.other_pharmacist).post(
+            f"/api/prescriptions/{other_prescription.id}/dispense/", payload, format="json"
+        )
+
+        resp = auth_client(self.pharmacist).get(self._history_url())
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data["data"]["count"], 1)
+        self.assertEqual(resp.data["data"]["results"][0]["medication_name"], "Amoxicillin")
+
+    def test_patient_cannot_access_pharmacist_history_endpoint(self):
+        resp = auth_client(self.patient).get(self._history_url())
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_doctor_cannot_access_pharmacist_history_endpoint(self):
+        resp = auth_client(self.doctor).get(self._history_url())
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_laboratorian_cannot_access_pharmacist_history_endpoint(self):
+        resp = auth_client(self.lab).get(self._history_url())
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_unapproved_pharmacist_cannot_access_history_endpoint(self):
+        resp = auth_client(self.unapproved_pharmacist).get(self._history_url())
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_history_response_does_not_include_sensitive_fields(self):
+        self._dispense(self.pharmacist, self.item1, "dispensed")
+        resp = auth_client(self.pharmacist).get(self._history_url())
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        record = resp.data["data"]["results"][0]
+        self.assertNotIn("qr_token", record)
+        self.assertNotIn("note", record)
+        self.assertNotIn("doctor_notes", record)
+        self.assertNotIn("audit", record)
+        self.assertNotIn("national_id", record.get("patient", {}))
+        self.assertNotIn("phone_number", record.get("patient", {}))
+
+    def test_history_records_are_ordered_newest_first(self):
+        payload = {
+            "items": [
+                {
+                    "prescription_item_id": str(self.item1.id),
+                    "status": "dispensed",
+                    "dispensed_quantity": "1 box",
+                },
+                {
+                    "prescription_item_id": str(self.item2.id),
+                    "status": "unavailable",
+                    "note": "Out of stock",
+                },
+            ]
+        }
+        dispense_resp = auth_client(self.pharmacist).post(
+            f"/api/prescriptions/{self.prescription.id}/dispense/", payload, format="json"
+        )
+        self.assertEqual(dispense_resp.status_code, status.HTTP_200_OK)
+        older = DispensingRecord.objects.get(prescription_item=self.item1)
+        newer = DispensingRecord.objects.get(prescription_item=self.item2)
+        DispensingRecord.objects.filter(id=older.id).update(
+            created_at=timezone.now() - timedelta(days=1)
+        )
+        DispensingRecord.objects.filter(id=newer.id).update(created_at=timezone.now())
+
+        resp = auth_client(self.pharmacist).get(self._history_url())
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        results = resp.data["data"]["results"]
+        self.assertEqual(results[0]["item_id"], str(self.item2.id))
+        self.assertEqual(results[1]["item_id"], str(self.item1.id))
+
+    def test_history_supports_pagination(self):
+        payload = {
+            "items": [
+                {
+                    "prescription_item_id": str(self.item1.id),
+                    "status": "dispensed",
+                    "dispensed_quantity": "1 box",
+                },
+                {
+                    "prescription_item_id": str(self.item2.id),
+                    "status": "unavailable",
+                    "note": "Out of stock",
+                },
+            ]
+        }
+        dispense_resp = auth_client(self.pharmacist).post(
+            f"/api/prescriptions/{self.prescription.id}/dispense/", payload, format="json"
+        )
+        self.assertEqual(dispense_resp.status_code, status.HTTP_200_OK)
+        resp = auth_client(self.pharmacist).get(f"{self._history_url()}?limit=1&offset=0")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data["data"]["count"], 2)
+        self.assertEqual(len(resp.data["data"]["results"]), 1)
+        self.assertIsNotNone(resp.data["data"]["next"])
 
 
 # ──────────────────────────────────────────────

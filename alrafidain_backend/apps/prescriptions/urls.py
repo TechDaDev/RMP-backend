@@ -6,6 +6,7 @@ from .views import (
     PatientPrescriptionDetailView,
     PatientPrescriptionListView,
     PharmacistDispenseItemsView,
+    PharmacistDispensingHistoryView,
     PharmacistPrescriptionScanView,
 )
 
@@ -25,6 +26,11 @@ urlpatterns = [
         "doctor/<uuid:prescription_id>/cancel/",
         DoctorCancelPrescriptionView.as_view(),
         name="doctor-prescription-cancel",
+    ),
+    path(
+        "pharmacist/history/",
+        PharmacistDispensingHistoryView.as_view(),
+        name="pharmacist-prescription-history",
     ),
     path("scan/", PharmacistPrescriptionScanView.as_view(), name="pharmacist-prescription-scan"),
     path(

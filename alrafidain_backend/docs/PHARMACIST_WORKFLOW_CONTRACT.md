@@ -374,6 +374,69 @@ After dispense action, prescription status is recalculated:
 
 ## Dispensing History
 
+### Pharmacist Dispensing History Endpoint
+
+**Endpoint**: `GET /api/prescriptions/pharmacist/history/`
+
+- **Auth required**: Yes (JWT)
+- **Role required**: Pharmacist
+- **Approval required**: `verification_status = APPROVED`
+- **Scope**: Only dispensing records where `pharmacist_id == request.user.id`
+- **Ordering**: Newest first (`-created_at`)
+- **Pagination**: Limit/offset (`?limit=...&offset=...`)
+
+**Response shape**:
+```json
+{
+  "success": true,
+  "message": "Dispensing history retrieved.",
+  "data": {
+    "count": 10,
+    "next": null,
+    "previous": null,
+    "results": [
+      {
+        "id": "uuid",
+        "prescription_id": "uuid",
+        "prescription_status": "partially_dispensed",
+        "item_id": "uuid",
+        "medication_name": "Amoxicillin",
+        "strength": "500mg",
+        "dosage": "1 capsule",
+        "frequency": "3x daily",
+        "duration": "7 days",
+        "route": "oral",
+        "quantity": "21 capsules",
+        "dispensed_quantity": "1 box",
+        "status": "dispensed",
+        "dispensed_at": "2026-05-09T12:30:00Z",
+        "patient": {
+          "id": "uuid",
+          "full_name": "Pat Ient",
+          "gender": null,
+          "age": null
+        },
+        "doctor": {
+          "id": "uuid",
+          "full_name": "Doc Tor",
+          "specialty": "general_medicine"
+        },
+        "created_at": "2026-05-09T12:30:00Z",
+        "updated_at": "2026-05-09T12:30:00Z"
+      }
+    ]
+  }
+}
+```
+
+**Forbidden fields**:
+
+- `qr_token`
+- dispensing internal `note`
+- doctor private notes
+- patient private profile fields (phone, address, national ID, etc.)
+- records from other pharmacists
+
 ### Doctor Dispensing Records View
 
 Doctor can see dispensing records in prescription detail response via `dispensing_records` array:
@@ -612,15 +675,12 @@ When cancelled:
 
 ## Known Backend Gaps
 
-### No Known Gaps
+### Resolved in Phase 7.4A
 
-✅ Pharmacist verification enforced at views
-✅ QR scan implements expiry check
-✅ Dispensing transitions prescription status atomically
-✅ All endpoints tested and working
-✅ Audit logs created for all actions
-✅ Notifications triggered correctly
-✅ Privacy rules enforced (patient data not exposed to pharmacist)
+✅ Added `GET /api/prescriptions/pharmacist/history/` for pharmacist-scoped dispensing history
+✅ Pharmacist history now supports pagination with the standard response envelope
+✅ History excludes QR token and internal dispensing notes
+✅ Role and approval gates match scan/dispense clinical endpoints
 
 ### Minor Enhancement Opportunities (Not Phase 7.0A)
 

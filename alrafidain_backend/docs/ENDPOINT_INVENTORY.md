@@ -107,6 +107,7 @@ Legend:
 | GET | `/api/prescriptions/my/<id>/` | `PatientPrescriptionDetailView` | Yes | patient | `PatientPrescriptionDetailSerializer` | **No medication items** | stable |
 | GET | `/api/prescriptions/doctor/<id>/` | `DoctorPrescriptionDetailView` | Yes | doctor (assigned) | `DoctorPrescriptionDetailSerializer` | Full items visible to doctor | stable |
 | POST | `/api/prescriptions/doctor/<id>/cancel/` | `DoctorCancelPrescriptionView` | Yes | doctor (assigned) | — | — | stable |
+| GET | `/api/prescriptions/pharmacist/history/` | `PharmacistDispensingHistoryView` | Yes | pharmacist (approved) | `PharmacistDispensingHistorySerializer` | Own dispensing records only; no QR token/internal notes | stable |
 | POST | `/api/prescriptions/scan/` | `PharmacistPrescriptionScanView` | Yes | pharmacist (approved) | `PharmacistPrescriptionScanSerializer` | **Pending items only** | stable |
 | POST | `/api/prescriptions/<id>/dispense/` | `PharmacistDispenseItemsView` | Yes | pharmacist (approved) | `PharmacistDispenseSerializer` | — | stable |
 
@@ -243,7 +244,7 @@ Legend:
 | Profiles | 6 |
 | Consultations | 10 |
 | Messaging | 2 |
-| Prescriptions | 7 |
+| Prescriptions | 8 |
 | Lab Orders | 8 |
 | Lab Results | 10 |
 | Patient Records | 7 |
@@ -253,4 +254,4 @@ Legend:
 | RAG Feedback | 2 |
 | RAG Admin Feedback | 2 |
 | RAG Admin Analytics/Export | 2 |
-| **Total** | **86** |
+| **Total** | **87** |

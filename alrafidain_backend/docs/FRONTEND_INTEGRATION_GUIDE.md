@@ -477,6 +477,21 @@ POST /api/prescriptions/{prescription_id}/dispense/
 
 Marks the prescription as dispensed.
 
+### 8.3 View Pharmacist Dispensing History
+
+```http
+GET /api/prescriptions/pharmacist/history/?limit=20&offset=0
+```
+
+Returns paginated dispensing records for the authenticated approved pharmacist only.
+
+- Includes safe patient summary (`id`, `full_name`, `gender`, `age`)
+- Includes safe doctor summary (`id`, `full_name`, `specialty`)
+- Includes medication item metadata and dispensing status
+- Excludes `qr_token`, internal dispensing notes, and private patient profile fields
+
+Use this endpoint for `/app/pharmacist/history`. Do not generate or rely on fake history data.
+
 > **Boundary rule**: Pharmacists **cannot** access consultations, lab orders, or patient records. Any attempt returns 403 or 404.
 
 ---

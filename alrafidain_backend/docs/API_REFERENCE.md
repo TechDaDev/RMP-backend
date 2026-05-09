@@ -601,6 +601,69 @@ Record dispensing of scanned prescription items.
 
 ---
 
+### `GET /api/prescriptions/pharmacist/history/`
+
+List dispensing records for the authenticated pharmacist only.
+
+- **Auth required**: Yes
+- **Allowed roles**: Pharmacist (approved)
+- **Scope**: Only records created by the authenticated pharmacist
+- **Ordering**: Newest first
+- **Pagination**: DRF limit/offset (`?limit=<n>&offset=<n>`)
+
+**Response envelope:**
+```json
+{
+  "success": true,
+  "message": "Dispensing history retrieved.",
+  "data": {
+    "count": 1,
+    "next": null,
+    "previous": null,
+    "results": [
+      {
+        "id": "uuid",
+        "prescription_id": "uuid",
+        "prescription_status": "partially_dispensed",
+        "item_id": "uuid",
+        "medication_name": "Amoxicillin",
+        "strength": "500mg",
+        "dosage": "1 capsule",
+        "frequency": "3x daily",
+        "duration": "7 days",
+        "route": "oral",
+        "quantity": "21 capsules",
+        "dispensed_quantity": "1 box",
+        "status": "dispensed",
+        "dispensed_at": "2026-05-09T12:30:00Z",
+        "patient": {
+          "id": "uuid",
+          "full_name": "Pat Ient",
+          "gender": null,
+          "age": null
+        },
+        "doctor": {
+          "id": "uuid",
+          "full_name": "Doc Tor",
+          "specialty": "general_medicine"
+        },
+        "created_at": "2026-05-09T12:30:00Z",
+        "updated_at": "2026-05-09T12:30:00Z"
+      }
+    ]
+  }
+}
+```
+
+**Privacy and safety rules:**
+
+- Does not return `qr_token`
+- Does not return dispensing internal `note`
+- Does not return patient private profile fields (address, national ID, phone, etc.)
+- Does not return records created by other pharmacists
+
+---
+
 > **Note**: There is no `GET /api/prescriptions/<id>/qr/` endpoint. Patients present the `qr_token` field from their own prescription detail response directly to the pharmacist.
 
 ---
