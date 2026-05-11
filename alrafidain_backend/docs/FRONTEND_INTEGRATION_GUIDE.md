@@ -223,7 +223,7 @@ After login, use `user_type` from the login response to route:
 | `laboratorian` | Lab scanner — QR scan → create result |
 | (staff flag) | Admin panel — knowledge base, RAG feedback, analytics |
 
-For doctors and non-patient roles, also check `verification_status` from `GET /api/profiles/me/`. A `pending` doctor cannot take actions until approved by staff.
+For professional roles (`doctor`, `pharmacist`, `laboratorian`), also check `verification_status` from `GET /api/profiles/me/`. A `pending` professional account cannot perform approved-only actions until reviewed by staff.
 
 ---
 
