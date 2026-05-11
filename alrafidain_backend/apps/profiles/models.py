@@ -116,6 +116,13 @@ class DoctorProfile(BaseModel):
         default=VerificationStatus.PENDING,
     )
     verified_at = models.DateTimeField(blank=True, null=True)
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="doctor_profiles_verified",
+    )
     verification_notes = models.TextField(blank=True)
 
     class Meta:
@@ -174,6 +181,13 @@ class PharmacistProfile(BaseModel):
         default=VerificationStatus.PENDING,
     )
     verified_at = models.DateTimeField(blank=True, null=True)
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pharmacist_profiles_verified",
+    )
     verification_notes = models.TextField(blank=True)
 
     class Meta:
@@ -230,6 +244,13 @@ class LaboratorianProfile(BaseModel):
         default=VerificationStatus.PENDING,
     )
     verified_at = models.DateTimeField(blank=True, null=True)
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="laboratorian_profiles_verified",
+    )
     verification_notes = models.TextField(blank=True)
 
     class Meta:

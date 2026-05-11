@@ -170,6 +170,180 @@ paths:
       responses:
         '200':
           description: No response body
+  /api/admin/verifications/:
+    get:
+      operationId: admin_verifications_list
+      parameters:
+      - in: query
+        name: limit
+        schema:
+          type: integer
+      - in: query
+        name: offset
+        schema:
+          type: integer
+      - in: query
+        name: role
+        schema:
+          type: string
+      - in: query
+        name: search
+        schema:
+          type: string
+      - in: query
+        name: status
+        schema:
+          type: string
+      tags:
+      - Admin Verifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AdminVerificationList'
+          description: ''
+  /api/admin/verifications/{role}/{id}/:
+    get:
+      operationId: admin_verifications_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: role
+        schema:
+          type: string
+        required: true
+      tags:
+      - Admin Verifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVerificationDetail'
+          description: ''
+  /api/admin/verifications/{role}/{id}/approve/:
+    post:
+      operationId: admin_verifications_approve_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: role
+        schema:
+          type: string
+        required: true
+      tags:
+      - Admin Verifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminVerificationDecision'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminVerificationDecision'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminVerificationDecision'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVerificationDetail'
+          description: ''
+  /api/admin/verifications/{role}/{id}/reject/:
+    post:
+      operationId: admin_verifications_reject_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: role
+        schema:
+          type: string
+        required: true
+      tags:
+      - Admin Verifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminVerificationDecision'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminVerificationDecision'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminVerificationDecision'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVerificationDetail'
+          description: ''
+  /api/admin/verifications/{role}/{id}/suspend/:
+    post:
+      operationId: admin_verifications_suspend_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      - in: path
+        name: role
+        schema:
+          type: string
+        required: true
+      tags:
+      - Admin Verifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdminVerificationDecision'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/AdminVerificationDecision'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AdminVerificationDecision'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminVerificationDetail'
+          description: ''
   /api/consultations/:
     post:
       operationId: consultations_create
@@ -2064,6 +2238,89 @@ components:
       required:
       - code
       - email
+    AdminVerificationDecision:
+      type: object
+      properties:
+        note:
+          type: string
+          maxLength: 2000
+        reason:
+          type: string
+          maxLength: 2000
+    AdminVerificationDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          readOnly: true
+        role:
+          type: string
+        status:
+          type: string
+          readOnly: true
+        user:
+          type: string
+          readOnly: true
+        profile:
+          type: string
+          readOnly: true
+        submitted_at:
+          type: string
+          readOnly: true
+        updated_at:
+          type: string
+          readOnly: true
+        verification_notes:
+          type: string
+          readOnly: true
+        verified_at:
+          type: string
+          readOnly: true
+        verified_by:
+          type: string
+          readOnly: true
+      required:
+      - id
+      - profile
+      - role
+      - status
+      - submitted_at
+      - updated_at
+      - user
+      - verification_notes
+      - verified_at
+      - verified_by
+    AdminVerificationList:
+      type: object
+      properties:
+        id:
+          type: string
+          readOnly: true
+        role:
+          type: string
+        status:
+          type: string
+          readOnly: true
+        user:
+          type: string
+          readOnly: true
+        profile:
+          type: string
+          readOnly: true
+        submitted_at:
+          type: string
+          readOnly: true
+        updated_at:
+          type: string
+          readOnly: true
+      required:
+      - id
+      - profile
+      - role
+      - status
+      - submitted_at
+      - updated_at
+      - user
     ApprovalStatusEnum:
       enum:
       - pending

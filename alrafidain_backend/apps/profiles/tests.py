@@ -3,7 +3,9 @@ from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
 
+from apps.audit.models import AuditLog
 from apps.common.choices import UserType, VerificationStatus
+from apps.notifications.models import Notification
 from apps.profiles.models import (
     DoctorProfile,
     LaboratorianProfile,
@@ -20,7 +22,7 @@ PROFILE_ME_URL = "/api/profiles/me/"
 def _create_active_user(user_type=UserType.PATIENT, email="user@example.com"):
     user = User.objects.create_user(
         email=email,
-        password="StrongPass1!",
+        password="StrongPass1!",  # noqa: S106
         first_name="Test",
         last_name="User",
         user_type=user_type,
@@ -214,3 +216,238 @@ class DoctorSpecialtyOtherValidationTests(TestCase):
         self.assertIn("error", resp.data)
         self.assertIn("details", resp.data["error"])
         self.assertIn("specialty_other", resp.data["error"]["details"])
+
+
+class AdminVerificationAPITests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.staff = User.objects.create_user(
+            email="staff-verifications@example.com",
+            password="StrongPass1!",  # noqa: S106
+            first_name="Staff",
+            last_name="Reviewer",
+            user_type=UserType.DOCTOR,
+            is_active=True,
+            is_staff=True,
+        )
+        UserProfile.objects.create(user=self.staff)
+        DoctorProfile.objects.create(
+            user=self.staff,
+            verification_status=VerificationStatus.APPROVED,
+        )
+        self.staff_client = _auth_client(self.staff)
+
+        self.patient = _create_active_user(UserType.PATIENT, email="patient-ver@example.com")
+        self.doctor = _create_active_user(UserType.DOCTOR, email="doctor-ver@example.com")
+        self.pharmacist = _create_active_user(UserType.PHARMACIST, email="pharm-ver@example.com")
+        self.laboratorian = _create_active_user(
+            UserType.LABORATORIAN,
+            email="lab-ver@example.com",
+        )
+
+        self.doctor.doctor_profile.medical_license_number = "DOC-100"
+        self.doctor.doctor_profile.specialty = "general_medicine"
+        self.doctor.doctor_profile.work_address = "Baghdad Clinic"
+        self.doctor.doctor_profile.save(
+            update_fields=["medical_license_number", "specialty", "work_address", "updated_at"]
+        )
+
+        self.pharmacist.pharmacist_profile.pharmacist_license_number = "PH-200"
+        self.pharmacist.pharmacist_profile.pharmacy_name = "Rafidain Pharmacy"
+        self.pharmacist.pharmacist_profile.pharmacy_address = "Basra Street"
+        self.pharmacist.pharmacist_profile.save(
+            update_fields=[
+                "pharmacist_license_number",
+                "pharmacy_name",
+                "pharmacy_address",
+                "updated_at",
+            ]
+        )
+
+        self.laboratorian.laboratorian_profile.laboratorian_license_number = "LAB-300"
+        self.laboratorian.laboratorian_profile.laboratory_name = "Rafidain Lab"
+        self.laboratorian.laboratorian_profile.laboratory_address = "Nineveh Road"
+        self.laboratorian.laboratorian_profile.save(
+            update_fields=[
+                "laboratorian_license_number",
+                "laboratory_name",
+                "laboratory_address",
+                "updated_at",
+            ]
+        )
+
+    def _list_url(self):
+        return "/api/admin/verifications/"
+
+    def _detail_url(self, role, profile_id):
+        return f"/api/admin/verifications/{role}/{profile_id}/"
+
+    def _action_url(self, role, profile_id, action):
+        return f"/api/admin/verifications/{role}/{profile_id}/{action}/"
+
+    def test_anonymous_cannot_list(self):
+        response = self.client.get(self._list_url())
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_patient_cannot_list(self):
+        response = _auth_client(self.patient).get(self._list_url())
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_doctor_cannot_list(self):
+        response = _auth_client(self.doctor).get(self._list_url())
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_pharmacist_cannot_list(self):
+        response = _auth_client(self.pharmacist).get(self._list_url())
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_laboratorian_cannot_list(self):
+        response = _auth_client(self.laboratorian).get(self._list_url())
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_staff_can_list_pending_verifications(self):
+        response = self.staff_client.get(self._list_url())
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data["success"])
+        self.assertEqual(response.data["data"]["count"], 3)
+
+    def test_list_includes_only_professional_roles(self):
+        response = self.staff_client.get(self._list_url())
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        roles = {item["role"] for item in response.data["data"]["results"]}
+        self.assertSetEqual(roles, {"doctor", "pharmacist", "laboratorian"})
+
+    def test_role_filter_works(self):
+        response = self.staff_client.get(self._list_url() + "?role=doctor")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["data"]["count"], 1)
+        self.assertEqual(response.data["data"]["results"][0]["role"], "doctor")
+
+    def test_status_filter_works(self):
+        self.doctor.doctor_profile.verification_status = VerificationStatus.APPROVED
+        self.doctor.doctor_profile.save(update_fields=["verification_status", "updated_at"])
+
+        response = self.staff_client.get(self._list_url() + "?status=approved")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(response.data["data"]["count"], 1)
+        results = response.data["data"]["results"]
+        self.assertTrue(any(item["id"] == self.doctor.doctor_profile.id for item in results))
+        self.assertTrue(all(item["status"] == "approved" for item in results))
+
+    def test_search_works_by_email_and_license(self):
+        response_email = self.staff_client.get(self._list_url() + "?search=doctor-ver")
+        self.assertEqual(response_email.status_code, status.HTTP_200_OK)
+        self.assertEqual(response_email.data["data"]["count"], 1)
+        self.assertEqual(response_email.data["data"]["results"][0]["role"], "doctor")
+
+        response_license = self.staff_client.get(self._list_url() + "?search=PH-200")
+        self.assertEqual(response_license.status_code, status.HTTP_200_OK)
+        self.assertEqual(response_license.data["data"]["count"], 1)
+        self.assertEqual(response_license.data["data"]["results"][0]["role"], "pharmacist")
+
+    def test_admin_can_retrieve_detail(self):
+        response = self.staff_client.get(
+            self._detail_url("doctor", self.doctor.doctor_profile.id),
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["data"]["role"], "doctor")
+        self.assertEqual(response.data["data"]["status"], VerificationStatus.PENDING)
+
+    def test_admin_can_approve_doctor(self):
+        response = self.staff_client.post(
+            self._action_url("doctor", self.doctor.doctor_profile.id, "approve"),
+            {"note": "Approved after license check"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.doctor.doctor_profile.refresh_from_db()
+        self.assertEqual(
+            self.doctor.doctor_profile.verification_status, VerificationStatus.APPROVED
+        )
+        self.assertEqual(self.doctor.doctor_profile.verified_by_id, self.staff.id)
+        self.assertIsNotNone(self.doctor.doctor_profile.verified_at)
+
+    def test_admin_can_reject_pharmacist_with_reason(self):
+        response = self.staff_client.post(
+            self._action_url("pharmacist", self.pharmacist.pharmacist_profile.id, "reject"),
+            {"reason": "License document is invalid."},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.pharmacist.pharmacist_profile.refresh_from_db()
+        self.assertEqual(
+            self.pharmacist.pharmacist_profile.verification_status,
+            VerificationStatus.REJECTED,
+        )
+        self.assertEqual(
+            self.pharmacist.pharmacist_profile.verification_notes,
+            "License document is invalid.",
+        )
+
+    def test_admin_can_suspend_laboratorian_with_reason(self):
+        response = self.staff_client.post(
+            self._action_url("laboratorian", self.laboratorian.laboratorian_profile.id, "suspend"),
+            {"reason": "Temporary compliance suspension."},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.laboratorian.laboratorian_profile.refresh_from_db()
+        self.assertEqual(
+            self.laboratorian.laboratorian_profile.verification_status,
+            VerificationStatus.SUSPENDED,
+        )
+
+    def test_reject_without_reason_returns_400(self):
+        response = self.staff_client.post(
+            self._action_url("pharmacist", self.pharmacist.pharmacist_profile.id, "reject"),
+            {},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_suspend_without_reason_returns_400(self):
+        response = self.staff_client.post(
+            self._action_url("laboratorian", self.laboratorian.laboratorian_profile.id, "suspend"),
+            {},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_cannot_approve_own_profile(self):
+        response = self.staff_client.post(
+            self._action_url("doctor", self.staff.doctor_profile.id, "approve"),
+            {"note": "Self approval"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_response_does_not_expose_sensitive_fields(self):
+        response = self.staff_client.get(self._list_url())
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        result = response.data["data"]["results"][0]
+        self.assertNotIn("password", result["user"])
+        self.assertNotIn("token", result["user"])
+        self.assertNotIn("medical_license_image", result["profile"])
+
+    def test_action_creates_audit_log_and_notification(self):
+        response = self.staff_client.post(
+            self._action_url("doctor", self.doctor.doctor_profile.id, "approve"),
+            {"note": "Approved."},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+        self.assertTrue(
+            AuditLog.objects.filter(
+                action="verification_approved",
+                target_type="DoctorProfile",
+                target_id=str(self.doctor.doctor_profile.id),
+            ).exists()
+        )
+        self.assertTrue(
+            Notification.objects.filter(
+                recipient=self.doctor,
+                notification_type="profile",
+            ).exists()
+        )

@@ -1,3 +1,5 @@
+from contextlib import suppress
+
 from django.conf import settings
 from rest_framework import serializers
 
@@ -192,10 +194,8 @@ class FullProfileSerializer(serializers.Serializer):
         role_serializer = None
         role_profile_data = None
 
-        try:
+        with suppress(UserProfile.DoesNotExist):
             user_profile_obj = user.user_profile
-        except UserProfile.DoesNotExist:
-            pass
 
         user_type = user.user_type
 

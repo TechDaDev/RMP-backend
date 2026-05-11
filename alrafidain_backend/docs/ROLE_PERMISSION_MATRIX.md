@@ -9,6 +9,7 @@ _Phase 13 — API Contract Freeze — Al-Rafidain Medical Platform_
 - [Role Definitions](#role-definitions)
 - [Accounts](#accounts)
 - [Profiles](#profiles)
+- [Admin Verification Review](#admin-verification-review)
 - [Consultations](#consultations)
 - [Messaging](#messaging)
 - [Prescriptions](#prescriptions)
@@ -64,6 +65,23 @@ Legend: ✅ Allowed | ❌ Denied | ⚠️ Partial (see notes)
 | Update doctor profile | ❌ | ✅ | ❌ | ❌ | ❌ |
 | Update pharmacist profile | ❌ | ❌ | ✅ | ❌ | ❌ |
 | Update laboratorian profile | ❌ | ❌ | ❌ | ✅ | ❌ |
+
+---
+
+## Admin Verification Review
+
+| Action | patient | doctor (any) | pharmacist (any) | laboratorian (any) | staff/admin |
+|---|---|---|---|---|---|
+| List verification queue | ❌ | ❌ | ❌ | ❌ | ✅ |
+| View verification detail | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Approve verification | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Reject verification | ❌ | ❌ | ❌ | ❌ | ✅ |
+| Suspend verification | ❌ | ❌ | ❌ | ❌ | ✅ |
+
+Notes:
+- Queue includes only doctor/pharmacist/laboratorian profiles.
+- Patient profiles are excluded.
+- Staff/admin cannot approve/reject/suspend their own profile.
 
 ---
 

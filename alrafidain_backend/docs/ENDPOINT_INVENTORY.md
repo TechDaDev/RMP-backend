@@ -16,6 +16,7 @@ Legend:
 - [Health / Schema / Docs](#health--schema--docs)
 - [Accounts](#accounts)
 - [Profiles](#profiles)
+- [Admin Verification Review](#admin-verification-review)
 - [Consultations](#consultations)
 - [Messaging](#messaging)
 - [Prescriptions](#prescriptions)
@@ -69,6 +70,20 @@ Legend:
 | PATCH | `/api/profiles/me/doctor/` | `UpdateDoctorProfileView` | Yes | doctor | `DoctorProfileSerializer` | — | stable |
 | PATCH | `/api/profiles/me/pharmacist/` | `UpdatePharmacistProfileView` | Yes | pharmacist | `PharmacistProfileSerializer` | — | stable |
 | PATCH | `/api/profiles/me/laboratorian/` | `UpdateLaboratorianProfileView` | Yes | laboratorian | `LaboratorianProfileSerializer` | — | stable |
+
+---
+
+## Admin Verification Review
+
+> All endpoints require `is_staff=True` or `is_superuser=True`.
+
+| Method | Path | View | Auth | Roles | Serializer | Privacy | Status |
+|---|---|---|---|---|---|---|---|
+| GET | `/api/admin/verifications/` | `AdminVerificationListView` | Yes | staff/admin | `AdminVerificationListSerializer` | Professional profile summary only; no medical/prescription/lab payloads | admin-only |
+| GET | `/api/admin/verifications/<role>/<id>/` | `AdminVerificationDetailView` | Yes | staff/admin | `AdminVerificationDetailSerializer` | Safe verification detail only | admin-only |
+| POST | `/api/admin/verifications/<role>/<id>/approve/` | `AdminVerificationApproveView` | Yes | staff/admin | `AdminVerificationDecisionSerializer` | Sets approved status; self-approval denied | admin-only |
+| POST | `/api/admin/verifications/<role>/<id>/reject/` | `AdminVerificationRejectView` | Yes | staff/admin | `AdminVerificationDecisionSerializer` | Requires rejection reason | admin-only |
+| POST | `/api/admin/verifications/<role>/<id>/suspend/` | `AdminVerificationSuspendView` | Yes | staff/admin | `AdminVerificationDecisionSerializer` | Requires suspension reason | admin-only |
 
 ---
 
@@ -242,6 +257,7 @@ Legend:
 | Health/Schema | 6 |
 | Accounts | 7 |
 | Profiles | 6 |
+| Admin Verification Review | 5 |
 | Consultations | 10 |
 | Messaging | 2 |
 | Prescriptions | 8 |
@@ -254,4 +270,4 @@ Legend:
 | RAG Feedback | 2 |
 | RAG Admin Feedback | 2 |
 | RAG Admin Analytics/Export | 2 |
-| **Total** | **87** |
+| **Total** | **92** |

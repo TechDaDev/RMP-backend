@@ -556,6 +556,26 @@ POST /api/rag/admin/exports/dataset/
 
 > Returns raw JSON array or `text/csv`. No envelope wrapper.
 
+### 10.5 Verification Review Queue (Phase 9A Backend)
+
+```http
+GET  /api/admin/verifications/
+GET  /api/admin/verifications/{role}/{id}/
+POST /api/admin/verifications/{role}/{id}/approve/
+POST /api/admin/verifications/{role}/{id}/reject/
+POST /api/admin/verifications/{role}/{id}/suspend/
+```
+
+Notes:
+- Staff/admin only (`is_staff` or `is_superuser`).
+- Supported roles: `doctor`, `pharmacist`, `laboratorian`.
+- Patients are excluded from this queue.
+- `status` defaults to `pending` when omitted.
+- Filters: `role`, `status`, `search`, `limit`, `offset`.
+- Reject/suspend require `reason`.
+- Approve accepts optional `note`.
+- Self-approval is denied by backend policy.
+
 ---
 
 ## 11. Privacy Rules and Data Visibility
@@ -572,6 +592,7 @@ Critical rules your frontend must enforce (backend enforces these server-side to
 | Patient record | Doctor (assigned) | Only the doctor assigned to an active consultation can access |
 | RAG endpoints | Doctors only | Patients, pharmacists, laboratorians → 403 |
 | RAG admin endpoints | Staff only | Non-staff doctors → 403 |
+| Verification review endpoints | Staff only | Non-staff users → 403 |
 | Pharmacist isolation | — | Cannot access consultations, lab orders, patient records |
 | Laboratorian isolation | — | Cannot access prescriptions, consultation messages |
 

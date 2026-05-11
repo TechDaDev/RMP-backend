@@ -32,6 +32,7 @@ All responses follow the standard envelope:
 - [Privacy and Role Restrictions](#privacy-and-role-restrictions)
 - [Authentication](#authentication)
 - [Profiles](#profiles)
+- [Admin Verification Review API](#admin-verification-review-api)
 - [Consultations](#consultations)
 - [Messaging](#messaging)
 - [Prescriptions](#prescriptions)
@@ -265,6 +266,133 @@ Update laboratorian profile (license, lab info).
 
 - **Auth required**: Yes
 - **Allowed roles**: Laboratorian
+
+---
+
+## Admin Verification Review API
+
+These endpoints are for staff/admin users only and are intended for reviewing professional role verification profiles.
+
+- **Base path**: `/api/admin/verifications/`
+- **Allowed roles**: `is_staff=True` or `is_superuser=True`
+- **Included profile roles**: doctor, pharmacist, laboratorian
+- **Excluded**: patient profiles
+- **Privacy**: no password/token/OTP/QR fields, no patient medical data, no prescription or lab result payloads
+
+### `GET /api/admin/verifications/`
+
+List verification requests.
+
+**Query params:**
+- `role=doctor|pharmacist|laboratorian`
+- `status=pending|approved|rejected|suspended` (defaults to `pending`)
+- `search=<email|name|license|workplace>`
+- `limit=<n>`
+- `offset=<n>`
+
+**Response `200`:**
+```json
+{
+  "success": true,
+  "message": "Verification requests retrieved.",
+  "data": {
+    "count": 10,
+    "next": null,
+    "previous": null,
+    "results": [
+      {
+        "id": "uuid",
+        "role": "doctor",
+        "status": "pending",
+        "user": {
+          "id": "uuid",
+          "email": "doctor@example.com",
+          "full_name": "Doctor Name",
+          "is_active": true,
+          "date_joined": "2026-01-01T00:00:00Z"
+        },
+        "profile": {
+          "license_number": "DOC-100",
+          "specialty": "general_medicine",
+          "workplace_name": "Senior Doctor",
+          "address": "Baghdad Clinic",
+          "years_of_experience": 8,
+          "phone_number": "07712345678"
+        },
+        "submitted_at": "2026-01-01T00:00:00Z",
+        "updated_at": "2026-01-01T00:00:00Z"
+      }
+    ]
+  }
+}
+```
+
+### `GET /api/admin/verifications/<role>/<id>/`
+
+Get one verification request detail.
+
+**Response `200`:** same shape as list item plus:
+- `verification_notes`
+- `verified_at`
+- `verified_by` (nullable `{id,email,full_name}`)
+
+### `POST /api/admin/verifications/<role>/<id>/approve/`
+
+Approve a verification request.
+
+**Request body:**
+```json
+{
+  "note": "Optional admin note"
+}
+```
+
+Effects:
+- sets `verification_status=approved`
+- sets `verified_by` and `verified_at`
+- updates `verification_notes` with optional note
+- creates audit log + notification
+
+### `POST /api/admin/verifications/<role>/<id>/reject/`
+
+Reject a verification request.
+
+**Request body:**
+```json
+{
+  "reason": "Required rejection reason"
+}
+```
+
+Effects:
+- sets `verification_status=rejected`
+- sets `verified_by` and `verified_at`
+- stores reason in `verification_notes`
+- creates audit log + notification
+
+### `POST /api/admin/verifications/<role>/<id>/suspend/`
+
+Suspend a verification request.
+
+**Request body:**
+```json
+{
+  "reason": "Required suspension reason"
+}
+```
+
+Effects:
+- sets `verification_status=suspended`
+- sets `verified_by` and `verified_at`
+- stores reason in `verification_notes`
+- creates audit log + notification
+
+### Validation and safety rules
+
+- Non-admin users are denied.
+- Admin/staff cannot review their own profile.
+- Patients never appear in this queue.
+- Endpoint responses intentionally exclude medical-record, prescription-item, and lab-result data.
 
 ---
 
