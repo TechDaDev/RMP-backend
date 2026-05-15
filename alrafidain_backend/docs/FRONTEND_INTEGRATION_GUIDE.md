@@ -130,7 +130,7 @@ Store both tokens immediately. Use the `user_type` field to route the user to th
 
 ### 2.4 Token Refresh
 
-Access tokens expire (default: 60 min). Refresh silently:
+Access tokens expire (default: 24 hours). Refresh silently:
 
 ```http
 POST /api/accounts/token/refresh/
