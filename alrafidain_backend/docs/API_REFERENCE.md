@@ -1364,6 +1364,8 @@ The requesting user must be the **assigned doctor** of that consultation.
 Backend context enrichment:
 - If the patient uploaded consultation attachments (`.jpg/.jpeg/.png/.webp/.pdf/.docx/.txt`), backend extracts report text and injects it into the RAG object summary.
 - OCR uses EasyOCR with Arabic + English (`Reader(['ar', 'en'])`) for image-based documents.
+- Extracted text is passed through a security gate: non-medical text is dropped and prompt-injection-like lines are sanitized before RAG usage.
+- If extracted content is unsafe or not likely medical, backend excludes it from AI context (request still succeeds).
 
 **Request body:**
 
@@ -1384,6 +1386,8 @@ The requesting user must be the **ordering doctor** (`lab_result.doctor`) for th
 Backend context enrichment:
 - If `result_file` exists for the lab result, backend extracts report text and includes it in the RAG object summary.
 - OCR uses EasyOCR with Arabic + English (`Reader(['ar', 'en'])`) for image-based files and scanned PDF images.
+- Extracted text is passed through a security gate: non-medical text is dropped and prompt-injection-like lines are sanitized before RAG usage.
+- If extracted content is unsafe or not likely medical, backend excludes it from AI context (request still succeeds).
 
 **Request body:**
 

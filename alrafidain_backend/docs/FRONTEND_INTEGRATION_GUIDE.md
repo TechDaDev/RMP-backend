@@ -585,6 +585,17 @@ When patients upload consultation attachments or when a lab result includes an u
   - `POST /api/rag/consultations/{consultation_id}/support/`
   - `POST /api/rag/lab-results/{lab_result_id}/support/`
 
+Security behavior (backend enforced):
+- Extracted text must look like a medical report before it is used for AI context.
+- Prompt-injection-like lines (for example instruction overrides such as "ignore previous instructions") are removed.
+- If extracted content is non-medical or high-risk, it is excluded from AI context (fail-closed).
+
+Frontend implementation notes:
+- No API payload change: continue sending the same support endpoint requests.
+- Do not promise users that uploaded files are always used by AI; wording should be "used when valid and safe".
+- If AI response quality looks weak, suggest uploading a clearer medical report scan/photo.
+- Keep server error handling unchanged; this security gate does not add a new frontend error code contract.
+
 Frontend recommendation:
 - Encourage clear scans/photos for X-ray/ultrasound/lab report uploads to improve OCR quality.
 
