@@ -189,7 +189,7 @@ class FullProfileSerializer(serializers.Serializer):
     def to_representation(self, instance):
         from apps.common.choices import UserType, VerificationStatus
 
-        from .staff_serializers import UserStaffProfileSerializer
+        from .staff_serializers import StaffDetailSerializer
 
         user = instance
         user_profile_obj = None
@@ -229,7 +229,7 @@ class FullProfileSerializer(serializers.Serializer):
         elif user_type == UserType.STAFF:
             try:
                 role_profile_obj = user.staff_profile
-                role_serializer = UserStaffProfileSerializer
+                role_serializer = StaffDetailSerializer
             except StaffProfile.DoesNotExist:
                 pass
 
@@ -239,8 +239,16 @@ class FullProfileSerializer(serializers.Serializer):
         # — Completion —
         shared_complete = user_profile_obj.is_complete if user_profile_obj else False
         shared_missing = user_profile_obj.missing_fields if user_profile_obj else []
-        role_complete = role_profile_obj.is_complete if role_profile_obj else False
-        role_missing = role_profile_obj.missing_fields if role_profile_obj else []
+        if role_profile_obj is not None and hasattr(role_profile_obj, "is_complete"):
+            role_complete = role_profile_obj.is_complete
+        else:
+            # Staff profiles are not tracked with role completeness fields.
+            role_complete = role_profile_obj is not None
+
+        if role_profile_obj is not None and hasattr(role_profile_obj, "missing_fields"):
+            role_missing = role_profile_obj.missing_fields
+        else:
+            role_missing = []
 
         completion = {
             "shared_profile_complete": shared_complete,

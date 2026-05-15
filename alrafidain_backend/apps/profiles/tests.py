@@ -4,13 +4,14 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from apps.audit.models import AuditLog
-from apps.common.choices import UserType, VerificationStatus
+from apps.common.choices import StaffRole, UserType, VerificationStatus
 from apps.notifications.models import Notification
 from apps.profiles.models import (
     DoctorProfile,
     LaboratorianProfile,
     PatientProfile,
     PharmacistProfile,
+    StaffProfile,
     UserProfile,
 )
 
@@ -37,6 +38,17 @@ def _create_active_user(user_type=UserType.PATIENT, email="user@example.com"):
         PharmacistProfile.objects.create(user=user)
     elif user_type == UserType.LABORATORIAN:
         LaboratorianProfile.objects.create(user=user)
+    elif user_type == UserType.STAFF:
+        StaffProfile.objects.create(
+            user=user,
+            staff_role=StaffRole.SYSTEM_ADMIN,
+            department="Administration",
+            can_approve_professionals=True,
+            can_manage_knowledge_base=True,
+            can_export_datasets=True,
+            can_view_audit_logs=True,
+            has_completed_training=True,
+        )
     return user
 
 
@@ -173,6 +185,18 @@ class FullProfileShapeTests(TestCase):
         client = _auth_client(user)
         resp = client.get(PROFILE_ME_URL)
         self.assertFalse(resp.data["data"]["completion"]["overall_complete"])
+
+    def test_staff_profile_shape(self):
+        user = _create_active_user(UserType.STAFF, email="staff@example.com")
+        client = _auth_client(user)
+        resp = client.get(PROFILE_ME_URL)
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        data = resp.data["data"]
+        self.assertIsNotNone(data["role_profile"])
+        self.assertEqual(data["role_profile"]["staff_role"], StaffRole.SYSTEM_ADMIN)
+        self.assertEqual(data["role_profile"]["role_display"], "System Administrator")
+        self.assertFalse(data["verification"]["required"])
 
 
 class VerificationStatusNotWritableTests(TestCase):
