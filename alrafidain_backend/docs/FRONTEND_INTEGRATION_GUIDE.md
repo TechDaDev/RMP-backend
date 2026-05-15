@@ -576,6 +576,18 @@ Notes:
 - Approve accepts optional `note`.
 - Self-approval is denied by backend policy.
 
+### 10.6 Clinical Report OCR for AI Support
+
+When patients upload consultation attachments or when a lab result includes an uploaded file:
+- Backend extracts report text from image/PDF/DOCX/TXT files.
+- OCR is configured for Arabic + English.
+- Extracted report text is automatically included in doctor RAG support context for:
+  - `POST /api/rag/consultations/{consultation_id}/support/`
+  - `POST /api/rag/lab-results/{lab_result_id}/support/`
+
+Frontend recommendation:
+- Encourage clear scans/photos for X-ray/ultrasound/lab report uploads to improve OCR quality.
+
 ---
 
 ## 11. Privacy Rules and Data Visibility

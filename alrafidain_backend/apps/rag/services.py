@@ -17,6 +17,7 @@ from apps.common.choices import (
     RAGResponseStatus,
     RAGSafetyLevel,
 )
+from apps.common.report_extraction import extract_clinical_report_text
 
 from .permissions import is_approved_doctor
 from .prompting import build_doctor_rag_prompt
@@ -332,6 +333,25 @@ def build_consultation_summary_for_rag(consultation) -> str:
     if getattr(consultation, "duration", None):
         parts.append(f"Duration: {consultation.duration}")
 
+    max_files = int(getattr(settings, "RAG_MAX_REPORT_FILES", 3))
+    max_chars_per_file = int(getattr(settings, "RAG_REPORT_TEXT_CHARS_PER_FILE", 1500))
+
+    attachments = []
+    try:
+        attachments = list(consultation.attachments.all()[:max_files])
+    except Exception:
+        attachments = []
+
+    for attachment in attachments:
+        extracted = extract_clinical_report_text(
+            attachment.file,
+            max_chars=max_chars_per_file,
+        )
+        if not extracted:
+            continue
+        original_name = getattr(attachment, "original_name", "uploaded_report")
+        parts.append(f"Patient report attachment ({original_name}) extracted text:\n{extracted}")
+
     return "\n".join(parts)
 
 
@@ -364,6 +384,15 @@ def build_lab_result_summary_for_rag(lab_result) -> str:
         parts.append(f"Laboratorian notes: {lab_result.laboratorian_notes}")
     if getattr(lab_result, "doctor_notes", None):
         parts.append(f"Doctor notes: {lab_result.doctor_notes}")
+
+    result_file = getattr(lab_result, "result_file", None)
+    if result_file:
+        extracted = extract_clinical_report_text(
+            result_file,
+            max_chars=int(getattr(settings, "RAG_REPORT_TEXT_CHARS_PER_FILE", 1500)),
+        )
+        if extracted:
+            parts.append(f"Uploaded report extracted text:\n{extracted}")
 
     return "\n".join(parts)
 

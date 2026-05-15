@@ -1361,6 +1361,10 @@ General RAG query — ask any approved medical knowledge base question.
 RAG clinical support scoped to a specific consultation.  
 The requesting user must be the **assigned doctor** of that consultation.
 
+Backend context enrichment:
+- If the patient uploaded consultation attachments (`.jpg/.jpeg/.png/.webp/.pdf/.docx/.txt`), backend extracts report text and injects it into the RAG object summary.
+- OCR uses EasyOCR with Arabic + English (`Reader(['ar', 'en'])`) for image-based documents.
+
 **Request body:**
 
 | Field | Type | Required | Description |
@@ -1376,6 +1380,10 @@ The requesting user must be the **assigned doctor** of that consultation.
 
 RAG clinical support scoped to a specific lab result.  
 The requesting user must be the **ordering doctor** (`lab_result.doctor`) for that result.
+
+Backend context enrichment:
+- If `result_file` exists for the lab result, backend extracts report text and includes it in the RAG object summary.
+- OCR uses EasyOCR with Arabic + English (`Reader(['ar', 'en'])`) for image-based files and scanned PDF images.
 
 **Request body:**
 
@@ -1446,6 +1454,9 @@ The requesting user must be the **ordering doctor** (`lab_result.doctor`) for th
 - No Celery / async RAG processing.
 - DeepSeek is the only supported LLM provider.
 - Embeddings use `all-MiniLM-L6-v2` (384 dimensions via sentence-transformers).
+
+Operational note:
+- OCR runtime dependency is EasyOCR (`pip install easyocr`) with configured OCR languages defaulting to Arabic + English.
 
 ---
 

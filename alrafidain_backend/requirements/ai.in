@@ -6,3 +6,4 @@ numpy
 httpx
 pypdf
 python-docx
+easyocr

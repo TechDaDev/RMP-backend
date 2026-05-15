@@ -254,6 +254,13 @@ RAG_MAX_CONTEXT_CHUNKS = config("RAG_MAX_CONTEXT_CHUNKS", default=5, cast=int)
 RAG_MAX_QUERY_LENGTH = config("RAG_MAX_QUERY_LENGTH", default=2000, cast=int)
 RAG_MAX_ANSWER_LENGTH = config("RAG_MAX_ANSWER_LENGTH", default=4000, cast=int)
 RAG_EXPORT_MAX_ROWS = config("RAG_EXPORT_MAX_ROWS", default=10000, cast=int)
+RAG_MAX_REPORT_FILES = config("RAG_MAX_REPORT_FILES", default=3, cast=int)
+RAG_REPORT_TEXT_CHARS_PER_FILE = config("RAG_REPORT_TEXT_CHARS_PER_FILE", default=1500, cast=int)
+
+# OCR for clinical reports (attachments and uploaded result files)
+OCR_LANGUAGES = config("OCR_LANGUAGES", cast=Csv(), default="ar,en")
+OCR_USE_GPU = config("OCR_USE_GPU", default=False, cast=bool)
+OCR_MAX_EXTRACTED_CHARS = config("OCR_MAX_EXTRACTED_CHARS", default=6000, cast=int)
 
 # ── Phase 12E — Dataset export salt ────────────────────────────────────
 # Used to hash doctor/object IDs in exported datasets.

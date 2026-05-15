@@ -488,6 +488,36 @@ class BuildConsultationSummaryTest(TestCase):
         summary = build_consultation_summary_for_rag(consultation)
         self.assertIn("Consultation ID", summary)
 
+    @patch("apps.rag.services.extract_clinical_report_text")
+    def test_includes_extracted_attachment_text(self, mock_extract):
+        mock_extract.return_value = "Arabic and English report content"
+
+        attachment = MagicMock()
+        attachment.original_name = "report.pdf"
+        attachment.file = MagicMock()
+
+        attachments_manager = MagicMock()
+        attachments_manager.all.return_value = [attachment]
+
+        consultation = MagicMock()
+        consultation.pk = "00000000-0000-0000-0000-000000000110"
+        consultation.status = "submitted"
+        consultation.selected_specialty = "cardiology"
+        consultation.additional_notes = ""
+        consultation.current_medications_related = ""
+        consultation.has_fever = False
+        consultation.has_pain = False
+        consultation.has_breathing_difficulty = False
+        consultation.has_emergency_warning = False
+        consultation.severity = None
+        consultation.duration = None
+        consultation.attachments = attachments_manager
+
+        summary = build_consultation_summary_for_rag(consultation)
+
+        self.assertIn("report.pdf", summary)
+        self.assertIn("Arabic and English report content", summary)
+
 
 class BuildLabResultSummaryTest(TestCase):
     def test_builds_summary_with_all_fields(self):
@@ -510,6 +540,28 @@ class BuildLabResultSummaryTest(TestCase):
         self.assertIn("7.5", summary)
         self.assertIn("high", summary)
         self.assertIn("Repeat in 3 months", summary)
+
+    @patch("apps.rag.services.extract_clinical_report_text")
+    def test_includes_extracted_uploaded_result_file_text(self, mock_extract):
+        mock_extract.return_value = "scanned report text"
+
+        lab_result = MagicMock()
+        lab_result.pk = "00000000-0000-0000-0000-000000000102"
+        lab_result.lab_order_item.test_name = "Ultrasound Report"
+        lab_result.status = "submitted"
+        lab_result.value_type = "file_only"
+        lab_result.numeric_value = None
+        lab_result.unit = ""
+        lab_result.reference_range = ""
+        lab_result.flag = "unknown"
+        lab_result.text_value = None
+        lab_result.laboratorian_notes = ""
+        lab_result.doctor_notes = ""
+        lab_result.result_file = MagicMock()
+
+        summary = build_lab_result_summary_for_rag(lab_result)
+
+        self.assertIn("scanned report text", summary)
 
 
 # ---------------------------------------------------------------------------
