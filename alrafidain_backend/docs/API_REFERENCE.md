@@ -121,6 +121,7 @@ Obtain JWT token pair.
       "first_name": "John",
       "last_name": "Doe",
       "full_name": "John Doe",
+      "profile_image": "http://localhost:8000/media/profiles/<user_uuid>/<file>.jpg",
       "user_type": "patient",
       "is_active": true,
       "date_joined": "2025-01-01T00:00:00Z"
@@ -128,6 +129,8 @@ Obtain JWT token pair.
   }
 }
 ```
+
+`profile_image` is nullable. When present, it returns an absolute media URL.
 
 ---
 
@@ -209,6 +212,7 @@ Get current authenticated user.
 
 - **Auth required**: Yes
 - **Allowed roles**: All
+- **Response includes**: `id`, `email`, `first_name`, `last_name`, `full_name`, `profile_image`, `user_type`, `is_active`, `date_joined`
 
 ---
 

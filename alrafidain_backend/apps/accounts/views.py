@@ -93,7 +93,7 @@ class LoginView(APIView):
             data={
                 "access": str(refresh.access_token),
                 "refresh": str(refresh),
-                "user": UserSerializer(user).data,
+                "user": UserSerializer(user, context={"request": request}).data,
             }
         )
 
@@ -107,7 +107,8 @@ class MeView(APIView):
         description="Returns the authenticated user's basic information.",
     )
     def get(self, request):
-        return success_response(data=UserSerializer(request.user).data)
+        serialized_user = UserSerializer(request.user, context={"request": request}).data
+        return success_response(data=serialized_user)
 
 
 @extend_schema(tags=["Accounts"])

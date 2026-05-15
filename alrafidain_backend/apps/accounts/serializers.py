@@ -57,6 +57,26 @@ def _send_password_reset_email(user, otp: EmailOTP) -> None:
 
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(read_only=True)
+    profile_image = serializers.SerializerMethodField()
+
+    def get_profile_image(self, obj):
+        try:
+            profile = obj.user_profile
+        except Exception:
+            return None
+
+        if not getattr(profile, "profile_image", None):
+            return None
+
+        try:
+            image_url = profile.profile_image.url
+        except Exception:
+            return None
+
+        request = self.context.get("request")
+        if request is not None:
+            return request.build_absolute_uri(image_url)
+        return image_url
 
     class Meta:
         model = User
@@ -66,6 +86,7 @@ class UserSerializer(serializers.ModelSerializer):
             "first_name",
             "last_name",
             "full_name",
+            "profile_image",
             "user_type",
             "is_active",
             "date_joined",
