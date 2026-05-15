@@ -5,6 +5,7 @@ from .models import (
     LaboratorianProfile,
     PatientProfile,
     PharmacistProfile,
+    StaffProfile,
     UserProfile,
 )
 
@@ -92,6 +93,32 @@ class LaboratorianProfileAdmin(admin.ModelAdmin):
         "verification_status",
         "verified_at",
         "verification_notes",
+        "created_at",
+        "updated_at",
+    ]
+
+
+@admin.register(StaffProfile)
+class StaffProfileAdmin(admin.ModelAdmin):
+    list_display = ["user", "staff_role", "department", "is_active", "hire_date"]
+    list_filter = ["staff_role", "is_active", "hire_date", "created_at"]
+    search_fields = ["user__email", "user__first_name", "user__last_name", "department"]
+    readonly_fields = ["created_at", "updated_at", "hire_date", "last_active"]
+    fields = [
+        "user",
+        "staff_role",
+        "department",
+        "supervisor",
+        "can_approve_professionals",
+        "can_manage_knowledge_base",
+        "can_export_datasets",
+        "can_view_audit_logs",
+        "is_active",
+        "has_completed_training",
+        "training_completed_date",
+        "hire_date",
+        "last_active",
+        "deactivation_reason",
         "created_at",
         "updated_at",
     ]
