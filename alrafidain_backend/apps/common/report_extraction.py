@@ -15,6 +15,64 @@ _TEXT_EXTENSIONS = {".txt"}
 _DOCX_EXTENSIONS = {".docx"}
 _PDF_EXTENSIONS = {".pdf"}
 
+_MEDICAL_HINT_TERMS = {
+    # English
+    "patient",
+    "doctor",
+    "hospital",
+    "clinic",
+    "laboratory",
+    "lab",
+    "result",
+    "report",
+    "diagnosis",
+    "findings",
+    "impression",
+    "ultrasound",
+    "x-ray",
+    "xray",
+    "cbc",
+    "hemoglobin",
+    "glucose",
+    "hba1c",
+    "creatinine",
+    "prescription",
+    # Arabic
+    "المريض",
+    "الطبيب",
+    "مستشفى",
+    "عيادة",
+    "مختبر",
+    "تحليل",
+    "نتيجة",
+    "تقرير",
+    "تشخيص",
+    "أشعة",
+    "سونار",
+    "هيموغلوبين",
+    "سكر",
+    "كرياتينين",
+    "وصفة",
+}
+
+_PROMPT_INJECTION_PATTERNS = [
+    r"ignore\s+(all\s+)?(previous|prior)\s+instructions",
+    r"disregard\s+(all\s+)?(previous|prior)\s+instructions",
+    r"forget\s+(all\s+)?(previous|prior)\s+instructions",
+    r"you\s+are\s+now",
+    r"act\s+as\s+",
+    r"system\s*:",
+    r"developer\s*:",
+    r"assistant\s*:",
+    r"reveal\s+(the\s+)?(system|hidden)\s+prompt",
+    r"print\s+(the\s+)?(system|hidden)\s+prompt",
+    r"execute\s+code",
+    r"run\s+shell",
+    r"curl\s+http",
+    r"wget\s+http",
+    r"base64",
+]
+
 
 def _normalize_text(text: str) -> str:
     text = (text or "").replace("\x00", " ")
@@ -28,6 +86,86 @@ def _truncate(text: str, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
     return text[:max_chars].rstrip() + "\n...[TRUNCATED]"
+
+
+def _contains_prompt_injection(text: str) -> bool:
+    normalized = (text or "").lower()
+    return any(re.search(pattern, normalized) for pattern in _PROMPT_INJECTION_PATTERNS)
+
+
+def _sanitize_prompt_like_lines(text: str) -> str:
+    safe_lines = []
+    for line in (text or "").splitlines():
+        lower_line = line.lower().strip()
+        if any(re.search(pattern, lower_line) for pattern in _PROMPT_INJECTION_PATTERNS):
+            continue
+        safe_lines.append(line)
+    return "\n".join(safe_lines).strip()
+
+
+def _is_likely_medical_report(text: str, *, min_term_hits: int = 2) -> bool:
+    normalized = (text or "").lower()
+    hits = sum(1 for term in _MEDICAL_HINT_TERMS if term in normalized)
+    return hits >= min_term_hits
+
+
+def secure_extracted_report_text(text: str) -> dict:
+    """
+    Security gate for extracted report text before AI prompt usage.
+
+    Returns:
+        {
+            "accepted": bool,
+            "reason": str,
+            "sanitized_text": str,
+            "is_medical_report": bool,
+            "has_prompt_injection": bool,
+        }
+    """
+    normalized = _normalize_text(text)
+    if not normalized:
+        return {
+            "accepted": False,
+            "reason": "empty_text",
+            "sanitized_text": "",
+            "is_medical_report": False,
+            "has_prompt_injection": False,
+        }
+
+    is_medical_report = _is_likely_medical_report(
+        normalized,
+        min_term_hits=int(getattr(settings, "OCR_MIN_MEDICAL_TERM_HITS", 2)),
+    )
+    has_prompt_injection = _contains_prompt_injection(normalized)
+
+    sanitized = _sanitize_prompt_like_lines(normalized)
+    sanitized = _normalize_text(sanitized)
+
+    if not is_medical_report:
+        return {
+            "accepted": False,
+            "reason": "not_medical_report",
+            "sanitized_text": "",
+            "is_medical_report": False,
+            "has_prompt_injection": has_prompt_injection,
+        }
+
+    if has_prompt_injection and not sanitized:
+        return {
+            "accepted": False,
+            "reason": "prompt_injection_detected",
+            "sanitized_text": "",
+            "is_medical_report": True,
+            "has_prompt_injection": True,
+        }
+
+    return {
+        "accepted": True,
+        "reason": "ok" if not has_prompt_injection else "sanitized_prompt_injection",
+        "sanitized_text": sanitized,
+        "is_medical_report": True,
+        "has_prompt_injection": has_prompt_injection,
+    }
 
 
 def _resolve_path(file_obj) -> str:

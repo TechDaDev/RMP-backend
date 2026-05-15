@@ -261,6 +261,7 @@ RAG_REPORT_TEXT_CHARS_PER_FILE = config("RAG_REPORT_TEXT_CHARS_PER_FILE", defaul
 OCR_LANGUAGES = config("OCR_LANGUAGES", cast=Csv(), default="ar,en")
 OCR_USE_GPU = config("OCR_USE_GPU", default=False, cast=bool)
 OCR_MAX_EXTRACTED_CHARS = config("OCR_MAX_EXTRACTED_CHARS", default=6000, cast=int)
+OCR_MIN_MEDICAL_TERM_HITS = config("OCR_MIN_MEDICAL_TERM_HITS", default=2, cast=int)
 
 # ── Phase 12E — Dataset export salt ────────────────────────────────────
 # Used to hash doctor/object IDs in exported datasets.

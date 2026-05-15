@@ -17,7 +17,7 @@ from apps.common.choices import (
     RAGResponseStatus,
     RAGSafetyLevel,
 )
-from apps.common.report_extraction import extract_clinical_report_text
+from apps.common.report_extraction import extract_clinical_report_text, secure_extracted_report_text
 
 from .permissions import is_approved_doctor
 from .prompting import build_doctor_rag_prompt
@@ -349,8 +349,16 @@ def build_consultation_summary_for_rag(consultation) -> str:
         )
         if not extracted:
             continue
+
+        secure_payload = secure_extracted_report_text(extracted)
+        if not secure_payload["accepted"]:
+            continue
+
         original_name = getattr(attachment, "original_name", "uploaded_report")
-        parts.append(f"Patient report attachment ({original_name}) extracted text:\n{extracted}")
+        parts.append(
+            f"Patient report attachment ({original_name}) extracted text:\n"
+            f"{secure_payload['sanitized_text']}"
+        )
 
     return "\n".join(parts)
 
@@ -392,7 +400,9 @@ def build_lab_result_summary_for_rag(lab_result) -> str:
             max_chars=int(getattr(settings, "RAG_REPORT_TEXT_CHARS_PER_FILE", 1500)),
         )
         if extracted:
-            parts.append(f"Uploaded report extracted text:\n{extracted}")
+            secure_payload = secure_extracted_report_text(extracted)
+            if secure_payload["accepted"]:
+                parts.append(f"Uploaded report extracted text:\n{secure_payload['sanitized_text']}")
 
     return "\n".join(parts)
 

@@ -56,6 +56,28 @@ is recorded on `KnowledgeDocument.security_status`.
 
 ---
 
+## OCR/RAG Content Safety Gate
+
+For uploaded clinical report files that are OCR-parsed and forwarded into AI-assist
+context, the backend applies a content safety gate before any extracted text is used.
+
+Current protections:
+- Medical-report likelihood check: extracted text must contain enough clinical terms
+  (Arabic/English) before it is eligible for RAG prompt context.
+- Prompt-injection detection: instruction-like phrases (for example "ignore previous
+  instructions", `system:`, `developer:`) are detected and removed.
+- Fail-closed behavior: text that is non-medical or fully injection-like is excluded
+  from AI context entirely.
+
+Settings in `config/settings/base.py`:
+- `OCR_MIN_MEDICAL_TERM_HITS` (default `2`): minimum number of medical hints required.
+- `OCR_MAX_EXTRACTED_CHARS`: hard cap for extracted text before safety processing.
+
+This protection is implemented in `apps/common/report_extraction.py` and enforced by
+RAG summary builders in `apps/rag/services.py`.
+
+---
+
 ## File Storage
 
 ### Development (current)
