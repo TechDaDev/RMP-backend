@@ -6,7 +6,7 @@ Seed source: `apps/common/management/commands/seed_test_users.py`
 
 | Role | Email | Password |
 |---|---|---|
-| Admin/Superuser | admin@rmp.local | Admin1234! |
+| System Admin | admin@rmp.local | Admin1234! |
 | Patient | patient@rmp.local | Patient1234! |
 | Doctor | doctor@rmp.local | Doctor1234! |
 | Pharmacist | pharmacist@rmp.local | Pharmacist1234! |
@@ -16,19 +16,20 @@ Seed source: `apps/common/management/commands/seed_test_users.py`
 
 | Account | `user_type` | Always Has `UserProfile` | Role-Specific Profile |
 |---|---|---|---|
-| Admin/Superuser | `doctor` (for model compatibility) | Yes | `DoctorProfile` |
+| System Admin | `staff` | No | `StaffProfile` |
 | Patient | `patient` | Yes | `PatientProfile` |
 | Doctor | `doctor` | Yes | `DoctorProfile` |
 | Pharmacist | `pharmacist` | Yes | `PharmacistProfile` |
 | Laboratorian | `laboratorian` | Yes | `LaboratorianProfile` |
 
 Notes:
-- There is no separate `admin` user type in the `UserType` enum.
-- Admin access comes from `is_staff=True` and `is_superuser=True`.
+- `admin@rmp.local` uses `user_type=staff` (new in Phase X).
+- Admin access comes from `is_staff=True`, `is_superuser=True`, and `StaffProfile.staff_role=system_admin`.
+- Staff users do not require `UserProfile` (no phone, address, etc.); they have only `StaffProfile`.
 
 ## Profile Field Summary by Type
 
-### Shared Profile (`UserProfile`) for all users
+### Shared Profile (`UserProfile`) for patient, doctor, pharmacist, laboratorian (not staff)
 - `phone_number`
 - `profile_image`
 - `gender`
@@ -84,3 +85,17 @@ Notes:
 - `verified_at`
 - `verified_by`
 - `verification_notes`
+
+### Staff (`StaffProfile`)
+- `staff_role` (choices: `system_admin`, `verification_officer`, `knowledge_base_manager`, `analytics_officer`, `support_specialist`, `compliance_officer`)
+- `department`
+- `supervisor` (FK to another staff user, optional)
+- `can_approve_professionals` (bool)
+- `can_manage_knowledge_base` (bool)
+- `can_export_datasets` (bool)
+- `can_view_audit_logs` (bool)
+- `hire_date`
+- `last_active`
+- `is_active`
+- `has_completed_training`
+- `training_completed_date`

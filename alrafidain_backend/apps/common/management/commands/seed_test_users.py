@@ -8,12 +8,13 @@ from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 
-from apps.common.choices import MedicalSpecialty, UserType, VerificationStatus
+from apps.common.choices import MedicalSpecialty, StaffRole, UserType, VerificationStatus
 from apps.profiles.models import (
     DoctorProfile,
     LaboratorianProfile,
     PatientProfile,
     PharmacistProfile,
+    StaffProfile,
     UserProfile,
 )
 
@@ -25,7 +26,7 @@ USERS = [
         "password": "Admin1234!",
         "first_name": "Admin",
         "last_name": "User",
-        "user_type": UserType.DOCTOR,  # superusers need a user_type to satisfy the model
+        "user_type": UserType.STAFF,  # Changed from DOCTOR to STAFF
         "is_active": True,
         "is_staff": True,
         "is_superuser": True,
@@ -109,11 +110,29 @@ def _ensure_laboratorian_profile(user):
     )
 
 
+def _ensure_staff_profile(user):
+    """Create StaffProfile with SYSTEM_ADMIN role and all permissions enabled."""
+    StaffProfile.objects.get_or_create(
+        user=user,
+        defaults={
+            "staff_role": StaffRole.SYSTEM_ADMIN,
+            "department": "Administration",
+            "can_approve_professionals": True,
+            "can_manage_knowledge_base": True,
+            "can_export_datasets": True,
+            "can_view_audit_logs": True,
+            "has_completed_training": True,
+            "training_completed_date": timezone.now(),
+        },
+    )
+
+
 PROFILE_BUILDERS = {
     UserType.PATIENT: [_ensure_user_profile, _ensure_patient_profile],
     UserType.DOCTOR: [_ensure_user_profile, _ensure_doctor_profile],
     UserType.PHARMACIST: [_ensure_user_profile, _ensure_pharmacist_profile],
     UserType.LABORATORIAN: [_ensure_user_profile, _ensure_laboratorian_profile],
+    UserType.STAFF: [_ensure_staff_profile],
 }
 
 

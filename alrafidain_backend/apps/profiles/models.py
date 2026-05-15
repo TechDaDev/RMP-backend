@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
 
-from apps.common.choices import Gender, Governorate, MedicalSpecialty, VerificationStatus
+from apps.common.choices import Gender, Governorate, MedicalSpecialty, StaffRole, VerificationStatus
 from apps.common.models import BaseModel
 from apps.common.upload_paths import (
     doctor_license_upload_path,
@@ -281,3 +281,49 @@ class LaboratorianProfile(BaseModel):
 
     def __str__(self):
         return f"Laboratorian: {self.user.email}"
+
+
+class StaffProfile(BaseModel):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="staff_profile",
+    )
+    staff_role = models.CharField(
+        max_length=50,
+        choices=StaffRole.choices,
+    )
+    department = models.CharField(max_length=100, blank=True)
+
+    # Organizational hierarchy
+    supervisor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="staff_supervised",
+    )
+
+    # Granular permissions
+    can_approve_professionals = models.BooleanField(default=False)
+    can_manage_knowledge_base = models.BooleanField(default=False)
+    can_export_datasets = models.BooleanField(default=False)
+    can_view_audit_logs = models.BooleanField(default=False)
+
+    # Tracking
+    hire_date = models.DateField(auto_now_add=True)
+    last_active = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True)
+    deactivation_reason = models.TextField(blank=True)
+
+    # Training / Onboarding
+    has_completed_training = models.BooleanField(default=False)
+    training_completed_date = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name = "Staff Profile"
+        verbose_name_plural = "Staff Profiles"
+
+    def __str__(self):
+        return f"Staff [{self.get_staff_role_display()}]: {self.user.email}"
+

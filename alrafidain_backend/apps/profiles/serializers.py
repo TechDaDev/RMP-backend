@@ -12,6 +12,7 @@ from .models import (
     LaboratorianProfile,
     PatientProfile,
     PharmacistProfile,
+    StaffProfile,
     UserProfile,
 )
 
@@ -188,6 +189,8 @@ class FullProfileSerializer(serializers.Serializer):
     def to_representation(self, instance):
         from apps.common.choices import UserType, VerificationStatus
 
+        from .staff_serializers import UserStaffProfileSerializer
+
         user = instance
         user_profile_obj = None
         role_profile_obj = None
@@ -222,6 +225,12 @@ class FullProfileSerializer(serializers.Serializer):
                 role_profile_obj = user.laboratorian_profile
                 role_serializer = LaboratorianProfileSerializer
             except LaboratorianProfile.DoesNotExist:
+                pass
+        elif user_type == UserType.STAFF:
+            try:
+                role_profile_obj = user.staff_profile
+                role_serializer = UserStaffProfileSerializer
+            except StaffProfile.DoesNotExist:
                 pass
 
         if role_profile_obj is not None and role_serializer is not None:

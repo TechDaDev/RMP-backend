@@ -6,6 +6,16 @@ class UserType(models.TextChoices):
     DOCTOR = "doctor", "Doctor"
     PHARMACIST = "pharmacist", "Pharmacist"
     LABORATORIAN = "laboratorian", "Laboratorian"
+    STAFF = "staff", "Staff / Admin"
+
+
+class StaffRole(models.TextChoices):
+    SYSTEM_ADMIN = "system_admin", "System Administrator"
+    VERIFICATION_OFFICER = "verification_officer", "Verification Officer"
+    KNOWLEDGE_BASE_MANAGER = "knowledge_base_manager", "Knowledge Base Manager"
+    ANALYTICS_OFFICER = "analytics_officer", "Analytics Officer"
+    SUPPORT_SPECIALIST = "support_specialist", "Support Specialist"
+    COMPLIANCE_OFFICER = "compliance_officer", "Compliance Officer"
 
 
 class Gender(models.TextChoices):

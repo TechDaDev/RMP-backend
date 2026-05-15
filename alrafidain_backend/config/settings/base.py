@@ -258,7 +258,7 @@ RAG_MAX_REPORT_FILES = config("RAG_MAX_REPORT_FILES", default=3, cast=int)
 RAG_REPORT_TEXT_CHARS_PER_FILE = config("RAG_REPORT_TEXT_CHARS_PER_FILE", default=1500, cast=int)
 
 # OCR for clinical reports (attachments and uploaded result files)
-OCR_LANGUAGES = config("OCR_LANGUAGES", cast=Csv(), default="ar,en")
+OCR_LANGUAGES = config("OCR_LANGUAGES", cast=Csv(), default="ar,en,ku")
 OCR_USE_GPU = config("OCR_USE_GPU", default=False, cast=bool)
 OCR_MAX_EXTRACTED_CHARS = config("OCR_MAX_EXTRACTED_CHARS", default=6000, cast=int)
 OCR_MIN_MEDICAL_TERM_HITS = config("OCR_MIN_MEDICAL_TERM_HITS", default=2, cast=int)
