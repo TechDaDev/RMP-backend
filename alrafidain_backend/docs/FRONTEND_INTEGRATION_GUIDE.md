@@ -529,11 +529,22 @@ POST /api/lab-orders/items/{lab_order_item_id}/results/
 ### 10.1 Knowledge Base Management
 
 ```http
-POST /api/knowledge-base/documents/upload/      // Upload PDF/document
+POST /api/knowledge-base/documents/             // Upload document
 GET  /api/knowledge-base/documents/             // List all documents
 POST /api/knowledge-base/documents/{id}/process/ // Trigger vectorisation
 POST /api/knowledge-base/documents/{id}/approve/ // Approve for RAG use
 ```
+
+Upload request is `multipart/form-data` and must include:
+- `title`
+- `document_type` (`medical_book`, `laboratory_book`, `clinical_guideline`, `drug_reference`, `patient_education`, `platform_policy`, `other`)
+- `language` (`english`, `arabic`, `kurdish`, `mixed`, `other`)
+- `audience` (`doctor`, `pharmacist`, `laboratorian`, `patient`, `admin`, `mixed`)
+- `file` (accepted extensions: `.pdf`, `.docx`, `.txt`)
+
+Compatibility note:
+- Backend also accepts file aliases: `reference`, `document`, `document_file`, `upload`.
+- Prefer sending `file` as the canonical field.
 
 ### 10.2 RAG Feedback Review
 
@@ -791,9 +802,14 @@ Endpoints accepting files use `multipart/form-data`:
 
 - `POST /api/consultations/{id}/messages/` — `content_file` field for image/audio attachments
 - `POST /api/lab-orders/{id}/results/` — `file` field for lab result PDF
-- `POST /api/knowledge-base/documents/upload/` — `file` field for document
+- `POST /api/knowledge-base/documents/` — `file` field for document
 
-Maximum file sizes are configured in Django settings (default: 10 MB). Always set `Content-Type: multipart/form-data` when uploading.
+Maximum file sizes are configured in Django settings:
+- Knowledge documents: 20 MB
+- Clinical attachments: 15 MB
+- Profile images: 5 MB
+
+Always set `Content-Type: multipart/form-data` when uploading.
 
 ---
 

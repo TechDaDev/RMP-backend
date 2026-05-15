@@ -105,6 +105,19 @@ class UploadTests(TestCase):
         response = _upload_document(self.client, file=_make_docx_file())
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
+    def test_staff_can_upload_with_reference_file_alias(self):
+        self.client.force_authenticate(self.staff)
+        payload = {
+            "title": "Reference Upload",
+            "document_type": KnowledgeDocumentType.OTHER,
+            "language": KnowledgeLanguage.ENGLISH,
+            "audience": KnowledgeAudience.MIXED,
+            "reference": _make_txt_file("medical reference content " * 80),
+        }
+        response = self.client.post(UPLOAD_URL, payload, format="multipart")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(KnowledgeDocument.objects.count(), 1)
+
     def test_non_staff_cannot_upload(self):
         self.client.force_authenticate(self.regular)
         response = _upload_document(self.client)

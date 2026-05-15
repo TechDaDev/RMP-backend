@@ -44,6 +44,8 @@ class KnowledgeDocumentUploadView(APIView):
 
     permission_classes = [CanAccessKnowledgeBase]
 
+    FILE_FIELD_ALIASES = ("reference", "document", "document_file", "upload")
+
     def get(self, request):
         qs = KnowledgeDocument.objects.select_related("uploaded_by", "approved_by").annotate(
             chunk_count=Count("chunks", filter=Q(chunks__is_active=True), distinct=True)
@@ -69,9 +71,17 @@ class KnowledgeDocumentUploadView(APIView):
         return success_response(data=KnowledgeDocumentSerializer(qs, many=True).data)
 
     def post(self, request):
-        serializer = KnowledgeDocumentUploadSerializer(
-            data=request.data, context={"request": request}
-        )
+        payload = request.data.copy()
+        if "file" not in payload:
+            for alias in self.FILE_FIELD_ALIASES:
+                if alias in request.FILES:
+                    payload["file"] = request.FILES[alias]
+                    break
+                if alias in payload:
+                    payload["file"] = payload[alias]
+                    break
+
+        serializer = KnowledgeDocumentUploadSerializer(data=payload, context={"request": request})
         if not serializer.is_valid():
             record_security_event(
                 actor=request.user,
@@ -80,6 +90,9 @@ class KnowledgeDocumentUploadView(APIView):
                 metadata={
                     "reason_code": "validation_failed",
                     "error_fields": sorted(serializer.errors.keys()),
+                    "file_aliases_present": sorted(
+                        [alias for alias in self.FILE_FIELD_ALIASES if alias in request.FILES]
+                    ),
                 },
             )
             return error_response(errors=serializer.errors)
