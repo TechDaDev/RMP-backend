@@ -21,12 +21,12 @@ Seed source: `apps/common/management/commands/seed_test_users.py`
 
 | Account | `user_type` | Always Has `UserProfile` | Role-Specific Profile |
 |---|---|---|---|
-| System Admin | `staff` | No | `StaffProfile` |
-| Verification Officer | `staff` | No | `StaffProfile` |
-| Knowledge Base Manager | `staff` | No | `StaffProfile` |
-| Analytics Officer | `staff` | No | `StaffProfile` |
-| Support Specialist | `staff` | No | `StaffProfile` |
-| Compliance Officer | `staff` | No | `StaffProfile` |
+| System Admin | `staff` | Yes | `StaffProfile` |
+| Verification Officer | `staff` | Yes | `StaffProfile` |
+| Knowledge Base Manager | `staff` | Yes | `StaffProfile` |
+| Analytics Officer | `staff` | Yes | `StaffProfile` |
+| Support Specialist | `staff` | Yes | `StaffProfile` |
+| Compliance Officer | `staff` | Yes | `StaffProfile` |
 | Patient | `patient` | Yes | `PatientProfile` |
 | Doctor | `doctor` | Yes | `DoctorProfile` |
 | Pharmacist | `pharmacist` | Yes | `PharmacistProfile` |
@@ -35,12 +35,12 @@ Seed source: `apps/common/management/commands/seed_test_users.py`
 Notes:
 - `admin@rmp.local` uses `user_type=staff` (new in Phase X).
 - Admin access comes from `is_staff=True`, `is_superuser=True`, and `StaffProfile.staff_role=system_admin`.
-- Staff users do not require `UserProfile` (no phone, address, etc.); they have only `StaffProfile`.
+- Staff users have both `UserProfile` and `StaffProfile` in seeded environments.
 - All additional staff accounts are `is_staff=True` and mapped to their matching `staff_role`.
 
 ## Profile Field Summary by Type
 
-### Shared Profile (`UserProfile`) for patient, doctor, pharmacist, laboratorian (not staff)
+### Shared Profile (`UserProfile`) for all seeded users
 - `phone_number`
 - `profile_image`
 - `gender`

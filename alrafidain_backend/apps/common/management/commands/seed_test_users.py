@@ -234,7 +234,7 @@ PROFILE_BUILDERS = {
     UserType.DOCTOR: [_ensure_user_profile, _ensure_doctor_profile],
     UserType.PHARMACIST: [_ensure_user_profile, _ensure_pharmacist_profile],
     UserType.LABORATORIAN: [_ensure_user_profile, _ensure_laboratorian_profile],
-    UserType.STAFF: [_ensure_staff_profile],
+    UserType.STAFF: [_ensure_user_profile, _ensure_staff_profile],
 }
 
 
@@ -253,8 +253,13 @@ class Command(BaseCommand):
 
         for spec in USERS:
             email = spec["email"]
-            if User.objects.filter(email=email).exists():
-                self.stdout.write(f"  SKIP  {email} (already exists)")
+            existing_user = User.objects.filter(email=email).first()
+            if existing_user is not None:
+                # Keep existing account credentials/state, but ensure required
+                # role profiles exist so seed remains self-healing.
+                for builder in PROFILE_BUILDERS.get(existing_user.user_type, []):
+                    _run_profile_builder(builder, existing_user, spec)
+                self.stdout.write(f"  SYNC  {email} (already exists; profiles ensured)")
                 continue
 
             is_super = spec.get("is_superuser", False)
