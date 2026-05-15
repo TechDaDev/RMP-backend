@@ -26,10 +26,67 @@ USERS = [
         "password": "Admin1234!",
         "first_name": "Admin",
         "last_name": "User",
-        "user_type": UserType.STAFF,  # Changed from DOCTOR to STAFF
+        "user_type": UserType.STAFF,
+        "staff_role": StaffRole.SYSTEM_ADMIN,
+        "department": "Administration",
         "is_active": True,
         "is_staff": True,
         "is_superuser": True,
+    },
+    {
+        "email": "verifier@rmp.local",
+        "password": "Verifier1234!",
+        "first_name": "Vera",
+        "last_name": "Reviewer",
+        "user_type": UserType.STAFF,
+        "staff_role": StaffRole.VERIFICATION_OFFICER,
+        "department": "Verification",
+        "is_active": True,
+        "is_staff": True,
+    },
+    {
+        "email": "kbmanager@rmp.local",
+        "password": "KBManager1234!",
+        "first_name": "Kareem",
+        "last_name": "Base",
+        "user_type": UserType.STAFF,
+        "staff_role": StaffRole.KNOWLEDGE_BASE_MANAGER,
+        "department": "Knowledge Base",
+        "is_active": True,
+        "is_staff": True,
+    },
+    {
+        "email": "analytics@rmp.local",
+        "password": "Analytics1234!",
+        "first_name": "Anas",
+        "last_name": "Metrics",
+        "user_type": UserType.STAFF,
+        "staff_role": StaffRole.ANALYTICS_OFFICER,
+        "department": "Analytics",
+        "is_active": True,
+        "is_staff": True,
+    },
+    {
+        "email": "support@rmp.local",
+        "password": "Support1234!",
+        "first_name": "Sara",
+        "last_name": "Support",
+        "user_type": UserType.STAFF,
+        "staff_role": StaffRole.SUPPORT_SPECIALIST,
+        "department": "Support",
+        "is_active": True,
+        "is_staff": True,
+    },
+    {
+        "email": "compliance@rmp.local",
+        "password": "Compliance1234!",
+        "first_name": "Celine",
+        "last_name": "Audit",
+        "user_type": UserType.STAFF,
+        "staff_role": StaffRole.COMPLIANCE_OFFICER,
+        "department": "Compliance",
+        "is_active": True,
+        "is_staff": True,
     },
     {
         "email": "patient@rmp.local",
@@ -110,17 +167,62 @@ def _ensure_laboratorian_profile(user):
     )
 
 
-def _ensure_staff_profile(user):
-    """Create StaffProfile with SYSTEM_ADMIN role and all permissions enabled."""
-    StaffProfile.objects.get_or_create(
-        user=user,
-        defaults={
-            "staff_role": StaffRole.SYSTEM_ADMIN,
-            "department": "Administration",
+def _staff_permissions_for_role(staff_role: str) -> dict:
+    if staff_role == StaffRole.SYSTEM_ADMIN:
+        return {
             "can_approve_professionals": True,
             "can_manage_knowledge_base": True,
             "can_export_datasets": True,
             "can_view_audit_logs": True,
+        }
+    if staff_role == StaffRole.VERIFICATION_OFFICER:
+        return {
+            "can_approve_professionals": True,
+            "can_manage_knowledge_base": False,
+            "can_export_datasets": False,
+            "can_view_audit_logs": False,
+        }
+    if staff_role == StaffRole.KNOWLEDGE_BASE_MANAGER:
+        return {
+            "can_approve_professionals": False,
+            "can_manage_knowledge_base": True,
+            "can_export_datasets": False,
+            "can_view_audit_logs": False,
+        }
+    if staff_role == StaffRole.ANALYTICS_OFFICER:
+        return {
+            "can_approve_professionals": False,
+            "can_manage_knowledge_base": False,
+            "can_export_datasets": True,
+            "can_view_audit_logs": False,
+        }
+    if staff_role == StaffRole.COMPLIANCE_OFFICER:
+        return {
+            "can_approve_professionals": False,
+            "can_manage_knowledge_base": False,
+            "can_export_datasets": False,
+            "can_view_audit_logs": True,
+        }
+    return {
+        "can_approve_professionals": False,
+        "can_manage_knowledge_base": False,
+        "can_export_datasets": False,
+        "can_view_audit_logs": False,
+    }
+
+
+def _ensure_staff_profile(user, spec=None):
+    """Create StaffProfile using role-specific defaults from seed spec."""
+    staff_role = (spec or {}).get("staff_role", StaffRole.SYSTEM_ADMIN)
+    department = (spec or {}).get("department", "Administration")
+    permissions = _staff_permissions_for_role(staff_role)
+
+    StaffProfile.objects.get_or_create(
+        user=user,
+        defaults={
+            "staff_role": staff_role,
+            "department": department,
+            **permissions,
             "has_completed_training": True,
             "training_completed_date": timezone.now(),
         },
@@ -134,6 +236,13 @@ PROFILE_BUILDERS = {
     UserType.LABORATORIAN: [_ensure_user_profile, _ensure_laboratorian_profile],
     UserType.STAFF: [_ensure_staff_profile],
 }
+
+
+def _run_profile_builder(builder, user, spec):
+    try:
+        builder(user, spec)
+    except TypeError:
+        builder(user)
 
 
 class Command(BaseCommand):
@@ -162,7 +271,7 @@ class Command(BaseCommand):
 
             # Build role-appropriate profiles
             for builder in PROFILE_BUILDERS.get(spec["user_type"], []):
-                builder(user)
+                _run_profile_builder(builder, user, spec)
 
             label = "SUPERUSER" if is_super else spec["user_type"].upper()
             self.stdout.write(self.style.SUCCESS(f"  CREATED [{label:15}] {email}"))
@@ -172,7 +281,12 @@ class Command(BaseCommand):
         self.stdout.write("")
         self.stdout.write("  Role           | Email                    | Password")
         self.stdout.write("  ---------------+---------------------------+------------------")
-        self.stdout.write("  Admin/Superuser| admin@rmp.local          | Admin1234!")
+        self.stdout.write("  System Admin   | admin@rmp.local          | Admin1234!")
+        self.stdout.write("  Verifier       | verifier@rmp.local       | Verifier1234!")
+        self.stdout.write("  KB Manager     | kbmanager@rmp.local      | KBManager1234!")
+        self.stdout.write("  Analytics      | analytics@rmp.local      | Analytics1234!")
+        self.stdout.write("  Support        | support@rmp.local        | Support1234!")
+        self.stdout.write("  Compliance     | compliance@rmp.local     | Compliance1234!")
         self.stdout.write("  Patient        | patient@rmp.local        | Patient1234!")
         self.stdout.write("  Doctor         | doctor@rmp.local         | Doctor1234!")
         self.stdout.write("  Pharmacist     | pharmacist@rmp.local     | Pharmacist1234!")

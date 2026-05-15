@@ -7,6 +7,11 @@ Seed source: `apps/common/management/commands/seed_test_users.py`
 | Role | Email | Password |
 |---|---|---|
 | System Admin | admin@rmp.local | Admin1234! |
+| Verification Officer | verifier@rmp.local | Verifier1234! |
+| Knowledge Base Manager | kbmanager@rmp.local | KBManager1234! |
+| Analytics Officer | analytics@rmp.local | Analytics1234! |
+| Support Specialist | support@rmp.local | Support1234! |
+| Compliance Officer | compliance@rmp.local | Compliance1234! |
 | Patient | patient@rmp.local | Patient1234! |
 | Doctor | doctor@rmp.local | Doctor1234! |
 | Pharmacist | pharmacist@rmp.local | Pharmacist1234! |
@@ -17,6 +22,11 @@ Seed source: `apps/common/management/commands/seed_test_users.py`
 | Account | `user_type` | Always Has `UserProfile` | Role-Specific Profile |
 |---|---|---|---|
 | System Admin | `staff` | No | `StaffProfile` |
+| Verification Officer | `staff` | No | `StaffProfile` |
+| Knowledge Base Manager | `staff` | No | `StaffProfile` |
+| Analytics Officer | `staff` | No | `StaffProfile` |
+| Support Specialist | `staff` | No | `StaffProfile` |
+| Compliance Officer | `staff` | No | `StaffProfile` |
 | Patient | `patient` | Yes | `PatientProfile` |
 | Doctor | `doctor` | Yes | `DoctorProfile` |
 | Pharmacist | `pharmacist` | Yes | `PharmacistProfile` |
@@ -26,6 +36,7 @@ Notes:
 - `admin@rmp.local` uses `user_type=staff` (new in Phase X).
 - Admin access comes from `is_staff=True`, `is_superuser=True`, and `StaffProfile.staff_role=system_admin`.
 - Staff users do not require `UserProfile` (no phone, address, etc.); they have only `StaffProfile`.
+- All additional staff accounts are `is_staff=True` and mapped to their matching `staff_role`.
 
 ## Profile Field Summary by Type
 
