@@ -19,8 +19,21 @@ from .models import (
 _VERIFICATION_READ_ONLY = ["verification_status", "verified_at", "verification_notes"]
 
 
+def _preserve_existing_file_for_partial_update(serializer, field_name: str, value):
+    if (
+        serializer.partial
+        and value in (None, "")
+        and getattr(serializer, "instance", None) is not None
+    ):
+        existing = getattr(serializer.instance, field_name, None)
+        if existing:
+            return existing
+    return value
+
+
 class UserProfileSerializer(serializers.ModelSerializer):
     def validate_profile_image(self, value):
+        value = _preserve_existing_file_for_partial_update(self, "profile_image", value)
         validate_uploaded_file(
             value,
             allowed_extensions=settings.PROFILE_IMAGE_ALLOWED_EXTENSIONS,
@@ -63,6 +76,7 @@ class PatientProfileSerializer(serializers.ModelSerializer):
 
 class DoctorProfileSerializer(serializers.ModelSerializer):
     def validate_medical_license_image(self, value):
+        value = _preserve_existing_file_for_partial_update(self, "medical_license_image", value)
         validate_uploaded_file(
             value,
             allowed_extensions=settings.PROFILE_IMAGE_ALLOWED_EXTENSIONS,
@@ -108,6 +122,11 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
 
 class PharmacistProfileSerializer(serializers.ModelSerializer):
     def validate_pharmacist_license_image(self, value):
+        value = _preserve_existing_file_for_partial_update(
+            self,
+            "pharmacist_license_image",
+            value,
+        )
         validate_uploaded_file(
             value,
             allowed_extensions=settings.PROFILE_IMAGE_ALLOWED_EXTENSIONS,
@@ -117,6 +136,7 @@ class PharmacistProfileSerializer(serializers.ModelSerializer):
         return value
 
     def validate_pharmacy_license_image(self, value):
+        value = _preserve_existing_file_for_partial_update(self, "pharmacy_license_image", value)
         validate_uploaded_file(
             value,
             allowed_extensions=settings.PROFILE_IMAGE_ALLOWED_EXTENSIONS,
@@ -147,6 +167,11 @@ class PharmacistProfileSerializer(serializers.ModelSerializer):
 
 class LaboratorianProfileSerializer(serializers.ModelSerializer):
     def validate_laboratorian_license_image(self, value):
+        value = _preserve_existing_file_for_partial_update(
+            self,
+            "laboratorian_license_image",
+            value,
+        )
         validate_uploaded_file(
             value,
             allowed_extensions=settings.PROFILE_IMAGE_ALLOWED_EXTENSIONS,
@@ -156,6 +181,7 @@ class LaboratorianProfileSerializer(serializers.ModelSerializer):
         return value
 
     def validate_laboratory_license_image(self, value):
+        value = _preserve_existing_file_for_partial_update(self, "laboratory_license_image", value)
         validate_uploaded_file(
             value,
             allowed_extensions=settings.PROFILE_IMAGE_ALLOWED_EXTENSIONS,

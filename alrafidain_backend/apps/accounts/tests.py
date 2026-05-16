@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -182,6 +183,28 @@ class ProfileUpdateTests(TestCase):
             "/api/profiles/me/doctor/", {"specialty": "Cardiology"}, format="json"
         )
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_patient_update_with_empty_profile_image_keeps_existing_image(self):
+        user = User.objects.get(email="test@example.com")
+        profile = user.user_profile
+        profile.profile_image = SimpleUploadedFile(
+            "avatar.jpg",
+            b"\x47\x49\x46\x38\x39\x61\x01\x00\x01\x00\x80\x00\x00\x00\x00\x00\xff\xff\xff\x21\xf9\x04\x01\x00\x00\x00\x00\x2c\x00\x00\x00\x00\x01\x00\x01\x00\x00\x02\x02\x44\x01\x00\x3b",
+            content_type="image/jpeg",
+        )
+        profile.save(update_fields=["profile_image", "updated_at"])
+        existing_name = profile.profile_image.name
+
+        resp = self.client.patch(
+            "/api/profiles/me/user-profile/",
+            {"district": "Karrada", "profile_image": ""},
+            format="multipart",
+        )
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        profile.refresh_from_db()
+        self.assertEqual(profile.district, "Karrada")
+        self.assertEqual(profile.profile_image.name, existing_name)
 
 
 class VerificationStatusDefaultTests(TestCase):

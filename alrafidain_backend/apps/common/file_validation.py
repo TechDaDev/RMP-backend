@@ -51,6 +51,11 @@ def validate_uploaded_file(
     allowed_content_types,
     max_size_mb: int,
 ):
+    # PATCH requests may include an empty value for optional file fields.
+    # Treat these as "no new upload" and skip file-level validation.
+    if file_obj in (None, ""):
+        return
+
     validate_file_size(file_obj, max_size_mb=max_size_mb)
     validate_file_extension(file_obj, allowed_extensions=allowed_extensions)
     validate_content_type(file_obj, allowed_content_types=allowed_content_types)

@@ -104,3 +104,19 @@ class ValidateUploadedFileTests(TestCase):
                 allowed_content_types=["application/pdf"],
                 max_size_mb=5,
             )
+
+    def test_none_value_skips_validation(self):
+        validate_uploaded_file(
+            None,
+            allowed_extensions=[".pdf"],
+            allowed_content_types=["application/pdf"],
+            max_size_mb=5,
+        )
+
+    def test_empty_string_value_skips_validation(self):
+        validate_uploaded_file(
+            "",
+            allowed_extensions=[".pdf"],
+            allowed_content_types=["application/pdf"],
+            max_size_mb=5,
+        )
