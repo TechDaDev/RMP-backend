@@ -31,6 +31,7 @@ from .services import (
     reject_knowledge_document,
     search_approved_chunks,
     semantic_search_approved_chunks,
+    process_knowledge_document,
 )
 from .tasks import process_knowledge_document_task
 
@@ -141,12 +142,31 @@ class KnowledgeDocumentDetailView(RetrieveAPIView):
 
 @extend_schema(tags=["Knowledge Base"])
 class KnowledgeDocumentProcessView(APIView):
-    """POST /api/knowledge-base/documents/<uuid:document_id>/process/ — Extract and chunk."""
+    """POST /api/knowledge-base/documents/<uuid:document_id>/process/ — Extract and chunk.
+    
+    Query params:
+    - sync=true|1 : Run processing synchronously (for dev/testing; slow response).
+                    Default: queued (returns 202 immediately).
+    """
 
     permission_classes = [CanAccessKnowledgeBase]
 
     def post(self, request, document_id):
         document = get_object_or_404(KnowledgeDocument, pk=document_id)
+        is_sync = request.query_params.get("sync", "").lower() in ("true", "1")
+
+        if is_sync:
+            # Synchronous processing for dev/testing (no worker needed)
+            from apps.knowledge_base.services import process_knowledge_document
+
+            process_knowledge_document(document)
+            return success_response(
+                message="Knowledge document processed synchronously.",
+                data=KnowledgeDocumentDetailSerializer(document).data,
+                status_code=status.HTTP_200_OK,
+            )
+
+        # Async (queued) processing
         job = create_background_job(
             task_name="knowledge_base.process_document",
             created_by=request.user,
@@ -162,11 +182,12 @@ class KnowledgeDocumentProcessView(APIView):
         )
 
         return success_response(
-            message="Knowledge document processing queued.",
+            message="Knowledge document processing queued. Poll document status to detect completion.",
             data={
                 "document_id": str(document.pk),
                 "job_id": str(job.pk),
                 "job_status": job.status,
+                "polling_hint": "GET /api/knowledge-base/documents/{document_id}/ until processing_status changes from 'uploaded'",
             },
             status_code=status.HTTP_202_ACCEPTED,
         )
@@ -187,6 +208,14 @@ class KnowledgeDocumentApproveView(APIView):
         try:
             approve_knowledge_document(document, approved_by=request.user)
         except (ValueError, PermissionError) as exc:
+            # Check if the issue is incomplete processing
+            if document.chunks.filter(is_active=True).count() == 0:
+                return error_response(
+                    message=f"Cannot approve: Document must be processed into chunks first. "
+                    f"Current status: {document.processing_status}. "
+                    f"POST /api/knowledge-base/documents/{document_id}/process/ then wait for processing_status='chunked'.",
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
             return error_response(message=str(exc))
 
         return success_response(data=KnowledgeDocumentDetailSerializer(document).data)

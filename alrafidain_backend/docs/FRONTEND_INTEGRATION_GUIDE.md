@@ -531,11 +531,11 @@ POST /api/lab-orders/items/{lab_order_item_id}/results/
 ```http
 POST /api/knowledge-base/documents/             // Upload document
 GET  /api/knowledge-base/documents/             // List all documents
-POST /api/knowledge-base/documents/{id}/process/ // Trigger vectorisation
+POST /api/knowledge-base/documents/{id}/process/ // Trigger processing (extract + chunk)
 POST /api/knowledge-base/documents/{id}/approve/ // Approve for RAG use
 ```
 
-Upload request is `multipart/form-data` and must include:
+**Upload request** is `multipart/form-data` and must include:
 - `title`
 - `document_type` (`medical_book`, `laboratory_book`, `clinical_guideline`, `drug_reference`, `patient_education`, `platform_policy`, `other`)
 - `language` (`english`, `arabic`, `kurdish`, `mixed`, `other`)
@@ -545,6 +545,24 @@ Upload request is `multipart/form-data` and must include:
 Compatibility note:
 - Backend also accepts file aliases: `reference`, `document`, `document_file`, `upload`.
 - Prefer sending `file` as the canonical field.
+
+**Processing workflow:**
+
+1. **Upload** → `POST /api/knowledge-base/documents/` → 201, returns `document_id`
+2. **Process** → `POST /api/knowledge-base/documents/{document_id}/process/` → 202 (queued) or 200 (sync)
+   - **Production mode** (Celery worker running):
+     - Returns 202 with `job_id`
+     - Frontend must **poll** `GET /api/knowledge-base/documents/{document_id}/` every 2–5 sec
+     - Wait until `processing_status` changes from `uploaded` to `chunked` (or `extracted`)
+   - **Development mode** (no Celery worker): Add `?sync=true` to force synchronous processing
+     - `POST /api/knowledge-base/documents/{document_id}/process/?sync=true` → 200 immediately
+     - Document transitions directly to `chunked` status
+3. **Approve** → `POST /api/knowledge-base/documents/{document_id}/approve/` → 200, only after processing_status=chunked
+4. **Embed** (optional) → `POST /api/knowledge-base/documents/{document_id}/embed/` → 200, generates vector embeddings
+
+**Frontend error handling:**
+- If approve returns 400 with "Cannot approve: Document must be processed", it means processing didn't complete.
+  - Recommended: Retry or inform user that system is processing (check status again in a few seconds).
 
 ### 10.2 RAG Feedback Review
 
