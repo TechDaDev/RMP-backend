@@ -54,6 +54,18 @@ class ValidateContentTypeTests(TestCase):
         f = SimpleUploadedFile("doc.txt", b"data", content_type="text/plain")
         validate_content_type(f, allowed_content_types=["text/plain"])
 
+    def test_jpeg_alias_content_type_passes(self):
+        f = SimpleUploadedFile("avatar.jpg", b"data", content_type="image/jpg")
+        validate_content_type(f, allowed_content_types=["image/jpeg"])
+
+    def test_content_type_with_parameters_passes(self):
+        f = SimpleUploadedFile("avatar.jpg", b"data", content_type="image/jpeg; charset=binary")
+        validate_content_type(f, allowed_content_types=["image/jpeg"])
+
+    def test_generic_octet_stream_falls_back_to_extension_guess(self):
+        f = SimpleUploadedFile("avatar.jpg", b"data", content_type="application/octet-stream")
+        validate_content_type(f, allowed_content_types=["image/jpeg"])
+
     def test_disallowed_content_type_raises(self):
         f = SimpleUploadedFile("bad.exe", b"data", content_type="application/x-msdownload")
         with self.assertRaises(ValidationError):

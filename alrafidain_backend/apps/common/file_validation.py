@@ -6,6 +6,23 @@ import os
 from rest_framework import serializers
 
 
+CONTENT_TYPE_ALIASES = {
+    "image/jpg": "image/jpeg",
+    "image/pjpeg": "image/jpeg",
+    "image/x-png": "image/png",
+}
+
+GENERIC_CONTENT_TYPES = {
+    "application/octet-stream",
+    "binary/octet-stream",
+}
+
+
+def _normalize_content_type(value: str) -> str:
+    normalized = (value or "").split(";", 1)[0].strip().lower()
+    return CONTENT_TYPE_ALIASES.get(normalized, normalized)
+
+
 def validate_file_size(file_obj, max_size_mb: int):
     max_bytes = max_size_mb * 1024 * 1024
     file_size = getattr(file_obj, "size", None)
@@ -30,12 +47,12 @@ def validate_file_extension(file_obj, allowed_extensions):
 
 
 def validate_content_type(file_obj, allowed_content_types):
-    allowed = {str(v).lower() for v in allowed_content_types}
-    content_type = (getattr(file_obj, "content_type", "") or "").lower()
+    allowed = {_normalize_content_type(str(v)) for v in allowed_content_types}
+    content_type = _normalize_content_type(getattr(file_obj, "content_type", "") or "")
 
-    if not content_type:
+    if not content_type or content_type in GENERIC_CONTENT_TYPES:
         guessed, _ = mimetypes.guess_type(getattr(file_obj, "name", ""))
-        content_type = (guessed or "").lower()
+        content_type = _normalize_content_type(guessed or "")
 
     if not content_type or content_type not in allowed:
         allowed_text = ", ".join(sorted(allowed))
