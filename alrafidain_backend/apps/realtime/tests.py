@@ -1,12 +1,16 @@
 """Tests for realtime permissions and broadcast services."""
 
 from types import SimpleNamespace
+from unittest.mock import patch
 from uuid import uuid4
 
 from asgiref.sync import async_to_sync
+from channels.db import database_sync_to_async
+from channels.testing import WebsocketCommunicator
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.test import TransactionTestCase
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.common.choices import (
     ConsultationDuration,
@@ -23,6 +27,7 @@ from apps.consultations.models import Consultation
 from apps.messaging.models import ConsultationMessage
 from apps.notifications.models import Notification
 from apps.profiles.models import DoctorProfile, PatientProfile, UserProfile
+from config.asgi import application
 
 from .permissions import can_connect_consultation_messages, can_connect_user_socket
 from .services import (
@@ -162,6 +167,40 @@ class BroadcastServiceTests(TransactionTestCase):
         )
         broadcast_message_created(message)
 
+    @patch("apps.realtime.services.send_to_group_safe")
+    def test_broadcast_message_created_matches_contract(self, send_to_group_safe):
+        patient = create_patient("contract-patient@example.com")
+        doctor = create_doctor("contract-doctor@example.com")
+        consultation = create_consultation(patient, doctor, ConsultationStatus.ACCEPTED)
+        message = ConsultationMessage.objects.create(
+            consultation=consultation,
+            sender=patient,
+            sender_role=MessageSenderRole.PATIENT,
+            message_type=MessageType.TEXT,
+            body="Contract message",
+        )
+
+        broadcast_message_created(message)
+
+        send_to_group_safe.assert_called_once()
+        group_name, event_data = send_to_group_safe.call_args.args
+        self.assertEqual(group_name, f"consultation_{consultation.id}")
+        self.assertEqual(event_data["type"], "chat.message.created")
+        self.assertEqual(event_data["consultation_id"], str(consultation.id))
+        self.assertEqual(
+            set(event_data["message"].keys()),
+            {
+                "id",
+                "sender",
+                "sender_role",
+                "message_type",
+                "body",
+                "attachments",
+                "is_read",
+                "created_at",
+            },
+        )
+
     def test_broadcast_messages_marked_read(self):
         patient = create_patient()
         doctor = create_doctor()
@@ -204,3 +243,55 @@ class BroadcastServiceTests(TransactionTestCase):
             lab_order=SimpleNamespace(patient_id=uuid4()),
         )
         broadcast_lab_result_released(lab_result)
+
+
+class ConsultationSocketDeliveryTests(TransactionTestCase):
+    def test_message_create_broadcast_reaches_other_participant(self):
+        patient = create_patient("socket-patient@example.com")
+        doctor = create_doctor("socket-doctor@example.com")
+        consultation = create_consultation(patient, doctor, ConsultationStatus.ACCEPTED)
+
+        patient_token = str(RefreshToken.for_user(patient).access_token)
+        doctor_token = str(RefreshToken.for_user(doctor).access_token)
+
+        async def scenario():
+            patient_socket = WebsocketCommunicator(
+                application,
+                f"/ws/consultations/{consultation.id}/messages/?token={patient_token}",
+            )
+            doctor_socket = WebsocketCommunicator(
+                application,
+                f"/ws/consultations/{consultation.id}/messages/?token={doctor_token}",
+            )
+
+            patient_connected, _ = await patient_socket.connect()
+            doctor_connected, _ = await doctor_socket.connect()
+
+            self.assertTrue(patient_connected)
+            self.assertTrue(doctor_connected)
+
+            try:
+                from apps.messaging.services import create_consultation_message
+
+                message = await database_sync_to_async(create_consultation_message)(
+                    consultation=consultation,
+                    sender=patient,
+                    body="Realtime hello",
+                )
+
+                patient_event = await patient_socket.receive_json_from(timeout=1)
+                doctor_event = await doctor_socket.receive_json_from(timeout=1)
+
+                self.assertEqual(patient_event["type"], "chat.message.created")
+                self.assertEqual(doctor_event["type"], "chat.message.created")
+                self.assertEqual(patient_event["consultation_id"], str(consultation.id))
+                self.assertEqual(doctor_event["consultation_id"], str(consultation.id))
+                self.assertEqual(patient_event["message"]["id"], str(message.id))
+                self.assertEqual(doctor_event["message"]["id"], str(message.id))
+                self.assertEqual(patient_event["message"]["body"], "Realtime hello")
+                self.assertEqual(doctor_event["message"]["body"], "Realtime hello")
+            finally:
+                await patient_socket.disconnect()
+                await doctor_socket.disconnect()
+
+        async_to_sync(scenario)()

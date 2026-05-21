@@ -48,6 +48,25 @@ class ConsultationMessageSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class ConsultationRealtimeMessageSerializer(serializers.ModelSerializer):
+    sender = MessageSenderSummarySerializer(read_only=True)
+    attachments = MessageAttachmentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = ConsultationMessage
+        fields = [
+            "id",
+            "sender",
+            "sender_role",
+            "message_type",
+            "body",
+            "attachments",
+            "is_read",
+            "created_at",
+        ]
+        read_only_fields = fields
+
+
 class ConsultationMessageCreateSerializer(serializers.Serializer):
     body = serializers.CharField(required=False, allow_blank=True)
     attachments = serializers.ListField(

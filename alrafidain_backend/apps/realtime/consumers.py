@@ -37,6 +37,10 @@ class UserRealtimeConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
         """Handle WebSocket connection."""
         user = self.scope.get("user", AnonymousUser())
+        logger.info(
+            "Realtime user socket connect attempt",
+            extra={"user_id": str(getattr(user, "id", "anonymous"))},
+        )
 
         # Check authentication
         if not can_connect_user_socket(user):
@@ -48,6 +52,10 @@ class UserRealtimeConsumer(AsyncJsonWebsocketConsumer):
 
         # Join user group
         await self.channel_layer.group_add(self.group_name, self.channel_name)
+        logger.info(
+            "Realtime user socket joined group",
+            extra={"user_id": str(self.user_id), "group_name": self.group_name},
+        )
         await self.accept()
         logger.debug(f"User {self.user_id} connected to realtime socket")
 
@@ -75,6 +83,10 @@ class UserRealtimeConsumer(AsyncJsonWebsocketConsumer):
 
     async def notification_created(self, event):
         """Handle notification.created event."""
+        logger.info(
+            "Delivering notification.created to user socket",
+            extra={"user_id": str(self.user_id)},
+        )
         await self.send_json(event)
 
     async def notification_unread_count(self, event):
@@ -83,6 +95,10 @@ class UserRealtimeConsumer(AsyncJsonWebsocketConsumer):
 
     async def consultation_updated(self, event):
         """Handle consultation.updated event."""
+        logger.info(
+            "Delivering consultation.updated to user socket",
+            extra={"user_id": str(self.user_id)},
+        )
         await self.send_json(event)
 
     async def prescription_updated(self, event):
@@ -118,6 +134,13 @@ class ConsultationMessageConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
         """Handle WebSocket connection."""
         user = self.scope.get("user", AnonymousUser())
+        logger.info(
+            "Consultation socket connect attempt",
+            extra={
+                "user_id": str(getattr(user, "id", "anonymous")),
+                "consultation_id": str(self.scope["url_route"]["kwargs"]["consultation_id"]),
+            },
+        )
 
         # Check authentication
         if not user.is_authenticated:
@@ -146,6 +169,14 @@ class ConsultationMessageConsumer(AsyncJsonWebsocketConsumer):
 
         # Join consultation group
         await self.channel_layer.group_add(self.group_name, self.channel_name)
+        logger.info(
+            "Consultation socket joined group",
+            extra={
+                "user_id": str(self.user_id),
+                "consultation_id": str(self.consultation_id),
+                "group_name": self.group_name,
+            },
+        )
         await self.accept()
         logger.debug(f"User {self.user_id} connected to consultation {self.consultation_id} socket")
 
@@ -175,10 +206,26 @@ class ConsultationMessageConsumer(AsyncJsonWebsocketConsumer):
 
     async def chat_message_created(self, event):
         """Handle chat.message.created event."""
+        logger.info(
+            "Delivering chat.message.created to consultation socket",
+            extra={
+                "user_id": str(self.user_id),
+                "consultation_id": str(self.consultation_id),
+                "message_id": str(event.get("message", {}).get("id")),
+            },
+        )
         await self.send_json(event)
 
     async def chat_messages_read(self, event):
         """Handle chat.messages.read event."""
+        logger.info(
+            "Delivering chat.messages.read to consultation socket",
+            extra={
+                "user_id": str(self.user_id),
+                "consultation_id": str(self.consultation_id),
+                "reader_id": str(event.get("reader_id")),
+            },
+        )
         await self.send_json(event)
 
     async def consultation_closed(self, event):
@@ -187,6 +234,13 @@ class ConsultationMessageConsumer(AsyncJsonWebsocketConsumer):
 
     async def consultation_updated(self, event):
         """Handle consultation.updated event."""
+        logger.info(
+            "Delivering consultation.updated to consultation socket",
+            extra={
+                "user_id": str(self.user_id),
+                "consultation_id": str(self.consultation_id),
+            },
+        )
         await self.send_json(event)
 
     # ── Database Query Helpers ─────────────────────────────────────────────

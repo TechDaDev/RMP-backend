@@ -16,12 +16,23 @@ from .serializers import (
 )
 from .services import create_consultation_message, mark_messages_as_read
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 @extend_schema(tags=["Messaging"])
 class ConsultationMessageCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def create_message(self, request, consultation):
+        logger.info(
+            "Creating consultation message via REST",
+            extra={
+                "consultation_id": str(consultation.id),
+                "sender_id": str(request.user.id),
+            },
+        )
         if not can_send_messages(request.user, consultation):
             return error_response(
                 message="You are not allowed to send messages for this consultation.",
@@ -41,6 +52,14 @@ class ConsultationMessageCreateView(APIView):
             body=serializer.validated_data.get("body"),
             attachments=serializer.validated_data.get("attachments", []),
             request=request,
+        )
+        logger.info(
+            "Consultation message created via REST",
+            extra={
+                "consultation_id": str(consultation.id),
+                "message_id": str(message.id),
+                "sender_id": str(request.user.id),
+            },
         )
         return success_response(
             message="Message sent successfully.",

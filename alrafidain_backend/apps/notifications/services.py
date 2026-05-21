@@ -1,3 +1,5 @@
+import logging
+
 from django.db import transaction
 
 from apps.common.choices import NotificationPriority
@@ -5,6 +7,25 @@ from apps.common.job_utils import create_background_job
 
 from .models import Notification
 from .tasks import publish_notification_event_task
+
+logger = logging.getLogger(__name__)
+
+
+def _publish_notification_event(notification_id, job_id):
+    try:
+        publish_notification_event_task.delay(
+            notification_id=str(notification_id),
+            job_id=str(job_id),
+        )
+    except Exception:
+        logger.exception(
+            "Failed to enqueue notification publish task",
+            extra={
+                "notification_id": str(notification_id),
+                "job_id": str(job_id),
+            },
+        )
+        raise
 
 
 def create_notification(
@@ -35,10 +56,8 @@ def create_notification(
 
     # Queue side-effect fanout only after commit.
     transaction.on_commit(
-        lambda: publish_notification_event_task.delay(
-            notification_id=str(notification.id),
-            job_id=str(job.id),
-        )
+        lambda: _publish_notification_event(notification.id, job.id),
+        robust=True,
     )
 
     return notification

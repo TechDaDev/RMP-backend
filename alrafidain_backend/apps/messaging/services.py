@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
+import logging
 
 from apps.audit.services import create_audit_log
 from apps.common.choices import MessageSenderRole, MessageType, NotificationType, UserType
@@ -8,6 +9,8 @@ from apps.notifications.services import create_notification
 
 from .models import ConsultationMessage, MessageAttachment
 from .permissions import can_send_messages
+
+logger = logging.getLogger(__name__)
 
 
 def _sender_role_from_user(user: object) -> str:
@@ -47,6 +50,16 @@ def create_consultation_message(
     )
     message.full_clean()
     message.save()
+    logger.info(
+        "Consultation message persisted",
+        extra={
+            "consultation_id": str(consultation.id),
+            "message_id": str(message.id),
+            "sender_id": str(sender.id),
+            "sender_role": sender_role,
+            "attachment_count": len(attachments),
+        },
+    )
 
     for file_obj in attachments:
         attachment = MessageAttachment(
@@ -107,13 +120,16 @@ def create_consultation_message(
 
         try:
             broadcast_message_created(message)
-        except Exception as e:
-            import logging
+        except Exception as exc:
+            logger.exception(
+                "Failed to broadcast chat.message.created event",
+                extra={
+                    "consultation_id": str(consultation.id),
+                    "message_id": str(message.id),
+                },
+            )
 
-            logger = logging.getLogger(__name__)
-            logger.error(f"Failed to broadcast message.created event: {e}")
-
-    transaction.on_commit(broadcast_message_event)
+    transaction.on_commit(broadcast_message_event, robust=True)
 
     return message
 
@@ -144,12 +160,16 @@ def mark_messages_as_read(consultation, reader):
 
             try:
                 broadcast_messages_marked_read(consultation, reader, count)
-            except Exception as e:
-                import logging
+            except Exception:
+                logger.exception(
+                    "Failed to broadcast chat.messages.read event",
+                    extra={
+                        "consultation_id": str(consultation.id),
+                        "reader_id": str(reader.id),
+                        "count": count,
+                    },
+                )
 
-                logger = logging.getLogger(__name__)
-                logger.error(f"Failed to broadcast messages.read event: {e}")
-
-        transaction.on_commit(broadcast_read_event)
+        transaction.on_commit(broadcast_read_event, robust=True)
 
     return count

@@ -87,7 +87,7 @@ def accept_consultation(*, consultation, doctor, request=None):
         except Exception as exc:
             logger.error("Failed to broadcast consultation.updated event: %s", exc)
 
-    transaction.on_commit(broadcast_update)
+    transaction.on_commit(broadcast_update, robust=True)
     return consultation
 
 
@@ -134,7 +134,7 @@ def add_consultation_response(
         except Exception as exc:
             logger.error("Failed to broadcast consultation.updated event: %s", exc)
 
-    transaction.on_commit(broadcast_update)
+    transaction.on_commit(broadcast_update, robust=True)
     return response
 
 
@@ -166,5 +166,5 @@ def close_consultation(*, consultation, doctor, request=None):
         except Exception as exc:
             logger.error("Failed to broadcast consultation.updated event: %s", exc)
 
-    transaction.on_commit(broadcast_update)
+    transaction.on_commit(broadcast_update, robust=True)
     return consultation

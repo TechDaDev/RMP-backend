@@ -97,7 +97,7 @@ def create_lab_order(consultation, doctor, items_data, request=None):
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to broadcast lab_order.updated event: {e}")
 
-    transaction.on_commit(broadcast_update)
+    transaction.on_commit(broadcast_update, robust=True)
 
     return lab_order
 
@@ -315,7 +315,7 @@ def complete_lab_order_items(lab_order, laboratorian, items_payload, request=Non
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to broadcast lab_order.updated event: {e}")
 
-    transaction.on_commit(broadcast_update)
+    transaction.on_commit(broadcast_update, robust=True)
 
     return lab_order
 
@@ -585,7 +585,7 @@ def release_lab_result_to_patient(lab_result, doctor, request=None):
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to broadcast lab_result.released event: {e}")
 
-    transaction.on_commit(broadcast_release)
+    transaction.on_commit(broadcast_release, robust=True)
 
     return lab_result
 

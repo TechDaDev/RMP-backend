@@ -32,15 +32,22 @@ def send_to_group_safe(group_name, event_data):
     """
     channel_layer = get_channel_layer_safe()
     if not channel_layer:
-        logger.debug(f"Channel layer unavailable, skipping broadcast to {group_name}")
+        logger.warning(
+            "Channel layer unavailable, skipping realtime broadcast",
+            extra={"group_name": group_name, "event_type": event_data.get("type")},
+        )
         return
 
     try:
+        logger.info(
+            "Sending realtime event to group",
+            extra={"group_name": group_name, "event_type": event_data.get("type")},
+        )
         async_to_sync(channel_layer.group_send)(group_name, event_data)
-    except Exception as e:
-        logger.error(
-            f"Failed to send event to group {group_name}: {e}",
-            extra={"event_type": event_data.get("type")},
+    except Exception:
+        logger.exception(
+            "Failed to send realtime event to group",
+            extra={"group_name": group_name, "event_type": event_data.get("type")},
         )
 
 
@@ -122,10 +129,10 @@ def broadcast_message_created(message):
     Args:
         message: Message instance
     """
-    from apps.messaging.serializers import ConsultationMessageSerializer
+    from apps.messaging.serializers import ConsultationRealtimeMessageSerializer
 
     try:
-        serializer = ConsultationMessageSerializer(message)
+        serializer = ConsultationRealtimeMessageSerializer(message)
         payload = serializer.data
 
         event_data = {
@@ -134,12 +141,26 @@ def broadcast_message_created(message):
             "message": payload,
         }
 
+        logger.info(
+            "Broadcasting chat.message.created",
+            extra={
+                "consultation_id": str(message.consultation_id),
+                "message_id": str(message.id),
+            },
+        )
+
         send_to_group_safe(
             consultation_group_name(message.consultation_id),
             event_data,
         )
-    except Exception as e:
-        logger.error(f"Failed to broadcast chat.message.created: {e}")
+    except Exception:
+        logger.exception(
+            "Failed to broadcast chat.message.created",
+            extra={
+                "consultation_id": str(message.consultation_id),
+                "message_id": str(message.id),
+            },
+        )
 
 
 def broadcast_messages_marked_read(consultation, reader, count):
@@ -159,12 +180,28 @@ def broadcast_messages_marked_read(consultation, reader, count):
             "count": count,
         }
 
+        logger.info(
+            "Broadcasting chat.messages.read",
+            extra={
+                "consultation_id": str(consultation.id),
+                "reader_id": str(reader.id),
+                "count": count,
+            },
+        )
+
         send_to_group_safe(
             consultation_group_name(consultation.id),
             event_data,
         )
-    except Exception as e:
-        logger.error(f"Failed to broadcast chat.messages.read: {e}")
+    except Exception:
+        logger.exception(
+            "Failed to broadcast chat.messages.read",
+            extra={
+                "consultation_id": str(consultation.id),
+                "reader_id": str(reader.id),
+                "count": count,
+            },
+        )
 
 
 def broadcast_consultation_updated(consultation):

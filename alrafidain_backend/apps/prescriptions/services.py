@@ -87,7 +87,7 @@ def create_prescription(consultation, doctor, items_data, request=None):
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to broadcast prescription.updated event: {e}")
 
-    transaction.on_commit(broadcast_update)
+    transaction.on_commit(broadcast_update, robust=True)
 
     return prescription
 
@@ -279,6 +279,6 @@ def dispense_prescription_items(prescription, pharmacist, items_payload, request
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to broadcast prescription.updated event: {e}")
 
-    transaction.on_commit(broadcast_update)
+    transaction.on_commit(broadcast_update, robust=True)
 
     return prescription

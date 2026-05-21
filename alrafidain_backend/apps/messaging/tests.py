@@ -7,6 +7,7 @@ from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
+from unittest.mock import patch
 
 from apps.audit.models import AuditLog
 from apps.common.choices import (
@@ -280,6 +281,21 @@ class MessagingTests(TestCase):
         att = MessageAttachment.objects.latest("created_at")
         self.assertEqual(att.uploaded_by_id, self.patient.id)
         self.assertEqual(att.original_name, "lab-result.txt")
+
+    def test_message_broadcast_still_runs_if_notification_enqueue_fails(self):
+        with patch(
+            "apps.notifications.tasks.publish_notification_event_task.delay",
+            side_effect=RuntimeError("broker unavailable"),
+        ), patch("apps.realtime.services.broadcast_message_created") as broadcast_message_created:
+            with self.captureOnCommitCallbacks(execute=True):
+                response = self.patient_client.post(
+                    self.msg_url(),
+                    {"body": "hello with failed notification enqueue"},
+                    format="json",
+                )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        broadcast_message_created.assert_called_once()
 
 
 class MessagingQueryPerformanceTests(TestCase):
