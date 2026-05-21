@@ -76,6 +76,7 @@ Clinical-action verification gates:
 | Assignment filter | `assigned_doctor IS NULL` |
 | Specialty filter | Exact match: `consultation.selected_specialty == doctor_profile.specialty` |
 | Response | `success_response` with `ConsultationListSerializer[]` |
+| Important | This endpoint returns consultations in the doctor's queue, not doctor accounts |
 
 Notes:
 - Matching is exact single-specialty matching.

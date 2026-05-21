@@ -544,6 +544,39 @@ List pending consultations matching doctor's specialty.
 
 - **Auth required**: Yes
 - **Allowed roles**: Doctor
+- **Returns**: A list of consultation records, not a list of doctors.
+- **Filtering**: Only `submitted` consultations with `assigned_doctor = null` and `selected_specialty = doctor_profile.specialty`.
+- **UI note**: Use this endpoint to build the doctor's pending queue screen. Do not use it as a patient-side doctor picker.
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": "82d1e509-d830-4f4c-a172-8bfe49bc7dec",
+      "patient": {
+        "id": "fc33b0b6-60b1-47e5-9def-b4ed9eb5c113",
+        "email": "patient@rmp.local",
+        "full_name": "Ahmad Al-Rashid",
+        "profile_image": null,
+        "user_type": "patient",
+        "is_active": true,
+        "date_joined": "2026-05-01T10:00:00Z"
+      },
+      "assigned_doctor": null,
+      "status": "submitted",
+      "recommended_specialty": "pulmonology",
+      "selected_specialty": "pulmonology",
+      "severity": "moderate",
+      "duration": "one_to_three_days",
+      "has_emergency_warning": false,
+      "created_at": "2026-05-21T05:27:42Z",
+      "updated_at": "2026-05-21T05:27:42Z"
+    }
+  ]
+}
+```
 
 ---
 

@@ -279,6 +279,13 @@ Future phase note: profile-completion gating before consultation creation will b
 
 ### 6.2 View Consultations
 
+Important distinction:
+- `GET /api/consultations/doctor/pending/` is a doctor queue endpoint. It returns consultations, not doctors.
+- Patients should not use that endpoint after submission.
+- The patient flow should go to consultation detail using the `data.id` returned from `POST /api/consultations/`.
+
+If product later requires a patient-visible doctor picker, that needs a dedicated backend endpoint. The current backend does not expose one.
+
 ```http
 GET /api/consultations/my/
 ```
