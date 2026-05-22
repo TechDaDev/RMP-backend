@@ -12,14 +12,16 @@ from apps.common.choices import (
     KnowledgeApprovalStatus,
     KnowledgeProcessingStatus,
     KnowledgeSecurityStatus,
+    MedicalRecordCategory,
     RAGFeedbackRating,
     RAGFeedbackReviewStatus,
     RAGResponseStatus,
     RAGSafetyLevel,
+    RAGServiceContext,
 )
 from apps.common.report_extraction import extract_clinical_report_text, secure_extracted_report_text
 
-from .permissions import is_approved_doctor
+from .permissions import can_access_consultation_rag, can_access_lab_result_rag, is_approved_doctor
 from .prompting import build_doctor_rag_prompt
 
 SAFE_FALLBACK_MESSAGE = (
@@ -250,9 +252,20 @@ def run_doctor_rag_query(
         ]
         raw_response = result.get("raw", {})
         usage = result.get("usage", {})
+        usage_summary = {
+            "prompt_tokens": usage.get("prompt_tokens", 0),
+            "completion_tokens": usage.get("completion_tokens", 0),
+            "prompt_cache_hit_tokens": usage.get("prompt_cache_hit_tokens", 0),
+            "prompt_cache_miss_tokens": usage.get("prompt_cache_miss_tokens", 0),
+        }
         token_input = usage.get("prompt_tokens")
         token_output = usage.get("completion_tokens")
         model_name = result.get("model", model_name)
+
+        if isinstance(raw_response, dict):
+            raw_response = {**raw_response, "usage_summary": usage_summary}
+        else:
+            raw_response = {"usage_summary": usage_summary}
 
         if require_sources and not _is_source_enforced_by_text(response_text):
             status = RAGResponseStatus.NO_CONTEXT
@@ -304,6 +317,120 @@ def run_doctor_rag_query(
     return rag_query, rag_response
 
 
+def _resolve_patient_and_context_for_rag_response(rag_query, doctor):
+    if not rag_query.object_id:
+        raise ValueError("This RAG response has no clinical object context to persist.")
+
+    if rag_query.service_context == RAGServiceContext.CONSULTATION:
+        from apps.consultations.models import Consultation
+
+        consultation = Consultation.objects.filter(pk=rag_query.object_id).first()
+        if consultation is None:
+            raise ValueError("Consultation context was not found.")
+        if not can_access_consultation_rag(doctor, consultation):
+            raise PermissionError("You cannot persist this consultation RAG response.")
+
+        return {
+            "patient": consultation.patient,
+            "title": f"AI Clinical Case Report (Consultation {consultation.pk})",
+            "context_summary": build_consultation_summary_for_rag(consultation),
+        }
+
+    if rag_query.service_context == RAGServiceContext.LAB_RESULT:
+        from apps.lab_orders.models import LabResult
+
+        lab_result = LabResult.objects.filter(pk=rag_query.object_id).first()
+        if lab_result is None:
+            raise ValueError("Lab result context was not found.")
+        if not can_access_lab_result_rag(doctor, lab_result):
+            raise PermissionError("You cannot persist this lab-result RAG response.")
+
+        return {
+            "patient": lab_result.patient,
+            "title": f"AI Clinical Case Report (Lab Result {lab_result.pk})",
+            "context_summary": build_lab_result_summary_for_rag(lab_result),
+        }
+
+    raise ValueError("Only consultation and lab-result RAG responses can be persisted.")
+
+
+def save_rag_response_to_patient_record(
+    *,
+    rag_response,
+    doctor,
+    physician_notes: str = "",
+    request=None,
+):
+    from apps.patient_records.services import (
+        create_medical_record_entry,
+        get_or_create_patient_medical_record,
+    )
+
+    if not doctor_can_use_rag(doctor):
+        raise PermissionError("Only approved doctors may persist RAG responses.")
+
+    rag_query = rag_response.rag_query
+    if rag_query.requested_by_id != doctor.pk:
+        raise PermissionError("You can only persist your own RAG response.")
+
+    if rag_response.status != RAGResponseStatus.SUCCESS:
+        raise ValueError("Only successful RAG responses can be persisted.")
+
+    raw_response = rag_response.raw_response if isinstance(rag_response.raw_response, dict) else {}
+    if raw_response.get("saved_patient_record_entry_id"):
+        raise ValueError("This RAG response was already saved to the patient record.")
+
+    resolved = _resolve_patient_and_context_for_rag_response(rag_query, doctor)
+    record = get_or_create_patient_medical_record(resolved["patient"])
+
+    safety = raw_response.get("safety", {}) if isinstance(raw_response, dict) else {}
+    source_titles = safety.get("document_titles") or []
+
+    notes_parts = []
+    if physician_notes.strip():
+        notes_parts.append(f"Treating physician notes:\n{physician_notes.strip()}")
+    notes_parts.append(f"RAG query: {rag_query.query_text}")
+    if source_titles:
+        notes_parts.append(f"Referenced sources: {', '.join(source_titles)}")
+    notes_parts.append(f"Clinical context snapshot:\n{resolved['context_summary']}")
+
+    entry = create_medical_record_entry(
+        record=record,
+        source_user=doctor,
+        category=MedicalRecordCategory.GENERAL_NOTE,
+        title=resolved["title"],
+        value=rag_response.response_text,
+        notes="\n\n".join(notes_parts),
+        request=request,
+    )
+
+    rag_response.raw_response = {
+        **raw_response,
+        "saved_patient_record_entry_id": str(entry.id),
+        "saved_patient_record_id": str(record.id),
+        "saved_by_doctor_id": str(doctor.id),
+        "saved_at": timezone.now().isoformat(),
+    }
+    rag_response.save(update_fields=["raw_response", "updated_at"])
+
+    create_audit_log(
+        actor=doctor,
+        action="rag_response_saved_to_patient_record",
+        target=entry,
+        metadata={
+            "rag_response_id": str(rag_response.id),
+            "rag_query_id": str(rag_query.id),
+            "patient_record_id": str(record.id),
+            "medical_record_entry_id": str(entry.id),
+            "service_context": rag_query.service_context,
+            "object_id": str(rag_query.object_id) if rag_query.object_id else None,
+        },
+        request=request,
+    )
+
+    return entry
+
+
 def build_consultation_summary_for_rag(consultation) -> str:
     """Build a plain-text clinical summary of a consultation for use as RAG object_summary."""
     parts = [
@@ -311,6 +438,15 @@ def build_consultation_summary_for_rag(consultation) -> str:
         f"Status: {consultation.status}",
         f"Specialty: {consultation.selected_specialty or 'N/A'}",
     ]
+    ranked_specialties = []
+    get_ranked = getattr(consultation, "get_recommended_specialties", None)
+    if callable(get_ranked):
+        ranked_specialties = get_ranked()
+    elif getattr(consultation, "recommended_specialties", None):
+        ranked_specialties = consultation.recommended_specialties
+    if ranked_specialties:
+        parts.append(f"Ranked specialties: {', '.join(ranked_specialties)}")
+
     if consultation.additional_notes:
         parts.append(f"Additional notes: {consultation.additional_notes}")
     if consultation.current_medications_related:

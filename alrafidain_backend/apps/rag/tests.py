@@ -29,6 +29,7 @@ from apps.common.choices import (
     VerificationStatus,
 )
 from apps.knowledge_base.models import KnowledgeChunk, KnowledgeDocument
+from apps.patient_records.models import MedicalRecordEntry
 from apps.profiles.models import DoctorProfile, PatientProfile, UserProfile
 
 from .models import RAGQuery, RAGRetrievedChunk
@@ -462,6 +463,10 @@ class BuildConsultationSummaryTest(TestCase):
         consultation.has_emergency_warning = False
         consultation.severity = "moderate"
         consultation.duration = "3 days"
+        consultation.get_recommended_specialties.return_value = [
+            MedicalSpecialty.CARDIOLOGY,
+            MedicalSpecialty.INTERNAL_MEDICINE,
+        ]
 
         summary = build_consultation_summary_for_rag(consultation)
 
@@ -470,6 +475,8 @@ class BuildConsultationSummaryTest(TestCase):
         self.assertIn("Aspirin 100mg", summary)
         self.assertIn("fever", summary)
         self.assertIn("moderate", summary)
+        self.assertIn("Ranked specialties", summary)
+        self.assertIn(MedicalSpecialty.INTERNAL_MEDICINE, summary)
 
     def test_builds_summary_minimal(self):
         consultation = MagicMock()
@@ -1290,6 +1297,104 @@ class RAGResponseFeedbackCreateViewTest(TestCase):
                     }
                 ],
             },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 400)
+
+
+class RAGResponseSaveToPatientRecordViewTest(TestCase):
+    def setUp(self):
+        from apps.common.choices import ConsultationStatus
+        from apps.consultations.models import Consultation
+
+        self.doctor = create_doctor(email="save_to_record_doc@example.com")
+        self.other_doctor = create_doctor(email="save_to_record_other@example.com")
+        self.patient = create_patient(email="save_to_record_patient@example.com")
+
+        self.consultation = Consultation.objects.create(
+            patient=self.patient,
+            assigned_doctor=self.doctor,
+            status=ConsultationStatus.ACCEPTED,
+            selected_specialty=MedicalSpecialty.GENERAL_MEDICINE,
+            duration="one_to_two_weeks",
+            severity="mild",
+        )
+
+        mock_client = MagicMock()
+        mock_client.chat.return_value = {
+            **MOCK_LLM_RESPONSE,
+            "content": "AI clinical summary for doctor review with sources.",
+        }
+        with patch(
+            "apps.knowledge_base.services.semantic_search_approved_chunks",
+            return_value=[_create_real_chunk(self.doctor)],
+        ):
+            _, self.rag_response = run_doctor_rag_query(
+                doctor=self.doctor,
+                query_text="Summarize this consultation for diagnosis support.",
+                service_context=RAGServiceContext.CONSULTATION,
+                object_id=self.consultation.pk,
+                llm_client=mock_client,
+            )
+
+    def url(self):
+        return f"/api/rag/responses/{self.rag_response.pk}/save-to-record/"
+
+    def test_assigned_doctor_can_save_response_to_patient_record(self):
+        client = auth_client(self.doctor)
+
+        resp = client.post(
+            self.url(),
+            {"physician_notes": "Likely non-cardiac chest pain; monitor and review ECG."},
+            format="json",
+        )
+
+        self.assertEqual(resp.status_code, 201)
+        entry = MedicalRecordEntry.objects.get(id=resp.data["id"])
+        self.assertEqual(entry.medical_record.patient_id, self.patient.id)
+        self.assertIn("ai clinical summary", entry.value.lower())
+        self.assertIn("Treating physician notes", entry.notes)
+        self.assertIn("Clinical context snapshot", entry.notes)
+
+        self.rag_response.refresh_from_db()
+        self.assertEqual(
+            self.rag_response.raw_response.get("saved_patient_record_entry_id"),
+            str(entry.id),
+        )
+
+    def test_cannot_save_the_same_response_twice(self):
+        client = auth_client(self.doctor)
+
+        first = client.post(self.url(), {}, format="json")
+        self.assertEqual(first.status_code, 201)
+
+        second = client.post(self.url(), {}, format="json")
+        self.assertEqual(second.status_code, 400)
+
+    def test_other_doctor_cannot_save_response(self):
+        client = auth_client(self.other_doctor)
+        resp = client.post(self.url(), {}, format="json")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_pending_doctor_cannot_save_response(self):
+        pending = create_doctor(email="save_to_record_pending@example.com", approved=False)
+        client = auth_client(pending)
+        resp = client.post(self.url(), {}, format="json")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_cannot_save_no_context_response(self):
+        with patch("apps.knowledge_base.services.semantic_search_approved_chunks", return_value=[]):
+            _, no_context_response = run_doctor_rag_query(
+                doctor=self.doctor,
+                query_text="This should be no context.",
+                service_context=RAGServiceContext.CONSULTATION,
+                object_id=self.consultation.pk,
+            )
+
+        client = auth_client(self.doctor)
+        resp = client.post(
+            f"/api/rag/responses/{no_context_response.pk}/save-to-record/",
+            {},
             format="json",
         )
         self.assertEqual(resp.status_code, 400)

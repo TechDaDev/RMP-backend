@@ -18,6 +18,7 @@ from .serializers import (
     RAGDatasetExportSerializer,
     RAGFeedbackReviewSerializer,
     RAGResponseFeedbackCreateSerializer,
+    RAGResponseSaveToRecordSerializer,
     RAGResponseFeedbackSerializer,
     RAGResponseSerializer,
 )
@@ -27,6 +28,7 @@ from .services import (
     doctor_can_use_rag,
     review_rag_feedback,
     run_doctor_rag_query,
+    save_rag_response_to_patient_record,
     submit_rag_response_feedback,
 )
 
@@ -205,6 +207,43 @@ class RAGResponseFeedbackCreateView(APIView):
             return Response({"detail": str(exc)}, status=403)
 
         return Response(RAGResponseFeedbackSerializer(feedback).data, status=201)
+
+
+class RAGResponseSaveToPatientRecordView(APIView):
+    """POST /api/rag/responses/<uuid:rag_response_id>/save-to-record/ — persist doctor RAG output."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, rag_response_id):
+        if not doctor_can_use_rag(request.user):
+            return Response(
+                {"detail": "Only approved doctors may save RAG responses to patient records."},
+                status=403,
+            )
+
+        rag_response = get_object_or_404(
+            RAGResponse.objects.select_related("rag_query"),
+            pk=rag_response_id,
+        )
+
+        serializer = RAGResponseSaveToRecordSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            entry = save_rag_response_to_patient_record(
+                rag_response=rag_response,
+                doctor=request.user,
+                physician_notes=serializer.validated_data.get("physician_notes", ""),
+                request=request,
+            )
+        except PermissionError as exc:
+            return Response({"detail": str(exc)}, status=403)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=400)
+
+        from apps.patient_records.serializers import MedicalRecordEntrySerializer
+
+        return Response(MedicalRecordEntrySerializer(entry).data, status=201)
 
 
 class MyRAGFeedbackListView(APIView):

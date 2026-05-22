@@ -10,6 +10,7 @@ from .views import (
     LabResultRAGSupportView,
     MyRAGFeedbackListView,
     RAGResponseFeedbackCreateView,
+    RAGResponseSaveToPatientRecordView,
 )
 
 urlpatterns = [
@@ -30,6 +31,11 @@ urlpatterns = [
         "responses/<uuid:rag_response_id>/feedback/",
         RAGResponseFeedbackCreateView.as_view(),
         name="rag-response-feedback-create",
+    ),
+    path(
+        "responses/<uuid:rag_response_id>/save-to-record/",
+        RAGResponseSaveToPatientRecordView.as_view(),
+        name="rag-response-save-to-record",
     ),
     path(
         "feedback/my/",

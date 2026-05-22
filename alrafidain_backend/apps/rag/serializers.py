@@ -178,6 +178,17 @@ class LabResultRAGSupportSerializer(serializers.Serializer):
         return fields
 
 
+class RAGResponseSaveToRecordSerializer(serializers.Serializer):
+    """Input serializer for saving a doctor RAG response into the patient record."""
+
+    physician_notes = serializers.CharField(
+        required=False,
+        allow_blank=True,
+        default="",
+        max_length=4000,
+    )
+
+
 # ---------------------------------------------------------------------------
 # Phase 12D — Feedback serializers
 # ---------------------------------------------------------------------------
