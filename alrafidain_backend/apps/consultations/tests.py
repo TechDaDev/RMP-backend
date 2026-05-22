@@ -527,6 +527,88 @@ class ConsultationFlowTests(TestCase):
         c.refresh_from_db()
         self.assertEqual(c.assigned_doctor_id, self.internal_doctor.id)
 
+    def test_multi_category_symptoms_route_top3_and_allow_rank3_acceptance(self):
+        neuro_doctor = create_user("doc-neuro@example.com", UserType.DOCTOR)
+        neuro_doctor.doctor_profile.specialty = MedicalSpecialty.NEUROLOGY
+        neuro_doctor.doctor_profile.save()
+        neuro_doctor_client = auth_client(neuro_doctor)
+
+        respiratory = SymptomCategory.objects.create(name="Respiratory", is_active=True)
+        neuro = SymptomCategory.objects.create(name="Neurology", is_active=True)
+
+        shortness_of_breath = Symptom.objects.create(
+            category=respiratory,
+            name="Shortness of breath",
+            is_active=True,
+        )
+        severe_headache = Symptom.objects.create(
+            category=neuro,
+            name="Severe headache",
+            is_active=True,
+        )
+
+        SymptomSpecialtyRule.objects.create(
+            symptom=shortness_of_breath,
+            specialty=MedicalSpecialty.PULMONOLOGY,
+            weight=6,
+            is_active=True,
+        )
+        SymptomSpecialtyRule.objects.create(
+            symptom=shortness_of_breath,
+            specialty=MedicalSpecialty.INTERNAL_MEDICINE,
+            weight=2,
+            is_active=True,
+        )
+        SymptomSpecialtyRule.objects.create(
+            symptom=severe_headache,
+            specialty=MedicalSpecialty.NEUROLOGY,
+            weight=7,
+            is_active=True,
+        )
+
+        create_resp = self.create_consultation(
+            symptom_ids=[
+                str(self.symptom.id),
+                str(self.symptom2.id),
+                str(shortness_of_breath.id),
+                str(severe_headache.id),
+            ]
+        )
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED)
+
+        consultation_id = create_resp.data["data"]["id"]
+        consultation = Consultation.objects.get(id=consultation_id)
+        self.assertEqual(
+            consultation.recommended_specialties,
+            [
+                MedicalSpecialty.NEUROLOGY,
+                MedicalSpecialty.CARDIOLOGY,
+                MedicalSpecialty.INTERNAL_MEDICINE,
+            ],
+        )
+        self.assertEqual(consultation.recommended_specialty, MedicalSpecialty.NEUROLOGY)
+        self.assertEqual(consultation.selected_specialty, MedicalSpecialty.NEUROLOGY)
+
+        neuro_pending = neuro_doctor_client.get("/api/consultations/doctor/pending/")
+        cardio_pending = self.doctor_client.get("/api/consultations/doctor/pending/")
+        internal_pending = self.internal_doctor_client.get("/api/consultations/doctor/pending/")
+
+        self.assertEqual(neuro_pending.status_code, status.HTTP_200_OK)
+        self.assertEqual(cardio_pending.status_code, status.HTTP_200_OK)
+        self.assertEqual(internal_pending.status_code, status.HTTP_200_OK)
+
+        self.assertEqual(len(neuro_pending.data["data"]), 1)
+        self.assertEqual(len(cardio_pending.data["data"]), 1)
+        self.assertEqual(len(internal_pending.data["data"]), 1)
+
+        accept_resp = self.internal_doctor_client.post(
+            f"/api/consultations/{consultation.id}/accept/", {}, format="json"
+        )
+        self.assertEqual(accept_resp.status_code, status.HTTP_200_OK)
+
+        consultation.refresh_from_db()
+        self.assertEqual(consultation.assigned_doctor_id, self.internal_doctor.id)
+
     def test_pharmacist_laboratorian_access_restricted(self):
         resp1 = self.create_consultation(client=self.pharmacist_client)
         resp2 = self.create_consultation(client=self.laboratorian_client)
