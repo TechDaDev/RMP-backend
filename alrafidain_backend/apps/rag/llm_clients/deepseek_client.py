@@ -35,7 +35,7 @@ class DeepSeekClient:
         self.base_url = (
             base_url or getattr(settings, "DEEPSEEK_BASE_URL", "https://api.deepseek.com")
         ).rstrip("/")
-        self.model = model or getattr(settings, "DEEPSEEK_MODEL", "deepseek-chat")
+        self.model = model or getattr(settings, "DEEPSEEK_MODEL", "deepseek-v4-flash")
         self.timeout = timeout or getattr(settings, "DEEPSEEK_TIMEOUT_SECONDS", 60)
 
         if not self.api_key:
@@ -106,6 +106,8 @@ class DeepSeekClient:
                 "usage": {
                     "prompt_tokens": usage.get("prompt_tokens", 0),
                     "completion_tokens": usage.get("completion_tokens", 0),
+                    "prompt_cache_hit_tokens": usage.get("prompt_cache_hit_tokens", 0),
+                    "prompt_cache_miss_tokens": usage.get("prompt_cache_miss_tokens", 0),
                 },
                 "raw": data,
             }

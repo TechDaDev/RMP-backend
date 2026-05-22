@@ -138,7 +138,10 @@ def _recommend_specialties_with_llm(symptoms, fallback_specialties, max_specialt
         max_tokens=250,
     )
     llm_specialties = _parse_llm_specialties(response["content"])
-    return _normalize_specialties(llm_specialties, fallback_specialties, max_specialties)
+    return {
+        "specialties": _normalize_specialties(llm_specialties, fallback_specialties, max_specialties),
+        "usage": response.get("usage", {}),
+    }
 
 
 def infer_specialty_from_symptoms(symptoms) -> str:
@@ -181,16 +184,22 @@ def recommend_specialty_from_symptoms(symptom_ids):
 
     if getattr(settings, "CONSULTATION_TRIAGE_USE_LLM", True):
         try:
-            recommended_specialties = _recommend_specialties_with_llm(
+            llm_result = _recommend_specialties_with_llm(
                 symptoms,
                 fallback_specialties,
                 _get_triage_max_specialties(),
             )
+            recommended_specialties = llm_result["specialties"]
             routing_method = "llm"
+            llm_usage = llm_result["usage"]
         except ModuleNotFoundError as exc:
             logger.warning("DeepSeek triage unavailable in this environment: %s", exc)
+            llm_usage = {}
         except Exception as exc:
             logger.warning("DeepSeek triage fallback engaged: %s", exc)
+            llm_usage = {}
+    else:
+        llm_usage = {}
 
     recommended_specialty = recommended_specialties[0]
     return {
@@ -199,6 +208,7 @@ def recommend_specialty_from_symptoms(symptom_ids):
         "scores": dict(scores),
         "has_red_flag": has_red_flag,
         "routing_method": routing_method,
+        "llm_usage": llm_usage,
     }
 
 

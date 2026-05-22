@@ -266,6 +266,7 @@ class ConsultationCreateSerializer(serializers.ModelSerializer):
                 "scores": rec["scores"],
                 "recommended_specialties": rec["recommended_specialties"],
                 "routing_method": rec["routing_method"],
+                "llm_usage": rec.get("llm_usage", {}),
             },
             request=request,
         )
