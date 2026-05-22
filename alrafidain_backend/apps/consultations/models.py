@@ -96,6 +96,7 @@ class Consultation(BaseModel):
     recommended_specialty = models.CharField(
         max_length=50, choices=MedicalSpecialty.choices, blank=True, null=True
     )
+    recommended_specialties = models.JSONField(default=list, blank=True)
     selected_specialty = models.CharField(
         max_length=50, choices=MedicalSpecialty.choices, blank=True, null=True
     )
@@ -137,6 +138,25 @@ class Consultation(BaseModel):
             models.Index(fields=["selected_specialty", "status", "-created_at"]),
         ]
 
+    def get_recommended_specialties(self):
+        allowed_specialties = {value for value, _label in MedicalSpecialty.choices}
+        ranked_specialties = []
+
+        for specialty in self.recommended_specialties or []:
+            if specialty in allowed_specialties and specialty not in ranked_specialties:
+                ranked_specialties.append(specialty)
+
+        primary_specialty = self.selected_specialty or self.recommended_specialty
+        if primary_specialty in allowed_specialties:
+            if primary_specialty in ranked_specialties:
+                ranked_specialties.remove(primary_specialty)
+            ranked_specialties.insert(0, primary_specialty)
+
+        return ranked_specialties[:3]
+
+    def matches_specialty(self, specialty):
+        return specialty in self.get_recommended_specialties()
+
     def clean(self):
         if self.patient and self.patient.user_type != UserType.PATIENT:
             raise ValidationError({"patient": "Consultation patient must have patient user type."})
@@ -167,9 +187,9 @@ class Consultation(BaseModel):
             if doctor_profile.verification_status != VerificationStatus.APPROVED:
                 raise ValidationError({"assigned_doctor": "Assigned doctor must be approved."})
 
-            target_specialty = self.selected_specialty or self.recommended_specialty
+            target_specialties = self.get_recommended_specialties()
             if doctor_profile.specialty == MedicalSpecialty.OTHER:
-                if target_specialty != MedicalSpecialty.OTHER:
+                if MedicalSpecialty.OTHER not in target_specialties:
                     raise ValidationError(
                         {
                             "assigned_doctor": (
@@ -177,7 +197,7 @@ class Consultation(BaseModel):
                             )
                         }
                     )
-            elif target_specialty and doctor_profile.specialty != target_specialty:
+            elif target_specialties and doctor_profile.specialty not in target_specialties:
                 raise ValidationError(
                     {"assigned_doctor": "Doctor specialty does not match consultation specialty."}
                 )

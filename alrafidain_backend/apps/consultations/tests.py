@@ -1,10 +1,13 @@
+import json
 from io import StringIO
+from unittest.mock import patch
 from uuid import UUID
 
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.db import connection
 from django.test import TestCase
+from django.test import override_settings
 from django.test.utils import CaptureQueriesContext
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -129,6 +132,10 @@ class RecommendationServiceTests(TestCase):
     def test_returns_highest_weighted_specialty(self):
         rec = recommend_specialty_from_symptoms([self.s1.id, self.s2.id])
         self.assertEqual(rec["recommended_specialty"], MedicalSpecialty.CARDIOLOGY)
+        self.assertEqual(
+            rec["recommended_specialties"],
+            [MedicalSpecialty.CARDIOLOGY, MedicalSpecialty.INTERNAL_MEDICINE],
+        )
 
     def test_red_flag_sets_has_red_flag(self):
         rec = recommend_specialty_from_symptoms([self.s2.id])
@@ -146,6 +153,38 @@ class RecommendationServiceTests(TestCase):
         s4 = Symptom.objects.create(category=self.cat, name="NoRule", is_active=True)
         rec = recommend_specialty_from_symptoms([s4.id])
         self.assertEqual(rec["recommended_specialty"], MedicalSpecialty.GENERAL_MEDICINE)
+        self.assertEqual(rec["recommended_specialties"], [MedicalSpecialty.GENERAL_MEDICINE])
+
+    @patch("apps.consultations.services._get_deepseek_client")
+    @override_settings(CONSULTATION_TRIAGE_USE_LLM=True)
+    def test_llm_ranked_specialties_take_priority_and_are_limited_to_three(
+        self, mock_get_client
+    ):
+        mock_get_client.return_value.chat.return_value = {
+            "content": json.dumps(
+                {
+                    "specialties": [
+                        MedicalSpecialty.INTERNAL_MEDICINE,
+                        MedicalSpecialty.CARDIOLOGY,
+                        MedicalSpecialty.PULMONOLOGY,
+                        MedicalSpecialty.DERMATOLOGY,
+                    ]
+                }
+            )
+        }
+
+        rec = recommend_specialty_from_symptoms([self.s1.id, self.s2.id])
+
+        self.assertEqual(rec["routing_method"], "llm")
+        self.assertEqual(rec["recommended_specialty"], MedicalSpecialty.INTERNAL_MEDICINE)
+        self.assertEqual(
+            rec["recommended_specialties"],
+            [
+                MedicalSpecialty.INTERNAL_MEDICINE,
+                MedicalSpecialty.CARDIOLOGY,
+                MedicalSpecialty.PULMONOLOGY,
+            ],
+        )
 
     def test_infer_specialty_uses_deterministic_tiebreaker(self):
         tie_a = Symptom.objects.create(category=self.cat, name="Tie A", is_active=True)
@@ -174,6 +213,9 @@ class ConsultationFlowTests(TestCase):
         self.pharmacist = create_user("ph@example.com", UserType.PHARMACIST)
         self.laboratorian = create_user("lab@example.com", UserType.LABORATORIAN)
         self.doctor = create_user("doc@example.com", UserType.DOCTOR)
+        self.internal_doctor = create_user("doc-internal@example.com", UserType.DOCTOR)
+        self.internal_doctor.doctor_profile.specialty = MedicalSpecialty.INTERNAL_MEDICINE
+        self.internal_doctor.doctor_profile.save()
         self.other_doctor = create_user("doc-other@example.com", UserType.DOCTOR)
         self.other_doctor.doctor_profile.specialty = MedicalSpecialty.OTHER
         self.other_doctor.doctor_profile.specialty_other = "Integrative"
@@ -196,10 +238,16 @@ class ConsultationFlowTests(TestCase):
         SymptomSpecialtyRule.objects.create(
             symptom=self.symptom2, specialty=MedicalSpecialty.CARDIOLOGY, weight=1
         )
+        SymptomSpecialtyRule.objects.create(
+            symptom=self.symptom2,
+            specialty=MedicalSpecialty.INTERNAL_MEDICINE,
+            weight=4,
+        )
 
         self.patient_client = auth_client(self.patient)
         self.patient2_client = auth_client(self.patient2)
         self.doctor_client = auth_client(self.doctor)
+        self.internal_doctor_client = auth_client(self.internal_doctor)
         self.other_doctor_client = auth_client(self.other_doctor)
         self.unapproved_doctor_client = auth_client(self.unapproved_doctor)
         self.pharmacist_client = auth_client(self.pharmacist)
@@ -246,6 +294,10 @@ class ConsultationFlowTests(TestCase):
             detail_resp.data["data"]["selected_specialty"],
             MedicalSpecialty.CARDIOLOGY,
         )
+        self.assertEqual(
+            detail_resp.data["data"]["recommended_specialties"],
+            [MedicalSpecialty.CARDIOLOGY, MedicalSpecialty.INTERNAL_MEDICINE],
+        )
 
     def test_patient_can_view_own_pending_consultation_detail(self):
         self.create_consultation()
@@ -269,6 +321,10 @@ class ConsultationFlowTests(TestCase):
         self.create_consultation()
         c = Consultation.objects.first()
         self.assertEqual(c.recommended_specialty, MedicalSpecialty.CARDIOLOGY)
+        self.assertEqual(
+            c.recommended_specialties,
+            [MedicalSpecialty.CARDIOLOGY, MedicalSpecialty.INTERNAL_MEDICINE],
+        )
         self.assertEqual(c.selected_specialty, MedicalSpecialty.CARDIOLOGY)
 
     def test_patient_supplied_selected_specialty_is_ignored(self):
@@ -332,6 +388,12 @@ class ConsultationFlowTests(TestCase):
     def test_approved_doctor_can_list_pending_matching_specialty(self):
         self.create_consultation()
         resp = self.doctor_client.get("/api/consultations/doctor/pending/")
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.data["data"]), 1)
+
+    def test_secondary_ranked_specialty_doctor_can_list_pending(self):
+        self.create_consultation()
+        resp = self.internal_doctor_client.get("/api/consultations/doctor/pending/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(len(resp.data["data"]), 1)
 
@@ -452,6 +514,18 @@ class ConsultationFlowTests(TestCase):
             f"/api/consultations/{c.id}/accept/", {}, format="json"
         )
         self.assertEqual(resp2.status_code, status.HTTP_200_OK)
+
+    def test_secondary_ranked_specialty_doctor_can_accept(self):
+        self.create_consultation()
+        c = Consultation.objects.first()
+
+        resp = self.internal_doctor_client.post(
+            f"/api/consultations/{c.id}/accept/", {}, format="json"
+        )
+
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        c.refresh_from_db()
+        self.assertEqual(c.assigned_doctor_id, self.internal_doctor.id)
 
     def test_pharmacist_laboratorian_access_restricted(self):
         resp1 = self.create_consultation(client=self.pharmacist_client)

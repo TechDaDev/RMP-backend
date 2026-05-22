@@ -153,13 +153,12 @@ class DoctorPendingConsultationListView(APIView):
         queryset = Consultation.objects.filter(
             status=ConsultationStatus.SUBMITTED,
             assigned_doctor__isnull=True,
-            selected_specialty=specialty,
         ).select_related("patient", "assigned_doctor")
+        matching_consultations = [
+            consultation for consultation in queryset if consultation.matches_specialty(specialty)
+        ]
 
-        if specialty == MedicalSpecialty.OTHER:
-            queryset = queryset.filter(selected_specialty=MedicalSpecialty.OTHER)
-
-        return success_response(data=ConsultationListSerializer(queryset, many=True).data)
+        return success_response(data=ConsultationListSerializer(matching_consultations, many=True).data)
 
 
 @extend_schema(tags=["Consultations"])

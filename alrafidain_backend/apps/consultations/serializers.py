@@ -77,6 +77,7 @@ class ConsultationListSerializer(serializers.ModelSerializer):
             "assigned_doctor",
             "status",
             "recommended_specialty",
+            "recommended_specialties",
             "selected_specialty",
             "severity",
             "duration",
@@ -101,6 +102,7 @@ class ConsultationDetailSerializer(serializers.ModelSerializer):
             "assigned_doctor",
             "status",
             "recommended_specialty",
+            "recommended_specialties",
             "selected_specialty",
             "selected_specialty_other",
             "ai_predicted_specialty",
@@ -175,6 +177,7 @@ class ConsultationCreateSerializer(serializers.ModelSerializer):
             "additional_notes",
             "attachments",
             "recommended_specialty",
+            "recommended_specialties",
             "has_emergency_warning",
             "status",
             "assigned_doctor",
@@ -188,6 +191,7 @@ class ConsultationCreateSerializer(serializers.ModelSerializer):
             "selected_specialty",
             "selected_specialty_other",
             "recommended_specialty",
+            "recommended_specialties",
             "has_emergency_warning",
             "status",
             "assigned_doctor",
@@ -232,6 +236,7 @@ class ConsultationCreateSerializer(serializers.ModelSerializer):
         consultation = Consultation.objects.create(
             patient=request.user,
             recommended_specialty=recommended_specialty,
+            recommended_specialties=rec["recommended_specialties"],
             selected_specialty=recommended_specialty,
             selected_specialty_other="",
             has_emergency_warning=has_emergency_warning,
@@ -256,7 +261,12 @@ class ConsultationCreateSerializer(serializers.ModelSerializer):
             actor=request.user,
             action="consultation_created",
             target=consultation,
-            metadata={"symptom_count": symptom_objs.count(), "scores": rec["scores"]},
+            metadata={
+                "symptom_count": symptom_objs.count(),
+                "scores": rec["scores"],
+                "recommended_specialties": rec["recommended_specialties"],
+                "routing_method": rec["routing_method"],
+            },
             request=request,
         )
         return consultation
@@ -277,13 +287,13 @@ class ConsultationAcceptSerializer(serializers.Serializer):
             raise serializers.ValidationError("Consultation has already been assigned.")
 
         doctor_profile = request.user.doctor_profile
-        target_specialty = consultation.selected_specialty or consultation.recommended_specialty
+        target_specialties = consultation.get_recommended_specialties()
         if doctor_profile.specialty == MedicalSpecialty.OTHER:
-            if target_specialty != MedicalSpecialty.OTHER:
+            if MedicalSpecialty.OTHER not in target_specialties:
                 raise serializers.ValidationError(
                     "Doctor with Other specialty can only accept Other consultations."
                 )
-        elif target_specialty and doctor_profile.specialty != target_specialty:
+        elif target_specialties and doctor_profile.specialty not in target_specialties:
             raise serializers.ValidationError(
                 "Doctor specialty does not match consultation specialty."
             )

@@ -12,3 +12,4 @@ channels-redis
 daphne
 django-cleanup
 Pillow
+httpx
