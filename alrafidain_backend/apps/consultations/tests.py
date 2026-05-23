@@ -420,6 +420,8 @@ class ConsultationFlowTests(TestCase):
         self.assertIn("symptoms", resp.data["data"])
         self.assertIn("Clinical interpretation", resp.data["data"]["ai_case_summary"])
         self.assertIn("Focused diagnostic directions", resp.data["data"]["ai_case_summary"])
+        self.assertNotIn("Weighted symptom-to-specialty signal", resp.data["data"]["ai_case_summary"])
+        self.assertNotIn("AI routing focus", resp.data["data"]["ai_case_summary"])
         c.refresh_from_db()
         self.assertEqual(c.assigned_doctor_id, self.doctor.id)
         self.assertEqual(c.status, ConsultationStatus.ACCEPTED)

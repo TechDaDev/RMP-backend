@@ -208,9 +208,6 @@ class Consultation(BaseModel):
         for rule in SymptomSpecialtyRule.objects.filter(symptom_id__in=symptom_ids, is_active=True):
             specialty_scores[rule.specialty] += rule.weight
 
-        ranked_score_items = sorted(
-            specialty_scores.items(), key=lambda item: (-item[1], item[0])
-        )[:3]
         specialty_labels = {value: label for value, label in MedicalSpecialty.choices}
 
         parts = []
@@ -232,25 +229,6 @@ class Consultation(BaseModel):
 
         if self.has_emergency_warning:
             parts.append("Emergency warning is present, so the case should be reviewed urgently.")
-
-        if ranked_score_items:
-            weighted_ranking_text = ", ".join(
-                f"{specialty_labels.get(specialty, specialty)} (signal {score})"
-                for specialty, score in ranked_score_items
-            )
-            parts.append(
-                "Weighted symptom-to-specialty signal: " + weighted_ranking_text + "."
-            )
-
-        if recommended_specialties:
-            parts.append(
-                "AI routing focus: "
-                + ", ".join(
-                    specialty_labels.get(specialty, specialty)
-                    for specialty in recommended_specialties[:3]
-                )
-                + "."
-            )
 
         clinical_hints = [
             SPECIALTY_CLINICAL_HINTS[specialty]
