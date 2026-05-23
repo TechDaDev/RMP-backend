@@ -612,28 +612,27 @@ Notes:
 - Approve accepts optional `note`.
 - Self-approval is denied by backend policy.
 
-### 10.6 Clinical Report OCR for AI Support
+### 10.6 Medical Report Candidates (Phase 10A)
 
-When patients upload consultation attachments or when a lab result includes an uploaded file:
-- Backend extracts report text from image/PDF/DOCX/TXT files.
-- OCR is configured for Arabic + English.
-- Extracted report text is automatically included in doctor RAG support context for:
-  - `POST /api/rag/consultations/{consultation_id}/support/`
-  - `POST /api/rag/lab-results/{lab_result_id}/support/`
+When a patient uploads a consultation chat attachment, the backend now creates a `PatientMedicalReport` candidate record.
 
-Security behavior (backend enforced):
-- Extracted text must look like a medical report before it is used for AI context.
-- Prompt-injection-like lines (for example instruction overrides such as "ignore previous instructions") are removed.
-- If extracted content is non-medical or high-risk, it is excluded from AI context (fail-closed).
+Available endpoints:
+- `GET /api/patient/medical-reports/`
+- `GET /api/patient/medical-reports/{report_id}/`
+- `GET /api/doctor/consultations/{consultation_id}/medical-reports/`
+- `GET /api/doctor/medical-reports/{report_id}/`
+- `POST /api/doctor/medical-reports/{report_id}/review/`
+
+Phase 10A behavior contract:
+- Candidate creation is non-blocking and does not break chat send flow.
+- No automatic OCR/LLM processing is triggered yet.
+- No automatic insertion into canonical patient medical record entries is triggered yet.
 
 Frontend implementation notes:
-- No API payload change: continue sending the same support endpoint requests.
-- Do not promise users that uploaded files are always used by AI; wording should be "used when valid and safe".
-- If AI response quality looks weak, suggest uploading a clearer medical report scan/photo.
-- Keep server error handling unchanged; this security gate does not add a new frontend error code contract.
-
-Frontend recommendation:
-- Encourage clear scans/photos for X-ray/ultrasound/lab report uploads to improve OCR quality.
+- Treat these as review candidates, not final verified medical record entries.
+- Continue using existing chat message flow; no request-body changes are required.
+- Use `file_url` for image/document preview, not storage-relative `file` paths.
+- For patient view, show high-level status only; detailed raw fields are doctor-only.
 
 ---
 

@@ -31,9 +31,16 @@ All responses follow the standard envelope:
 
 - [Privacy and Role Restrictions](#privacy-and-role-restrictions)
 - [Authentication](#authentication)
+  - [Register / Login / Activation / Password Reset](#authentication)
 - [Profiles](#profiles)
+  - [My Profile and Role Profiles](#profiles)
 - [Admin Verification Review API](#admin-verification-review-api)
+  - [Verification List and Actions](#admin-verification-review-api)
 - [Consultations](#consultations)
+  - [Symptom Catalog](#consultations)
+  - [Consultation Create and Detail](#consultations)
+  - [Doctor Queue and Assignment](#consultations)
+  - [Doctor Responses and Close](#consultations)
 - [Messaging](#messaging)
 - [Prescriptions](#prescriptions)
 - [Notifications](#notifications)
@@ -45,6 +52,21 @@ All responses follow the standard envelope:
 - [Phase 12C — RAG Doctor Support Endpoints](#phase-12c--rag-doctor-support-endpoints)
 - [Phase 12D — AI Evaluation and Doctor Feedback](#phase-12d--ai-evaluation-and-doctor-feedback)
 - [Phase 12E — Analytics and Training Dataset Preparation](#phase-12e--analytics-and-training-dataset-preparation)
+
+## Response Shape Notes
+
+Most endpoints use the standard success envelope:
+
+```json
+{
+  "status": "success",
+  "message": "...",
+  "data": {...}
+}
+```
+
+List endpoints usually return `data: []` or paginated `data.results`.
+GET endpoints intentionally do not include a request body unless they accept filters via query params.
 
 ---
 
@@ -214,6 +236,24 @@ Get current authenticated user.
 - **Allowed roles**: All
 - **Response includes**: `id`, `email`, `first_name`, `last_name`, `full_name`, `profile_image`, `user_type`, `is_active`, `date_joined`
 
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "uuid",
+    "email": "user@example.com",
+    "first_name": "John",
+    "last_name": "Doe",
+    "full_name": "John Doe",
+    "profile_image": null,
+    "user_type": "patient",
+    "is_active": true,
+    "date_joined": "2026-01-01T00:00:00Z"
+  }
+}
+```
+
 ---
 
 ## Profiles
@@ -233,6 +273,41 @@ Returned shape includes:
 Shared `UserProfile` fields:
 - `phone_number`, `profile_image`, `gender`, `date_of_birth`, `governorate`, `district`, `address`, `national_id`
 
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "user": {
+      "id": "uuid",
+      "email": "patient@example.com",
+      "full_name": "Patient Example",
+      "user_type": "patient"
+    },
+    "user_profile": {
+      "phone_number": "07712345678",
+      "profile_image": null,
+      "gender": "male",
+      "date_of_birth": "1995-03-10",
+      "governorate": "Baghdad",
+      "district": "Karkh",
+      "address": "Street 1",
+      "national_id": "12345678901"
+    },
+    "patient_profile": {
+      "social_security_id": "SS-1001",
+      "emergency_contact_name": "Ali Example",
+      "emergency_contact_phone": "07700000000"
+    },
+    "completion": {
+      "is_complete": true,
+      "missing_fields": []
+    },
+    "verification_status": null
+  }
+}
+```
+
 ---
 
 ### `PUT/PATCH /api/profiles/me/user-profile/`
@@ -241,6 +316,36 @@ Update UserProfile (phone, gender, DOB, address, etc.).
 
 - **Auth required**: Yes
 - **Allowed roles**: All
+
+**Request body:**
+```json
+{
+  "phone_number": "07712345678",
+  "gender": "female",
+  "date_of_birth": "1990-05-15",
+  "governorate": "Baghdad",
+  "district": "Rusafa",
+  "address": "Building 10, Apt 2",
+  "national_id": "12345678901"
+}
+```
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Profile updated successfully.",
+  "data": {
+    "phone_number": "07712345678",
+    "gender": "female",
+    "date_of_birth": "1990-05-15",
+    "governorate": "Baghdad",
+    "district": "Rusafa",
+    "address": "Building 10, Apt 2",
+    "national_id": "12345678901"
+  }
+}
+```
 
 ---
 
@@ -255,6 +360,28 @@ Patient profile fields:
 - `social_security_id`
 - `emergency_contact_name`
 - `emergency_contact_phone`
+
+**Request body:**
+```json
+{
+  "social_security_id": "SS-1001",
+  "emergency_contact_name": "Ali Example",
+  "emergency_contact_phone": "07700000000"
+}
+```
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Patient profile updated successfully.",
+  "data": {
+    "social_security_id": "SS-1001",
+    "emergency_contact_name": "Ali Example",
+    "emergency_contact_phone": "07700000000"
+  }
+}
+```
 
 ---
 
@@ -279,6 +406,39 @@ Doctor profile fields:
 - `verified_at` (read-only)
 - `verification_notes` (read-only)
 
+**Request body:**
+```json
+{
+  "medical_license_number": "DOC-1001",
+  "specialty": "general_medicine",
+  "subspecialty": "family_medicine",
+  "professional_title": "Consultant",
+  "years_of_experience": 12,
+  "bio": "General practitioner with outpatient experience.",
+  "work_address": "Baghdad Medical Center"
+}
+```
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Doctor profile updated successfully.",
+  "data": {
+    "medical_license_number": "DOC-1001",
+    "specialty": "general_medicine",
+    "subspecialty": "family_medicine",
+    "professional_title": "Consultant",
+    "years_of_experience": 12,
+    "bio": "General practitioner with outpatient experience.",
+    "work_address": "Baghdad Medical Center",
+    "verification_status": "approved",
+    "verified_at": "2026-05-01T09:00:00Z",
+    "verification_notes": "Verified by staff"
+  }
+}
+```
+
 ---
 
 ### `PUT/PATCH /api/profiles/me/pharmacist/`
@@ -299,6 +459,35 @@ Pharmacist profile fields:
 - `verification_status` (read-only)
 - `verified_at` (read-only)
 - `verification_notes` (read-only)
+
+**Request body:**
+```json
+{
+  "pharmacist_license_number": "PH-1001",
+  "pharmacy_name": "Al Rafidain Pharmacy",
+  "pharmacy_license_number": "PHARM-500",
+  "pharmacy_address": "Baghdad",
+  "working_hours": "09:00-17:00"
+}
+```
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Pharmacist profile updated successfully.",
+  "data": {
+    "pharmacist_license_number": "PH-1001",
+    "pharmacy_name": "Al Rafidain Pharmacy",
+    "pharmacy_license_number": "PHARM-500",
+    "pharmacy_address": "Baghdad",
+    "working_hours": "09:00-17:00",
+    "verification_status": "approved",
+    "verified_at": "2026-05-01T09:00:00Z",
+    "verification_notes": "Verified by staff"
+  }
+}
+```
 
 ---
 
@@ -321,6 +510,37 @@ Laboratorian profile fields:
 - `verification_status` (read-only)
 - `verified_at` (read-only)
 - `verification_notes` (read-only)
+
+**Request body:**
+```json
+{
+  "laboratorian_license_number": "LAB-1001",
+  "laboratory_name": "Central Lab",
+  "laboratory_license_number": "LABLIC-42",
+  "laboratory_address": "Baghdad",
+  "specialization": "hematology",
+  "working_hours": "08:00-16:00"
+}
+```
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Laboratorian profile updated successfully.",
+  "data": {
+    "laboratorian_license_number": "LAB-1001",
+    "laboratory_name": "Central Lab",
+    "laboratory_license_number": "LABLIC-42",
+    "laboratory_address": "Baghdad",
+    "specialization": "hematology",
+    "working_hours": "08:00-16:00",
+    "verification_status": "approved",
+    "verified_at": "2026-05-01T09:00:00Z",
+    "verification_notes": "Verified by staff"
+  }
+}
+```
 
 ---
 
@@ -391,6 +611,33 @@ Get one verification request detail.
 - `verified_at`
 - `verified_by` (nullable `{id,email,full_name}`)
 
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "uuid",
+    "role": "doctor",
+    "status": "approved",
+    "user": {
+      "id": "uuid",
+      "email": "doctor@example.com",
+      "full_name": "Doctor Name"
+    },
+    "profile": {
+      "license_number": "DOC-100",
+      "specialty": "general_medicine"
+    },
+    "verification_notes": "Approved after document review.",
+    "verified_at": "2026-01-03T09:00:00Z",
+    "verified_by": {
+      "id": "uuid",
+      "email": "staff@example.com",
+      "full_name": "Staff Reviewer"
+    }
+  }
+}
+```
+
 ### `POST /api/admin/verifications/<role>/<id>/approve/`
 
 Approve a verification request.
@@ -407,6 +654,14 @@ Effects:
 - sets `verified_by` and `verified_at`
 - updates `verification_notes` with optional note
 - creates audit log + notification
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Verification approved successfully."
+}
+```
 
 ### `POST /api/admin/verifications/<role>/<id>/reject/`
 
@@ -425,6 +680,14 @@ Effects:
 - stores reason in `verification_notes`
 - creates audit log + notification
 
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Verification rejected successfully."
+}
+```
+
 ### `POST /api/admin/verifications/<role>/<id>/suspend/`
 
 Suspend a verification request.
@@ -441,6 +704,14 @@ Effects:
 - sets `verified_by` and `verified_at`
 - stores reason in `verification_notes`
 - creates audit log + notification
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Verification suspended successfully."
+}
+```
 
 ### Validation and safety rules
 
@@ -459,6 +730,21 @@ List all active symptom categories.
 
 - **Auth required**: Yes
 - **Allowed roles**: All
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": "uuid",
+      "name": "Respiratory",
+      "description": "Symptoms related to lungs and breathing.",
+      "display_order": 3
+    }
+  ]
+}
+```
 
 ---
 
@@ -482,6 +768,28 @@ The 18 patient-friendly categories are: Emergency / Red Flags, General / Constit
 Symptom names use patient-friendly plain language, not disease names.
 Red-flag symptoms (e.g., Severe chest pain, Suicidal thoughts, Head injury) always include `emergency_medicine` routing.
 Specialty assignment is deterministic and weight-based. This is **not** a diagnosis; it is triage support only.
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": "uuid",
+      "category": {
+        "id": "uuid",
+        "name": "Respiratory",
+        "description": "Symptoms related to lungs and breathing.",
+        "display_order": 3
+      },
+      "name": "Cough",
+      "description": "Persistent or new cough.",
+      "is_red_flag": false,
+      "display_order": 1
+    }
+  ]
+}
+```
 
 ---
 
@@ -509,6 +817,43 @@ Create a new consultation.
 }
 ```
 
+**Response `201`:**
+```json
+{
+  "status": "success",
+  "message": "Consultation created successfully.",
+  "data": {
+    "id": "uuid",
+    "patient": {
+      "id": "uuid",
+      "email": "patient@example.com",
+      "full_name": "Patient Example"
+    },
+    "assigned_doctor": null,
+    "status": "submitted",
+    "recommended_specialty": "pulmonology",
+    "selected_specialty": "pulmonology",
+    "selected_specialty_other": "",
+    "duration": "one_to_three_days",
+    "severity": "moderate",
+    "has_fever": false,
+    "has_pain": true,
+    "has_breathing_difficulty": false,
+    "has_emergency_warning": false,
+    "previous_visit_for_same_issue": false,
+    "current_medications_related": "",
+    "additional_notes": "Chest tightness since yesterday",
+    "symptoms": [],
+    "responses": [],
+    "attachments": [],
+    "accepted_at": null,
+    "closed_at": null,
+    "created_at": "2026-05-21T10:00:00Z",
+    "updated_at": "2026-05-21T10:00:00Z"
+  }
+}
+```
+
 ---
 
 ### `GET /api/consultations/my/`
@@ -521,6 +866,32 @@ List consultations for the authenticated user.
 Behavior:
 - Patient: own consultations (`patient=request.user`)
 - Doctor: assigned consultations (`assigned_doctor=request.user`)
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": "uuid",
+      "patient": {
+        "id": "uuid",
+        "email": "patient@example.com",
+        "full_name": "Patient Example"
+      },
+      "assigned_doctor": null,
+      "status": "submitted",
+      "recommended_specialty": "pulmonology",
+      "selected_specialty": "pulmonology",
+      "severity": "moderate",
+      "duration": "one_to_three_days",
+      "has_emergency_warning": false,
+      "created_at": "2026-05-21T10:00:00Z",
+      "updated_at": "2026-05-21T10:00:00Z"
+    }
+  ]
+}
+```
 
 ---
 
@@ -535,6 +906,42 @@ Get consultation detail.
 - Doctors can view consultation detail only when assigned under current policy.
 
 Future phase note: backend profile-completion enforcement before consultation creation is planned but not implemented in this phase.
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "uuid",
+    "patient": {
+      "id": "uuid",
+      "email": "patient@example.com",
+      "full_name": "Patient Example"
+    },
+    "assigned_doctor": null,
+    "status": "submitted",
+    "recommended_specialty": "pulmonology",
+    "selected_specialty": "pulmonology",
+    "selected_specialty_other": "",
+    "duration": "one_to_three_days",
+    "severity": "moderate",
+    "has_fever": false,
+    "has_pain": true,
+    "has_breathing_difficulty": false,
+    "has_emergency_warning": false,
+    "previous_visit_for_same_issue": false,
+    "current_medications_related": "",
+    "additional_notes": "Chest tightness since yesterday",
+    "symptoms": [],
+    "responses": [],
+    "attachments": [],
+    "accepted_at": null,
+    "closed_at": null,
+    "created_at": "2026-05-21T10:00:00Z",
+    "updated_at": "2026-05-21T10:00:00Z"
+  }
+}
+```
 
 ---
 
@@ -587,6 +994,36 @@ List consultations assigned to the doctor.
 - **Auth required**: Yes
 - **Allowed roles**: Doctor
 
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": "uuid",
+      "patient": {
+        "id": "uuid",
+        "email": "patient@example.com",
+        "full_name": "Patient Example"
+      },
+      "assigned_doctor": {
+        "id": "uuid",
+        "email": "doctor@example.com",
+        "full_name": "Doctor Example"
+      },
+      "status": "accepted",
+      "recommended_specialty": "pulmonology",
+      "selected_specialty": "pulmonology",
+      "severity": "moderate",
+      "duration": "one_to_three_days",
+      "has_emergency_warning": false,
+      "created_at": "2026-05-21T10:00:00Z",
+      "updated_at": "2026-05-21T10:05:00Z"
+    }
+  ]
+}
+```
+
 ---
 
 ### `POST /api/consultations/<id>/accept/`
@@ -595,6 +1032,19 @@ Accept a consultation request.
 
 - **Auth required**: Yes
 - **Allowed roles**: Doctor (approved)
+
+**Request body:**
+```json
+{}
+```
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Consultation accepted successfully."
+}
+```
 
 ---
 
@@ -613,6 +1063,26 @@ Submit a doctor's medical response.
 }
 ```
 
+**Response `201`:**
+```json
+{
+  "status": "success",
+  "message": "Consultation response added.",
+  "data": {
+    "id": "uuid",
+    "doctor": {
+      "id": "uuid",
+      "email": "doctor@example.com",
+      "full_name": "Doctor Example"
+    },
+    "response_text": "Based on your symptoms...",
+    "recommendation_type": "needs_lab_test",
+    "created_at": "2026-05-21T10:15:00Z",
+    "updated_at": "2026-05-21T10:15:00Z"
+  }
+}
+```
+
 ---
 
 ### `POST /api/consultations/<id>/close/`
@@ -622,6 +1092,19 @@ Close a consultation.
 - **Auth required**: Yes
 - **Allowed roles**: Doctor (assigned)
 - **Allowed statuses**: `accepted`, `doctor_responded`
+
+**Request body:**
+```json
+{}
+```
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Consultation closed successfully."
+}
+```
 
 ---
 
@@ -635,6 +1118,27 @@ List messages in a consultation thread. Also marks incoming unread messages as r
 - **Allowed roles**: Patient (own), Doctor (assigned)
 - **Allowed consultation statuses**: `accepted`, `doctor_responded`, `closed`
 
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": "uuid",
+      "body": "Can you clarify something?",
+      "sender": {
+        "id": "uuid",
+        "email": "patient@example.com",
+        "full_name": "Patient Example"
+      },
+      "attachments": [],
+      "is_read": true,
+      "created_at": "2026-05-21T10:20:00Z"
+    }
+  ]
+}
+```
+
 ---
 
 ### `POST /api/consultations/<id>/messages/`
@@ -644,6 +1148,8 @@ Send a message in a consultation.
 - **Auth required**: Yes
 - **Allowed roles**: Patient (own), Doctor (assigned)
 - **Allowed consultation statuses**: `accepted`, `doctor_responded`
+
+**Request body:** multipart form data
 
 **Request body (multipart for attachments):**
 ```json
@@ -655,6 +1161,26 @@ Send a message in a consultation.
 
 **Note**: `body` or at least one attachment is required.
 
+**Response `201`:**
+```json
+{
+  "status": "success",
+  "message": "Message sent successfully.",
+  "data": {
+    "id": "uuid",
+    "body": "Can you clarify something?",
+    "sender": {
+      "id": "uuid",
+      "email": "patient@example.com",
+      "full_name": "Patient Example"
+    },
+    "attachments": [],
+    "is_read": false,
+    "created_at": "2026-05-21T10:20:00Z"
+  }
+}
+```
+
 ---
 
 ### `POST /api/consultations/<id>/messages/mark-read/`
@@ -663,6 +1189,21 @@ Mark all unread messages in this consultation as read (for the requesting user).
 
 - **Auth required**: Yes
 - **Allowed roles**: Patient (own), Doctor (assigned)
+
+**Request body:**
+```json
+{}
+```
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "marked_count": 3
+  }
+}
+```
 
 ---
 
@@ -734,6 +1275,32 @@ Invalid `route`:
 }
 ```
 
+**Response `201`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "uuid",
+    "consultation_id": "uuid",
+    "status": "active",
+    "items": [
+      {
+        "id": "uuid",
+        "medication_name": "Amoxicillin",
+        "strength": "500mg",
+        "dosage": "1 capsule",
+        "frequency": "3x daily",
+        "duration": "7 days",
+        "route": "oral",
+        "quantity": "21 capsules",
+        "instructions": "After meals",
+        "status": "pending"
+      }
+    ]
+  }
+}
+```
+
 > **Privacy note**: Medication item details are never included in patient-facing prescription responses.
 
 ---
@@ -745,6 +1312,26 @@ List patient's own prescriptions (items hidden).
 - **Auth required**: Yes
 - **Allowed roles**: Patient
 
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": "uuid",
+      "consultation_id": "uuid",
+      "status": "active",
+      "issued_at": "2026-05-21T11:00:00Z",
+      "doctor": {
+        "id": "uuid",
+        "full_name": "Doctor Example",
+        "specialty": "general_medicine"
+      }
+    }
+  ]
+}
+```
+
 ---
 
 ### `GET /api/prescriptions/my/<id>/`
@@ -753,6 +1340,25 @@ Get prescription detail for patient (items hidden).
 
 - **Auth required**: Yes
 - **Allowed roles**: Patient (own)
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "uuid",
+    "consultation_id": "uuid",
+    "status": "active",
+    "qr_token": "token-value",
+    "issued_at": "2026-05-21T11:00:00Z",
+    "doctor": {
+      "id": "uuid",
+      "full_name": "Doctor Example",
+      "specialty": "general_medicine"
+    }
+  }
+}
+```
 
 ---
 
@@ -763,6 +1369,36 @@ Get full prescription detail including medication items.
 - **Auth required**: Yes
 - **Allowed roles**: Doctor (issuer)
 
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "uuid",
+    "consultation_id": "uuid",
+    "status": "active",
+    "patient": {
+      "id": "uuid",
+      "full_name": "Patient Example"
+    },
+    "items": [
+      {
+        "id": "uuid",
+        "medication_name": "Amoxicillin",
+        "strength": "500mg",
+        "dosage": "1 capsule",
+        "frequency": "3x daily",
+        "duration": "7 days",
+        "route": "oral",
+        "quantity": "21 capsules",
+        "instructions": "After meals",
+        "status": "pending"
+      }
+    ]
+  }
+}
+```
+
 ---
 
 ### `POST /api/prescriptions/doctor/<id>/cancel/`
@@ -771,6 +1407,19 @@ Cancel a prescription (only if no items have been dispensed yet).
 
 - **Auth required**: Yes
 - **Allowed roles**: Doctor (issuer)
+
+**Request body:**
+```json
+{}
+```
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Prescription cancelled successfully."
+}
+```
 
 ---
 
@@ -789,6 +1438,26 @@ Pharmacist scans QR token to access pending prescription items.
 ```
 
 **Response**: Returns `prescription` metadata and only `pending` items for the scanned prescription. Also returns `locked: true` if the prescription is no longer dispensable.
+
+```json
+{
+  "status": "success",
+  "data": {
+    "prescription": {
+      "id": "uuid",
+      "status": "active",
+      "locked": false
+    },
+    "items": [
+      {
+        "id": "uuid",
+        "medication_name": "Amoxicillin",
+        "status": "pending"
+      }
+    ]
+  }
+}
+```
 
 ---
 
@@ -814,6 +1483,20 @@ Record dispensing of scanned prescription items.
 ```
 
 **Response**: Same shape as scan response (updated `prescription` + remaining `pending` items).
+
+```json
+{
+  "status": "success",
+  "data": {
+    "prescription": {
+      "id": "uuid",
+      "status": "partially_dispensed",
+      "locked": false
+    },
+    "items": []
+  }
+}
+```
 
 ---
 
@@ -893,6 +1576,23 @@ List all notifications for the current user.
 - **Auth required**: Yes
 - **Allowed roles**: All
 
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": "uuid",
+      "notification_type": "consultation",
+      "title": "Consultation accepted",
+      "message": "A doctor has accepted your consultation.",
+      "is_read": false,
+      "created_at": "2026-05-21T11:30:00Z"
+    }
+  ]
+}
+```
+
 ---
 
 ### `POST /api/notifications/<id>/mark-read/`
@@ -901,6 +1601,19 @@ Mark a notification as read.
 
 - **Auth required**: Yes
 - **Allowed roles**: All (own notifications)
+
+**Request body:**
+```json
+{}
+```
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Notification marked as read."
+}
+```
 
 ---
 
@@ -911,6 +1624,19 @@ Mark all unread notifications as read.
 - **Auth required**: Yes
 - **Allowed roles**: All
 
+**Request body:**
+```json
+{}
+```
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "All notifications marked as read."
+}
+```
+
 ---
 
 ### `GET /api/notifications/unread-count/`
@@ -919,6 +1645,16 @@ Get the count of unread notifications for the current user.
 
 - **Auth required**: Yes
 - **Allowed roles**: All
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "unread_count": 4
+  }
+}
+```
 
 ---
 
@@ -931,6 +1667,29 @@ Get the current patient's medical record with entries.
 - **Auth required**: Yes
 - **Allowed roles**: Patient
 
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "uuid",
+    "patient": {
+      "id": "uuid",
+      "full_name": "Patient Example"
+    },
+    "entries": [
+      {
+        "id": "uuid",
+        "category": "chronic_condition",
+        "title": "Type 2 Diabetes",
+        "value": "Diagnosed 2020",
+        "verification_status": "self_reported"
+      }
+    ]
+  }
+}
+```
+
 ---
 
 ### `GET /api/patient-records/patients/<patient_id>/`
@@ -939,6 +1698,29 @@ Get a patient's medical record (doctor view).
 
 - **Auth required**: Yes
 - **Allowed roles**: Doctor (approved, must have assigned consultation in one of: `accepted`, `doctor_responded`, `closed`)
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "uuid",
+    "patient": {
+      "id": "uuid",
+      "full_name": "Patient Example"
+    },
+    "entries": [
+      {
+        "id": "uuid",
+        "category": "chronic_condition",
+        "title": "Type 2 Diabetes",
+        "value": "Diagnosed 2020",
+        "verification_status": "doctor_confirmed"
+      }
+    ]
+  }
+}
+```
 
 ---
 
@@ -961,6 +1743,21 @@ Create a new medical record entry.
 
 > **Note**: Patients cannot set `verification_status`, `source_role`, `verified_by`, or `is_active` — these are controlled by the system. The `record_id` in the URL must be the patient's own record.
 
+**Response `201`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "uuid",
+    "category": "chronic_condition",
+    "title": "Type 2 Diabetes",
+    "value": "Diagnosed 2020",
+    "notes": "Optional additional notes",
+    "verification_status": "self_reported"
+  }
+}
+```
+
 ---
 
 ### `POST /api/patient-records/entries/<id>/confirm/`
@@ -980,6 +1777,14 @@ Doctor confirms or rejects a patient-submitted medical record entry.
 
 > `verification_status` accepts `"doctor_confirmed"` or `"rejected"`.
 
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Medical record entry updated successfully."
+}
+```
+
 ---
 
 ### `POST /api/patient-records/entries/<id>/deactivate/`
@@ -993,6 +1798,14 @@ Deactivate (soft-delete) a medical record entry.
 ```json
 {
   "notes": "Optional reason for deactivation"
+}
+```
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Medical record entry deactivated successfully."
 }
 ```
 
@@ -1013,6 +1826,14 @@ Set or update blood group for a patient.
 }
 ```
 
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Blood group updated successfully."
+}
+```
+
 ---
 
 ### `POST /api/patient-records/patients/<patient_id>/blood-group/verify/`
@@ -1021,6 +1842,169 @@ Laboratory-confirmed blood group update.
 
 - **Auth required**: Yes
 - **Allowed roles**: Laboratorian (approved)
+
+**Request body:**
+```json
+{
+  "blood_group": "o_positive",
+  "notes": "Confirmed from lab sample."
+}
+```
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Blood group verified successfully."
+}
+```
+
+---
+
+### `GET /api/patient/medical-reports/`
+
+List the current patient's medical report candidates.
+
+- **Auth required**: Yes
+- **Allowed roles**: Patient
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": "uuid",
+      "title": "chat-report.jpg",
+      "report_type": "unknown",
+      "processing_status": "uploaded",
+      "is_medical_report": false,
+      "created_at": "2026-05-23T12:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+### `GET /api/patient/medical-reports/<report_id>/`
+
+Get a patient-safe medical report candidate detail.
+
+- **Auth required**: Yes
+- **Allowed roles**: Patient (own reports only)
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "uuid",
+    "title": "chat-report.jpg",
+    "report_type": "unknown",
+    "processing_status": "uploaded",
+    "is_medical_report": false,
+    "doctor_notes": "",
+    "source_attachment": {
+      "id": "uuid",
+      "original_name": "chat-report.jpg",
+      "file_url": "https://api.example.com/media/messages/....jpg"
+    }
+  }
+}
+```
+
+---
+
+### `GET /api/doctor/consultations/<consultation_id>/medical-reports/`
+
+List medical report candidates for a consultation.
+
+- **Auth required**: Yes
+- **Allowed roles**: Doctor (approved, assigned to consultation)
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": "uuid",
+      "patient": {
+        "id": "uuid",
+        "full_name": "Patient Example"
+      },
+      "report_type": "unknown",
+      "processing_status": "uploaded",
+      "created_at": "2026-05-23T12:00:00Z"
+    }
+  ]
+}
+```
+
+---
+
+### `GET /api/doctor/medical-reports/<report_id>/`
+
+Get full doctor detail for a report candidate.
+
+- **Auth required**: Yes
+- **Allowed roles**: Doctor (approved, assigned via consultation)
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "uuid",
+    "title": "chat-report.jpg",
+    "report_type": "unknown",
+    "processing_status": "uploaded",
+    "raw_ocr_text": "",
+    "cleaned_report_text": "",
+    "structured_payload": {},
+    "source_attachment": {
+      "id": "uuid",
+      "original_name": "chat-report.jpg",
+      "file_url": "https://api.example.com/media/messages/....jpg"
+    }
+  }
+}
+```
+
+---
+
+### `POST /api/doctor/medical-reports/<report_id>/review/`
+
+Review a report candidate and set doctor notes/classification.
+
+- **Auth required**: Yes
+- **Allowed roles**: Doctor (approved, assigned via consultation)
+
+**Request body:**
+```json
+{
+  "is_medical_report": true,
+  "report_type": "lab_report",
+  "doctor_notes": "Likely CBC result image."
+}
+```
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Medical report reviewed successfully.",
+  "data": {
+    "id": "uuid",
+    "processing_status": "doctor_reviewed",
+    "is_medical_report": true,
+    "reviewed_at": "2026-05-23T12:10:00Z"
+  }
+}
+```
+
+> Phase 10A note: chat attachments create report candidates only. OCR/LLM extraction and automatic medical-record linking are not auto-triggered in this phase.
 
 ---
 
@@ -1032,6 +2016,22 @@ List available lab tests in the catalog (filterable by `?category=` and `?search
 
 - **Auth required**: Yes
 - **Allowed roles**: All
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": "uuid",
+      "name": "CBC",
+      "category": "hematology",
+      "sample_type": "Blood",
+      "description": "Complete blood count"
+    }
+  ]
+}
+```
 
 ---
 
@@ -1059,6 +2059,27 @@ Create a new lab order linked to a consultation.
 
 > **Privacy note**: Lab order item details (test names) are not included in patient-facing responses.
 
+**Response `201`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "uuid",
+    "consultation_id": "uuid",
+    "status": "pending",
+    "items": [
+      {
+        "id": "uuid",
+        "test_name": "CBC",
+        "category": "hematology",
+        "sample_type": "Blood",
+        "status": "pending"
+      }
+    ]
+  }
+}
+```
+
 ---
 
 ### `GET /api/lab-orders/my/`
@@ -1067,6 +2088,21 @@ List patient's own lab orders.
 
 - **Auth required**: Yes
 - **Allowed roles**: Patient
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": "uuid",
+      "consultation_id": "uuid",
+      "status": "pending",
+      "ordered_at": "2026-05-21T12:00:00Z"
+    }
+  ]
+}
+```
 
 ---
 
@@ -1077,6 +2113,20 @@ Get patient's own lab order detail (items hidden).
 - **Auth required**: Yes
 - **Allowed roles**: Patient (own)
 
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "uuid",
+    "consultation_id": "uuid",
+    "status": "pending",
+    "qr_token": "token-value",
+    "ordered_at": "2026-05-21T12:00:00Z"
+  }
+}
+```
+
 ---
 
 ### `GET /api/lab-orders/doctor/<id>/`
@@ -1086,6 +2136,27 @@ Get full lab order detail including test items.
 - **Auth required**: Yes
 - **Allowed roles**: Doctor (issuer)
 
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "uuid",
+    "consultation_id": "uuid",
+    "status": "pending",
+    "items": [
+      {
+        "id": "uuid",
+        "test_name": "CBC",
+        "category": "hematology",
+        "sample_type": "Blood",
+        "status": "pending"
+      }
+    ]
+  }
+}
+```
+
 ---
 
 ### `POST /api/lab-orders/doctor/<id>/cancel/`
@@ -1094,6 +2165,19 @@ Cancel a lab order (only if no items have been completed yet).
 
 - **Auth required**: Yes
 - **Allowed roles**: Doctor (issuer)
+
+**Request body:**
+```json
+{}
+```
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Lab order cancelled successfully."
+}
+```
 
 ---
 
@@ -1116,6 +2200,28 @@ Laboratorian scans QR token to access lab order items.
 - `completed_items` (NEW): List of already-completed items with metadata (test name, category, status, timestamps, result_id if available)
 - `locked: true` if no pending items remain
 - Audit log entry created
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "lab_order": {
+      "id": "uuid",
+      "status": "pending",
+      "locked": false
+    },
+    "remaining_items": [
+      {
+        "id": "uuid",
+        "test_name": "CBC",
+        "status": "pending"
+      }
+    ],
+    "completed_items": []
+  }
+}
+```
 
 ---
 
@@ -1140,6 +2246,27 @@ Record completion status for scanned lab order items.
 
 **Response**: Same shape as scan response (updated `lab_order` with both `remaining_items` and `completed_items`, status updated).
 
+```json
+{
+  "status": "success",
+  "data": {
+    "lab_order": {
+      "id": "uuid",
+      "status": "partially_completed",
+      "locked": false
+    },
+    "remaining_items": [],
+    "completed_items": [
+      {
+        "id": "uuid",
+        "test_name": "CBC",
+        "status": "completed"
+      }
+    ]
+  }
+}
+```
+
 ---
 
 > **Note**: There is no `GET /api/lab-orders/<id>/qr/` endpoint. Patients present the `qr_token` field from their own lab order detail response directly to the laboratorian.
@@ -1154,6 +2281,8 @@ Submit a lab result for a completed lab order item.
 
 - **Auth required**: Yes
 - **Allowed roles**: Laboratorian (approved, scanner for this order)
+
+**Request body:** choose one of the supported result payload shapes below.
 
 **Request body (numeric example):**
 ```json
@@ -1185,6 +2314,24 @@ Submit a lab result for a completed lab order item.
 
 > **Privacy note**: `laboratorian_notes` and `doctor_notes` are never included in patient-facing responses.
 
+**Response `201`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "uuid",
+    "lab_order_item_id": "uuid",
+    "value_type": "numeric",
+    "numeric_value": "7.2",
+    "unit": "mmol/L",
+    "reference_range": "3.9-6.1",
+    "flag": "high",
+    "status": "submitted",
+    "created_at": "2026-05-21T12:30:00Z"
+  }
+}
+```
+
 ---
 
 ### `GET /api/lab-orders/results/<id>/`
@@ -1193,6 +2340,24 @@ Get lab result detail (laboratorian view).
 
 - **Auth required**: Yes
 - **Allowed roles**: Laboratorian (own), Doctor (ordering doctor)
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "uuid",
+    "lab_order_item_id": "uuid",
+    "value_type": "numeric",
+    "numeric_value": "7.2",
+    "unit": "mmol/L",
+    "reference_range": "3.9-6.1",
+    "flag": "high",
+    "laboratorian_notes": "Repeated twice for accuracy",
+    "status": "submitted"
+  }
+}
+```
 
 ---
 
@@ -1212,6 +2377,14 @@ Correct a submitted lab result.
 }
 ```
 
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Lab result corrected successfully."
+}
+```
+
 ---
 
 ### `GET /api/lab-orders/doctor/results/<id>/`
@@ -1220,6 +2393,25 @@ Get full lab result detail (doctor view, including laboratorian notes).
 
 - **Auth required**: Yes
 - **Allowed roles**: Doctor (ordering doctor for this result)
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "uuid",
+    "lab_order_item_id": "uuid",
+    "value_type": "numeric",
+    "numeric_value": "7.2",
+    "unit": "mmol/L",
+    "reference_range": "3.9-6.1",
+    "flag": "high",
+    "laboratorian_notes": "Repeated twice for accuracy",
+    "doctor_notes": null,
+    "status": "submitted"
+  }
+}
+```
 
 ---
 
@@ -1238,6 +2430,14 @@ Doctor reviews a lab result.
 }
 ```
 
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Lab result reviewed successfully."
+}
+```
+
 ---
 
 ### `POST /api/lab-orders/doctor/results/<id>/release/`
@@ -1247,6 +2447,19 @@ Doctor releases a lab result to the patient.
 - **Auth required**: Yes
 - **Allowed roles**: Doctor (ordering doctor)
 - **Behavior**: Sets result status to `released` and timestamps `released_at` (also sets `reviewed_at` if empty)
+
+**Request body:**
+```json
+{}
+```
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Lab result released successfully."
+}
+```
 
 ---
 
@@ -1262,6 +2475,19 @@ Doctor links a released lab result to the patient's medical record.
 - Blood group results → update `BloodGroupRecord` as `laboratory_confirmed`
 - All other results → create `MedicalRecordEntry` as `laboratory_confirmed`
 
+**Request body:**
+```json
+{}
+```
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Lab result linked to medical record successfully."
+}
+```
+
 ---
 
 ### `GET /api/lab-results/my/`
@@ -1272,6 +2498,24 @@ List released lab results for the current patient.
 - **Allowed roles**: Patient
 - **Restriction**: Only `released` results are visible; `laboratorian_notes` and `doctor_notes` are excluded
 
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": [
+    {
+      "id": "uuid",
+      "value_type": "numeric",
+      "numeric_value": "7.2",
+      "unit": "mmol/L",
+      "reference_range": "3.9-6.1",
+      "flag": "high",
+      "status": "released"
+    }
+  ]
+}
+```
+
 ---
 
 ### `GET /api/lab-results/my/<id>/`
@@ -1280,6 +2524,22 @@ Get a specific released lab result (patient view).
 
 - **Auth required**: Yes
 - **Allowed roles**: Patient (own, released only)
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "data": {
+    "id": "uuid",
+    "value_type": "numeric",
+    "numeric_value": "7.2",
+    "unit": "mmol/L",
+    "reference_range": "3.9-6.1",
+    "flag": "high",
+    "status": "released"
+  }
+}
+```
 
 ## Audit / Admin Notes
 

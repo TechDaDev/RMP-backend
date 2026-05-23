@@ -179,6 +179,13 @@ class MedicalRecordCategory(models.TextChoices):
     SMOKING_STATUS = "smoking_status", "Smoking Status"
     PREGNANCY_STATUS = "pregnancy_status", "Pregnancy Status"
     GENERAL_NOTE = "general_note", "General Note"
+    LAB_REPORT = "lab_report", "Lab Report"
+    SONAR_REPORT = "sonar_report", "Sonar Report"
+    XRAY_REPORT = "xray_report", "X-Ray Report"
+    RADIOLOGY_REPORT = "radiology_report", "Radiology Report"
+    PRESCRIPTION_REPORT = "prescription_report", "Prescription Report"
+    DISCHARGE_SUMMARY = "discharge_summary", "Discharge Summary"
+    UPLOADED_MEDICAL_REPORT = "uploaded_medical_report", "Uploaded Medical Report"
 
 
 class MedicalRecordVerificationStatus(models.TextChoices):
@@ -194,6 +201,54 @@ class MedicalRecordSourceRole(models.TextChoices):
     DOCTOR = "doctor", "Doctor"
     LABORATORIAN = "laboratorian", "Laboratorian"
     SYSTEM = "system", "System"
+
+
+class MedicalReportType(models.TextChoices):
+    LAB_REPORT = "lab_report", "Lab Report"
+    SONAR_REPORT = "sonar_report", "Sonar Report"
+    XRAY_REPORT = "xray_report", "X-Ray Report"
+    CT_SCAN = "ct_scan", "CT Scan"
+    MRI = "mri", "MRI"
+    ECG = "ecg", "ECG"
+    PRESCRIPTION_IMAGE = "prescription_image", "Prescription Image"
+    DISCHARGE_SUMMARY = "discharge_summary", "Discharge Summary"
+    DOCTOR_NOTE = "doctor_note", "Doctor Note"
+    PATHOLOGY_REPORT = "pathology_report", "Pathology Report"
+    MICROBIOLOGY_REPORT = "microbiology_report", "Microbiology Report"
+    RADIOLOGY_REPORT = "radiology_report", "Radiology Report"
+    OTHER_MEDICAL_REPORT = "other_medical_report", "Other Medical Report"
+    NOT_MEDICAL_REPORT = "not_medical_report", "Not Medical Report"
+    UNKNOWN = "unknown", "Unknown"
+
+
+class MedicalReportProcessingStatus(models.TextChoices):
+    UPLOADED = "uploaded", "Uploaded"
+    QUEUED = "queued", "Queued"
+    OCR_PENDING = "ocr_pending", "OCR Pending"
+    OCR_COMPLETED = "ocr_completed", "OCR Completed"
+    LLM_PENDING = "llm_pending", "LLM Pending"
+    LLM_COMPLETED = "llm_completed", "LLM Completed"
+    ACCEPTED = "accepted", "Accepted"
+    REJECTED = "rejected", "Rejected"
+    FAILED = "failed", "Failed"
+    DOCTOR_REVIEWED = "doctor_reviewed", "Doctor Reviewed"
+
+
+class MedicalReportSource(models.TextChoices):
+    CHAT_ATTACHMENT = "chat_attachment", "Chat Attachment"
+    CONSULTATION_ATTACHMENT = "consultation_attachment", "Consultation Attachment"
+    LAB_RESULT_FILE = "lab_result_file", "Lab Result File"
+    MANUAL_UPLOAD = "manual_upload", "Manual Upload"
+    SYSTEM_IMPORT = "system_import", "System Import"
+
+
+class MedicalReportVisibility(models.TextChoices):
+    PATIENT_AND_ASSIGNED_DOCTOR = (
+        "patient_and_assigned_doctor",
+        "Patient and Assigned Doctor",
+    )
+    DOCTOR_ONLY = "doctor_only", "Doctor Only"
+    STAFF_ONLY = "staff_only", "Staff Only"
 
 
 class BloodGroup(models.TextChoices):

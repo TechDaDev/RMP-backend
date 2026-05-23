@@ -1,7 +1,8 @@
+import logging
+
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
-import logging
 
 from apps.audit.services import create_audit_log
 from apps.common.choices import MessageSenderRole, MessageType, NotificationType, UserType
@@ -83,6 +84,39 @@ def create_consultation_message(
             request=request,
         )
 
+        if sender_role == MessageSenderRole.PATIENT:
+            try:
+                from apps.patient_records.services import (
+                    create_patient_medical_report_from_message_attachment,
+                )
+
+                create_patient_medical_report_from_message_attachment(
+                    attachment=attachment,
+                    request=request,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to create medical report candidate from chat attachment",
+                    extra={
+                        "consultation_id": str(consultation.id),
+                        "message_id": str(message.id),
+                        "attachment_id": str(attachment.id),
+                        "sender_id": str(sender.id),
+                    },
+                )
+                create_audit_log(
+                    actor=sender,
+                    action="clinical_report_creation_failed",
+                    target=attachment,
+                    metadata={
+                        "consultation_id": str(consultation.id),
+                        "message_id": str(message.id),
+                        "attachment_id": str(attachment.id),
+                        "sender_id": str(sender.id),
+                    },
+                    request=request,
+                )
+
     create_audit_log(
         actor=sender,
         action="consultation_message_created",
@@ -120,7 +154,7 @@ def create_consultation_message(
 
         try:
             broadcast_message_created(message)
-        except Exception as exc:
+        except Exception:
             logger.exception(
                 "Failed to broadcast chat.message.created event",
                 extra={

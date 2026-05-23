@@ -1,14 +1,15 @@
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import extend_schema
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
-from apps.common.choices import ConsultationStatus, MedicalSpecialty, NotificationType, UserType
+from apps.common.choices import ConsultationStatus, NotificationType, UserType
 from apps.common.responses import error_response, success_response
 from apps.notifications.services import create_notification
 
-from .models import Consultation, Symptom, SymptomCategory
+from .models import Consultation, ConsultationSymptom, Symptom, SymptomCategory
 from .permissions import is_approved_doctor, is_assigned_doctor, is_consultation_patient
 from .serializers import (
     ConsultationAcceptSerializer,
@@ -94,11 +95,17 @@ class MyConsultationListView(APIView):
     def get(self, request):
         if request.user.user_type == UserType.PATIENT:
             queryset = Consultation.objects.filter(patient=request.user).select_related(
-                "patient", "assigned_doctor"
+                "patient",
+                "patient__user_profile",
+                "assigned_doctor",
+                "assigned_doctor__user_profile",
             )
         elif request.user.user_type == UserType.DOCTOR:
             queryset = Consultation.objects.filter(assigned_doctor=request.user).select_related(
-                "patient", "assigned_doctor"
+                "patient",
+                "patient__user_profile",
+                "assigned_doctor",
+                "assigned_doctor__user_profile",
             )
         else:
             return error_response(
@@ -117,10 +124,20 @@ class ConsultationDetailView(APIView):
     @extend_schema(summary="Get consultation detail")
     def get(self, request, consultation_id):
         consultation = get_object_or_404(
-            Consultation.objects.select_related("patient", "assigned_doctor").prefetch_related(
+            Consultation.objects.select_related(
+                "patient",
+                "patient__user_profile",
+                "assigned_doctor",
+                "assigned_doctor__user_profile",
+            ).prefetch_related(
                 "responses__doctor",
+                "responses__doctor__user_profile",
                 "attachments__uploaded_by",
-                "consultation_symptoms__symptom__category",
+                "attachments__uploaded_by__user_profile",
+                Prefetch(
+                    "consultation_symptoms",
+                    queryset=ConsultationSymptom.objects.select_related("symptom__category"),
+                ),
             ),
             id=consultation_id,
         )
@@ -153,12 +170,19 @@ class DoctorPendingConsultationListView(APIView):
         queryset = Consultation.objects.filter(
             status=ConsultationStatus.SUBMITTED,
             assigned_doctor__isnull=True,
-        ).select_related("patient", "assigned_doctor")
+        ).select_related(
+            "patient",
+            "patient__user_profile",
+            "assigned_doctor",
+            "assigned_doctor__user_profile",
+        )
         matching_consultations = [
             consultation for consultation in queryset if consultation.matches_specialty(specialty)
         ]
 
-        return success_response(data=ConsultationListSerializer(matching_consultations, many=True).data)
+        return success_response(
+            data=ConsultationListSerializer(matching_consultations, many=True).data
+        )
 
 
 @extend_schema(tags=["Consultations"])
@@ -172,7 +196,10 @@ class DoctorAssignedConsultationListView(APIView):
                 status_code=status.HTTP_403_FORBIDDEN,
             )
         queryset = Consultation.objects.filter(assigned_doctor=request.user).select_related(
-            "patient", "assigned_doctor"
+            "patient",
+            "patient__user_profile",
+            "assigned_doctor",
+            "assigned_doctor__user_profile",
         )
         return success_response(data=ConsultationListSerializer(queryset, many=True).data)
 
@@ -183,11 +210,25 @@ class ConsultationAcceptView(APIView):
 
     @extend_schema(summary="Accept consultation")
     def post(self, request, consultation_id):
-        consultation = Consultation.objects.select_related("assigned_doctor", "patient").prefetch_related(
-            "responses__doctor",
-            "attachments__uploaded_by",
-            "consultation_symptoms__symptom__category",
-        ).get(id=consultation_id)
+        consultation = (
+            Consultation.objects.select_related(
+                "assigned_doctor",
+                "assigned_doctor__user_profile",
+                "patient",
+                "patient__user_profile",
+            )
+            .prefetch_related(
+                "responses__doctor",
+                "responses__doctor__user_profile",
+                "attachments__uploaded_by",
+                "attachments__uploaded_by__user_profile",
+                Prefetch(
+                    "consultation_symptoms",
+                    queryset=ConsultationSymptom.objects.select_related("symptom__category"),
+                ),
+            )
+            .get(id=consultation_id)
+        )
 
         serializer = ConsultationAcceptSerializer(
             data=request.data,

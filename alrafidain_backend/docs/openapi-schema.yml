@@ -669,6 +669,71 @@ paths:
               schema:
                 $ref: '#/components/schemas/PaginatedSymptomList'
           description: ''
+  /api/doctor/consultations/{consultation_id}/medical-reports/:
+    get:
+      operationId: doctor_consultations_medical_reports_retrieve
+      summary: List medical report candidates for a doctor consultation
+      parameters:
+      - in: path
+        name: consultation_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Patient Medical Reports
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/doctor/medical-reports/{report_id}/:
+    get:
+      operationId: doctor_medical_reports_retrieve
+      summary: Get doctor medical report candidate detail
+      parameters:
+      - in: path
+        name: report_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Patient Medical Reports
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/doctor/medical-reports/{report_id}/review/:
+    post:
+      operationId: doctor_medical_reports_review_create
+      summary: Review medical report candidate
+      parameters:
+      - in: path
+        name: report_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Patient Medical Reports
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientMedicalReportDoctorReview'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatientMedicalReportDoctorReview'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatientMedicalReportDoctorReview'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
   /api/health/:
     get:
       operationId: health_retrieve
@@ -922,8 +987,12 @@ paths:
   /api/knowledge-base/documents/{document_id}/process/:
     post:
       operationId: knowledge_base_documents_process_create
-      description: POST /api/knowledge-base/documents/<uuid:document_id>/process/
-        — Extract and chunk.
+      description: |-
+        POST /api/knowledge-base/documents/<uuid:document_id>/process/ — Extract and chunk.
+
+        Query params:
+        - sync=true|1 : Run processing synchronously (for dev/testing; slow response).
+                        Default: queued (returns 202 immediately).
       parameters:
       - in: path
         name: document_id
@@ -1603,6 +1672,35 @@ paths:
       responses:
         '200':
           description: No response body
+  /api/patient/medical-reports/:
+    get:
+      operationId: patient_medical_reports_retrieve
+      summary: List patient medical report candidates
+      tags:
+      - Patient Medical Reports
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
+  /api/patient/medical-reports/{report_id}/:
+    get:
+      operationId: patient_medical_reports_retrieve_2
+      summary: Get patient medical report candidate detail
+      parameters:
+      - in: path
+        name: report_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Patient Medical Reports
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
   /api/prescriptions/{prescription_id}/dispense/:
     post:
       operationId: prescriptions_dispense_create
@@ -2077,6 +2175,25 @@ paths:
       responses:
         '200':
           description: No response body
+  /api/rag/responses/{rag_response_id}/save-to-record/:
+    post:
+      operationId: rag_responses_save_to_record_create
+      description: POST /api/rag/responses/<uuid:rag_response_id>/save-to-record/
+        — persist doctor RAG output.
+      parameters:
+      - in: path
+        name: rag_response_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - rag
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
   /api/schema/:
     get:
       operationId: schema_retrieve
@@ -2511,6 +2628,8 @@ components:
           oneOf:
           - $ref: '#/components/schemas/SpecialtyEnum'
           - $ref: '#/components/schemas/NullEnum'
+        recommended_specialties:
+          readOnly: true
         has_emergency_warning:
           type: boolean
           readOnly: true
@@ -2551,6 +2670,7 @@ components:
       - duration
       - has_emergency_warning
       - id
+      - recommended_specialties
       - recommended_specialty
       - selected_specialty
       - selected_specialty_other
@@ -2893,7 +3013,7 @@ components:
         approval_status:
           $ref: '#/components/schemas/ApprovalStatusEnum'
         processing_status:
-          $ref: '#/components/schemas/ProcessingStatusEnum'
+          $ref: '#/components/schemas/KnowledgeDocumentDetailProcessingStatusEnum'
         security_status:
           $ref: '#/components/schemas/SecurityStatusEnum'
         approved_at:
@@ -2941,6 +3061,18 @@ components:
       - title
       - updated_at
       - uploaded_by_email
+    KnowledgeDocumentDetailProcessingStatusEnum:
+      enum:
+      - uploaded
+      - extracted
+      - chunked
+      - failed
+      type: string
+      description: |-
+        * `uploaded` - Uploaded
+        * `extracted` - Extracted
+        * `chunked` - Chunked
+        * `failed` - Failed
     KnowledgeProcessingLog:
       type: object
       properties:
@@ -3529,6 +3661,13 @@ components:
       - smoking_status
       - pregnancy_status
       - general_note
+      - lab_report
+      - sonar_report
+      - xray_report
+      - radiology_report
+      - prescription_report
+      - discharge_summary
+      - uploaded_medical_report
       type: string
       description: |-
         * `blood_group` - Blood Group
@@ -3540,6 +3679,13 @@ components:
         * `smoking_status` - Smoking Status
         * `pregnancy_status` - Pregnancy Status
         * `general_note` - General Note
+        * `lab_report` - Lab Report
+        * `sonar_report` - Sonar Report
+        * `xray_report` - X-Ray Report
+        * `radiology_report` - Radiology Report
+        * `prescription_report` - Prescription Report
+        * `discharge_summary` - Discharge Summary
+        * `uploaded_medical_report` - Uploaded Medical Report
     MedicalRecordEntryDeactivate:
       type: object
       properties:
@@ -4045,6 +4191,44 @@ components:
           type: string
           format: date-time
           readOnly: true
+    PatientMedicalReportDoctorReview:
+      type: object
+      properties:
+        doctor_notes:
+          type: string
+        mark_reviewed:
+          type: boolean
+          default: true
+        report_type:
+          $ref: '#/components/schemas/ReportTypeEnum'
+        is_medical_report:
+          type: boolean
+        processing_status:
+          $ref: '#/components/schemas/PatientMedicalReportDoctorReviewProcessingStatusEnum'
+    PatientMedicalReportDoctorReviewProcessingStatusEnum:
+      enum:
+      - uploaded
+      - queued
+      - ocr_pending
+      - ocr_completed
+      - llm_pending
+      - llm_completed
+      - accepted
+      - rejected
+      - failed
+      - doctor_reviewed
+      type: string
+      description: |-
+        * `uploaded` - Uploaded
+        * `queued` - Queued
+        * `ocr_pending` - OCR Pending
+        * `ocr_completed` - OCR Completed
+        * `llm_pending` - LLM Pending
+        * `llm_completed` - LLM Completed
+        * `accepted` - Accepted
+        * `rejected` - Rejected
+        * `failed` - Failed
+        * `doctor_reviewed` - Doctor Reviewed
     PatientProfile:
       type: object
       properties:
@@ -4459,18 +4643,6 @@ components:
         * `normal` - Normal
         * `high` - High
         * `urgent` - Urgent
-    ProcessingStatusEnum:
-      enum:
-      - uploaded
-      - extracted
-      - chunked
-      - failed
-      type: string
-      description: |-
-        * `uploaded` - Uploaded
-        * `extracted` - Extracted
-        * `chunked` - Chunked
-        * `failed` - Failed
     RecommendationTypeEnum:
       enum:
       - general_advice
@@ -4513,6 +4685,40 @@ components:
       - password
       - password_confirm
       - user_type
+    ReportTypeEnum:
+      enum:
+      - lab_report
+      - sonar_report
+      - xray_report
+      - ct_scan
+      - mri
+      - ecg
+      - prescription_image
+      - discharge_summary
+      - doctor_note
+      - pathology_report
+      - microbiology_report
+      - radiology_report
+      - other_medical_report
+      - not_medical_report
+      - unknown
+      type: string
+      description: |-
+        * `lab_report` - Lab Report
+        * `sonar_report` - Sonar Report
+        * `xray_report` - X-Ray Report
+        * `ct_scan` - CT Scan
+        * `mri` - MRI
+        * `ecg` - ECG
+        * `prescription_image` - Prescription Image
+        * `discharge_summary` - Discharge Summary
+        * `doctor_note` - Doctor Note
+        * `pathology_report` - Pathology Report
+        * `microbiology_report` - Microbiology Report
+        * `radiology_report` - Radiology Report
+        * `other_medical_report` - Other Medical Report
+        * `not_medical_report` - Not Medical Report
+        * `unknown` - Unknown
     RequestPasswordReset:
       type: object
       properties:
@@ -4771,12 +4977,14 @@ components:
       - doctor
       - pharmacist
       - laboratorian
+      - staff
       type: string
       description: |-
         * `patient` - Patient
         * `doctor` - Doctor
         * `pharmacist` - Pharmacist
         * `laboratorian` - Laboratorian
+        * `staff` - Staff / Admin
     ValueTypeEnum:
       enum:
       - text

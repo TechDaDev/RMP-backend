@@ -52,3 +52,8 @@ def knowledge_document_upload_path(instance, filename: str) -> str:
     ext = os.path.splitext(filename)[1].lower()
     doc_id = str(instance.pk) if instance.pk else str(uuid.uuid4())
     return f"knowledge-base/documents/{doc_id}/{uuid.uuid4()}{ext}"
+
+
+def medical_report_upload_path(instance, filename: str) -> str:
+    ext = os.path.splitext(filename)[1].lower()
+    return f"medical_reports/{instance.patient_id}/{uuid.uuid4()}{ext}"

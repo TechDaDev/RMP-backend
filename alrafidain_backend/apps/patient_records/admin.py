@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import BloodGroupRecord, MedicalRecordEntry, PatientMedicalRecord
+from .models import BloodGroupRecord, MedicalRecordEntry, PatientMedicalRecord, PatientMedicalReport
 
 
 @admin.register(PatientMedicalRecord)
@@ -38,3 +38,41 @@ class BloodGroupRecordAdmin(admin.ModelAdmin):
     list_filter = ("verification_status", "created_at")
     search_fields = ("medical_record__patient__email", "source_user__email", "verified_by__email")
     readonly_fields = ("id", "created_at", "updated_at", "verified_at")
+
+
+@admin.register(PatientMedicalReport)
+class PatientMedicalReportAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "patient",
+        "consultation",
+        "report_type",
+        "processing_status",
+        "is_medical_report",
+        "created_at",
+        "processed_at",
+        "reviewed_at",
+    )
+    list_filter = (
+        "report_type",
+        "processing_status",
+        "is_medical_report",
+        "visibility",
+        "created_at",
+    )
+    search_fields = (
+        "patient__email",
+        "title",
+        "original_filename",
+    )
+    readonly_fields = (
+        "id",
+        "raw_ocr_text",
+        "cleaned_report_text",
+        "structured_payload",
+        "source_attachment",
+        "source_message",
+        "linked_medical_record_entry",
+        "created_at",
+        "updated_at",
+    )

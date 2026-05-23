@@ -1,3 +1,6 @@
+import os
+
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
@@ -6,6 +9,9 @@ from apps.audit.services import create_audit_log
 from apps.common.choices import (
     MedicalRecordSourceRole,
     MedicalRecordVerificationStatus,
+    MedicalReportProcessingStatus,
+    MedicalReportSource,
+    MedicalReportType,
     NotificationType,
     UserType,
     VerificationStatus,
@@ -13,7 +19,7 @@ from apps.common.choices import (
 from apps.common.policies import ClinicalAccessPolicy
 from apps.notifications.services import create_notification
 
-from .models import BloodGroupRecord, MedicalRecordEntry, PatientMedicalRecord
+from .models import BloodGroupRecord, MedicalRecordEntry, PatientMedicalRecord, PatientMedicalReport
 
 User = get_user_model()
 
@@ -272,3 +278,112 @@ def deactivate_medical_record_entry(entry, actor, notes=None, request=None):
     )
 
     return entry
+
+
+def _is_supported_clinical_attachment(attachment) -> bool:
+    allowed_extensions = {
+        ext.lower() for ext in getattr(settings, "CLINICAL_ATTACHMENT_ALLOWED_EXTENSIONS", [])
+    }
+    allowed_content_types = {
+        ctype.lower()
+        for ctype in getattr(settings, "CLINICAL_ATTACHMENT_ALLOWED_CONTENT_TYPES", [])
+    }
+
+    filename = getattr(attachment, "original_name", "") or getattr(attachment.file, "name", "")
+    extension = os.path.splitext(filename)[1].lower()
+    if extension and allowed_extensions and extension not in allowed_extensions:
+        return False
+
+    content_type = ""
+    file_obj = getattr(attachment.file, "file", None)
+    if file_obj is not None:
+        content_type = getattr(file_obj, "content_type", "") or ""
+    content_type = content_type.lower()
+
+    return not (
+        content_type and allowed_content_types and content_type not in allowed_content_types
+    )
+
+
+def create_patient_medical_report_from_message_attachment(*, attachment, request=None):
+    message = attachment.message
+    consultation = message.consultation
+    patient = consultation.patient
+
+    if message.sender_id != patient.id:
+        return None
+
+    if not _is_supported_clinical_attachment(attachment):
+        return None
+
+    existing = PatientMedicalReport.objects.filter(source_attachment=attachment).first()
+    if existing:
+        return existing
+
+    file_obj = getattr(attachment, "file", None)
+    file_size = None
+    mime_type = ""
+    if file_obj is not None:
+        try:
+            file_size = file_obj.size
+        except Exception:
+            file_size = None
+
+        raw_file = getattr(file_obj, "file", None)
+        if raw_file is not None:
+            mime_type = getattr(raw_file, "content_type", "") or ""
+
+    report = PatientMedicalReport.objects.create(
+        patient=patient,
+        consultation=consultation,
+        source_message=message,
+        source_attachment=attachment,
+        source=MedicalReportSource.CHAT_ATTACHMENT,
+        report_type=MedicalReportType.UNKNOWN,
+        processing_status=MedicalReportProcessingStatus.UPLOADED,
+        title=attachment.original_name or "Uploaded medical report",
+        original_filename=attachment.original_name or "",
+        mime_type=mime_type,
+        file_size=file_size,
+        is_medical_report=False,
+    )
+
+    create_audit_log(
+        actor=message.sender,
+        action="clinical_report_created_from_chat_attachment",
+        target=report,
+        metadata={
+            "patient_id": str(patient.id),
+            "consultation_id": str(consultation.id),
+            "source_message_id": str(message.id),
+            "source_attachment_id": str(attachment.id),
+            "report_id": str(report.id),
+        },
+        request=request,
+    )
+    return report
+
+
+def mark_medical_report_processing_status(report, status, error=""):
+    report.processing_status = status
+    if error:
+        report.processing_error = error
+    if status in {
+        MedicalReportProcessingStatus.OCR_COMPLETED,
+        MedicalReportProcessingStatus.LLM_COMPLETED,
+        MedicalReportProcessingStatus.ACCEPTED,
+        MedicalReportProcessingStatus.REJECTED,
+        MedicalReportProcessingStatus.FAILED,
+        MedicalReportProcessingStatus.DOCTOR_REVIEWED,
+    }:
+        report.processed_at = timezone.now()
+
+    update_fields = ["processing_status", "processing_error", "processed_at", "updated_at"]
+    report.save(update_fields=update_fields)
+    return report
+
+
+def link_medical_report_to_record_entry(report, entry):
+    report.linked_medical_record_entry = entry
+    report.save(update_fields=["linked_medical_record_entry", "updated_at"])
+    return report

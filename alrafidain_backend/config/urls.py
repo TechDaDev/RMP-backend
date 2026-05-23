@@ -23,6 +23,8 @@ urlpatterns = [
     path("api/lab-results/", include("apps.lab_orders.result_urls")),
     path("api/notifications/", include("apps.notifications.urls")),
     path("api/patient-records/", include("apps.patient_records.urls")),
+    path("api/patient/", include("apps.patient_records.patient_report_urls")),
+    path("api/doctor/", include("apps.patient_records.doctor_report_urls")),
     path("api/knowledge-base/", include("apps.knowledge_base.urls")),
     path("api/rag/", include("apps.rag.urls")),
 ]

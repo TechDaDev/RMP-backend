@@ -168,10 +168,15 @@ Notes:
 | Add entry | ❌ | ✅ (active consultation) | ❌ | ❌ | ❌ |
 | Confirm/deactivate entry | ❌ | ✅ (creator) | ❌ | ❌ | ❌ |
 | View patient record | ❌ | ✅ (active consultation) | ❌ | ❌ | ❌ |
+| List own medical report candidates | ✅ | ❌ | ❌ | ❌ | ❌ |
+| View own medical report candidate detail | ✅ (own) | ❌ | ❌ | ❌ | ❌ |
+| List consultation medical report candidates | ❌ | ✅ (assigned) | ❌ | ❌ | ✅ |
+| View medical report candidate detail | ❌ | ✅ (assigned) | ❌ | ❌ | ✅ |
+| Review medical report candidate | ❌ | ✅ (assigned) | ❌ | ❌ | ✅ |
 | Set blood group | ❌ | ❌ | ✅ | ❌ | ❌ |
 | Verify blood group | ❌ | ❌ | ✅ | ❌ | ❌ |
 
-> **Privacy rule**: Doctors can only view a patient's medical record when there is an active accepted consultation between them.
+> **Privacy rule**: Doctors can only view patient records and medical report candidates when they are assigned to the consultation relationship.
 
 ---
 

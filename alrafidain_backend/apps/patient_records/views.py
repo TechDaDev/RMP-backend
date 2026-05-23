@@ -1,15 +1,25 @@
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
-from apps.common.choices import MedicalRecordVerificationStatus, UserType
+from apps.common.choices import (
+    MedicalRecordVerificationStatus,
+    MedicalReportProcessingStatus,
+    NotificationType,
+    UserType,
+)
 from apps.common.responses import error_response, success_response
+from apps.consultations.models import Consultation
+from apps.notifications.services import create_notification
 
-from .models import MedicalRecordEntry, PatientMedicalRecord
+from .models import MedicalRecordEntry, PatientMedicalRecord, PatientMedicalReport
+from .permissions import can_review_medical_report, can_view_medical_report
 from .serializers import (
     BloodGroupRecordSerializer,
     MedicalRecordEntryConfirmSerializer,
@@ -17,6 +27,9 @@ from .serializers import (
     MedicalRecordEntryDeactivateSerializer,
     MedicalRecordEntrySerializer,
     PatientMedicalRecordSerializer,
+    PatientMedicalReportDetailSerializer,
+    PatientMedicalReportDoctorReviewSerializer,
+    PatientMedicalReportListSerializer,
     SetBloodGroupSerializer,
 )
 from .services import (
@@ -308,4 +321,209 @@ class LaboratorianVerifyBloodGroupView(APIView):
 
         return success_response(
             "Blood group verified.", data=BloodGroupRecordSerializer(blood_group_record).data
+        )
+
+
+def _apply_medical_report_filters(queryset, request):
+    report_type = request.query_params.get("report_type")
+    if report_type:
+        queryset = queryset.filter(report_type=report_type)
+
+    processing_status = request.query_params.get("processing_status")
+    if processing_status:
+        queryset = queryset.filter(processing_status=processing_status)
+
+    is_medical_report = request.query_params.get("is_medical_report")
+    if is_medical_report is not None:
+        queryset = queryset.filter(is_medical_report=is_medical_report.lower() == "true")
+
+    return queryset
+
+
+@extend_schema(tags=["Patient Medical Reports"])
+class PatientMedicalReportListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(summary="List patient medical report candidates")
+    def get(self, request):
+        if request.user.user_type != UserType.PATIENT:
+            return error_response(
+                "Only patients can access this endpoint.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        queryset = PatientMedicalReport.objects.filter(patient=request.user).select_related(
+            "consultation",
+            "reviewed_by",
+        )
+        queryset = _apply_medical_report_filters(queryset, request)
+        data = PatientMedicalReportListSerializer(
+            queryset.order_by("-created_at"),
+            many=True,
+            context={"request": request},
+        ).data
+        return success_response(data=data)
+
+
+@extend_schema(tags=["Patient Medical Reports"])
+class PatientMedicalReportDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(summary="Get patient medical report candidate detail")
+    def get(self, request, report_id):
+        report = get_object_or_404(
+            PatientMedicalReport.objects.select_related(
+                "patient",
+                "consultation",
+                "source_message",
+                "source_attachment",
+                "linked_medical_record_entry",
+                "reviewed_by",
+            ),
+            id=report_id,
+        )
+
+        if not can_view_medical_report(request.user, report):
+            return error_response("Not found.", status_code=status.HTTP_404_NOT_FOUND)
+
+        data = PatientMedicalReportDetailSerializer(report, context={"request": request}).data
+        return success_response(data=data)
+
+
+@extend_schema(tags=["Patient Medical Reports"])
+class DoctorConsultationMedicalReportListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(summary="List medical report candidates for a doctor consultation")
+    def get(self, request, consultation_id):
+        if request.user.user_type != UserType.DOCTOR:
+            return error_response(
+                "Only doctors can access this endpoint.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        try:
+            consultation = Consultation.objects.get(id=consultation_id)
+        except Consultation.DoesNotExist:
+            return error_response("Not found.", status_code=status.HTTP_404_NOT_FOUND)
+
+        if consultation.assigned_doctor_id != request.user.id:
+            return error_response("Not found.", status_code=status.HTTP_404_NOT_FOUND)
+
+        queryset = PatientMedicalReport.objects.filter(consultation=consultation).select_related(
+            "patient",
+            "consultation",
+            "reviewed_by",
+        )
+        queryset = _apply_medical_report_filters(queryset, request)
+        data = PatientMedicalReportListSerializer(
+            queryset.order_by("-created_at"),
+            many=True,
+            context={"request": request},
+        ).data
+        return success_response(data=data)
+
+
+@extend_schema(tags=["Patient Medical Reports"])
+class DoctorMedicalReportDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(summary="Get doctor medical report candidate detail")
+    def get(self, request, report_id):
+        if not (request.user.user_type == UserType.DOCTOR or request.user.is_staff):
+            return error_response(
+                "Only doctors can access this endpoint.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        report = get_object_or_404(
+            PatientMedicalReport.objects.select_related(
+                "patient",
+                "consultation",
+                "source_message",
+                "source_attachment",
+                "linked_medical_record_entry",
+                "reviewed_by",
+            ),
+            id=report_id,
+        )
+
+        if not can_view_medical_report(request.user, report):
+            return error_response("Not found.", status_code=status.HTTP_404_NOT_FOUND)
+
+        data = PatientMedicalReportDetailSerializer(report, context={"request": request}).data
+        return success_response(data=data)
+
+
+@extend_schema(tags=["Patient Medical Reports"])
+class DoctorMedicalReportReviewView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Review medical report candidate",
+        request=PatientMedicalReportDoctorReviewSerializer,
+    )
+    def post(self, request, report_id):
+        if not (request.user.user_type == UserType.DOCTOR or request.user.is_staff):
+            return error_response(
+                "Only doctors can access this endpoint.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        report = get_object_or_404(
+            PatientMedicalReport.objects.select_related("consultation"),
+            id=report_id,
+        )
+
+        if not can_review_medical_report(request.user, report):
+            return error_response("Not found.", status_code=status.HTTP_404_NOT_FOUND)
+
+        serializer = PatientMedicalReportDoctorReviewSerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response(
+                "Invalid input.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        data = serializer.validated_data
+        if "doctor_notes" in data:
+            report.doctor_notes = data["doctor_notes"]
+        if "report_type" in data:
+            report.report_type = data["report_type"]
+        if "is_medical_report" in data:
+            report.is_medical_report = data["is_medical_report"]
+        if "processing_status" in data:
+            report.processing_status = data["processing_status"]
+
+        if data.get("mark_reviewed", True):
+            report.reviewed_by = request.user
+            report.reviewed_at = timezone.now()
+            if "processing_status" not in data:
+                report.processing_status = MedicalReportProcessingStatus.DOCTOR_REVIEWED
+
+        try:
+            report.full_clean()
+        except ValidationError as exc:
+            return error_response(
+                "Invalid input.",
+                errors=exc.message_dict,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        report.save()
+
+        create_notification(
+            recipient=report.patient,
+            notification_type=NotificationType.MEDICAL_RECORD,
+            title="Medical report reviewed",
+            message="A doctor reviewed one of your uploaded medical reports.",
+            data={
+                "medical_report_id": str(report.id),
+                "consultation_id": str(report.consultation_id) if report.consultation_id else None,
+            },
+        )
+
+        return success_response(
+            message="Medical report reviewed.",
+            data=PatientMedicalReportDetailSerializer(report, context={"request": request}).data,
         )

@@ -272,6 +272,304 @@
                 }
             }
         },
+        "/api/admin/verifications/": {
+            "get": {
+                "operationId": "admin_verifications_list",
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "limit",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "offset",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "role",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "search",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "in": "query",
+                        "name": "status",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "tags": [
+                    "Admin Verifications"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/AdminVerificationList"
+                                    }
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/admin/verifications/{role}/{id}/": {
+            "get": {
+                "operationId": "admin_verifications_retrieve",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "role",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin Verifications"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdminVerificationDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/admin/verifications/{role}/{id}/approve/": {
+            "post": {
+                "operationId": "admin_verifications_approve_create",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "role",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin Verifications"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AdminVerificationDecision"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AdminVerificationDecision"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AdminVerificationDecision"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdminVerificationDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/admin/verifications/{role}/{id}/reject/": {
+            "post": {
+                "operationId": "admin_verifications_reject_create",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "role",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin Verifications"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AdminVerificationDecision"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AdminVerificationDecision"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AdminVerificationDecision"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdminVerificationDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/admin/verifications/{role}/{id}/suspend/": {
+            "post": {
+                "operationId": "admin_verifications_suspend_create",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    },
+                    {
+                        "in": "path",
+                        "name": "role",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Admin Verifications"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AdminVerificationDecision"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AdminVerificationDecision"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AdminVerificationDecision"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdminVerificationDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
         "/api/consultations/": {
             "post": {
                 "operationId": "consultations_create",
@@ -821,6 +1119,115 @@
                 }
             }
         },
+        "/api/doctor/consultations/{consultation_id}/medical-reports/": {
+            "get": {
+                "operationId": "doctor_consultations_medical_reports_retrieve",
+                "summary": "List medical report candidates for a doctor consultation",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "consultation_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Patient Medical Reports"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/doctor/medical-reports/{report_id}/": {
+            "get": {
+                "operationId": "doctor_medical_reports_retrieve",
+                "summary": "Get doctor medical report candidate detail",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "report_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Patient Medical Reports"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/doctor/medical-reports/{report_id}/review/": {
+            "post": {
+                "operationId": "doctor_medical_reports_review_create",
+                "summary": "Review medical report candidate",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "report_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Patient Medical Reports"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatientMedicalReportDoctorReview"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatientMedicalReportDoctorReview"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatientMedicalReportDoctorReview"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
         "/api/health/": {
             "get": {
                 "operationId": "health_retrieve",
@@ -1239,7 +1646,7 @@
         "/api/knowledge-base/documents/{document_id}/process/": {
             "post": {
                 "operationId": "knowledge_base_documents_process_create",
-                "description": "POST /api/knowledge-base/documents/<uuid:document_id>/process/ — Extract and chunk.",
+                "description": "POST /api/knowledge-base/documents/<uuid:document_id>/process/ — Extract and chunk.\n\nQuery params:\n- sync=true|1 : Run processing synchronously (for dev/testing; slow response).\n                Default: queued (returns 202 immediately).",
                 "parameters": [
                     {
                         "in": "path",
@@ -2391,6 +2798,55 @@
                 }
             }
         },
+        "/api/patient/medical-reports/": {
+            "get": {
+                "operationId": "patient_medical_reports_retrieve",
+                "summary": "List patient medical report candidates",
+                "tags": [
+                    "Patient Medical Reports"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/patient/medical-reports/{report_id}/": {
+            "get": {
+                "operationId": "patient_medical_reports_retrieve_2",
+                "summary": "Get patient medical report candidate detail",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "report_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Patient Medical Reports"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
         "/api/prescriptions/{prescription_id}/dispense/": {
             "post": {
                 "operationId": "prescriptions_dispense_create",
@@ -2558,6 +3014,51 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/PrescriptionPatientDetail"
+                                }
+                            }
+                        },
+                        "description": ""
+                    }
+                }
+            }
+        },
+        "/api/prescriptions/pharmacist/history/": {
+            "get": {
+                "operationId": "prescriptions_pharmacist_history_list",
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "required": false,
+                        "in": "query",
+                        "description": "Number of results to return per page.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "offset",
+                        "required": false,
+                        "in": "query",
+                        "description": "The initial index from which to return the results.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "tags": [
+                    "Prescriptions"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaginatedPharmacistDispensingHistoryList"
                                 }
                             }
                         },
@@ -3154,6 +3655,36 @@
                 }
             }
         },
+        "/api/rag/responses/{rag_response_id}/save-to-record/": {
+            "post": {
+                "operationId": "rag_responses_save_to_record_create",
+                "description": "POST /api/rag/responses/<uuid:rag_response_id>/save-to-record/ — persist doctor RAG output.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "rag_response_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "rag"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
         "/api/schema/": {
             "get": {
                 "operationId": "schema_retrieve",
@@ -3341,6 +3872,116 @@
                 "required": [
                     "code",
                     "email"
+                ]
+            },
+            "AdminVerificationDecision": {
+                "type": "object",
+                "properties": {
+                    "note": {
+                        "type": "string",
+                        "maxLength": 2000
+                    },
+                    "reason": {
+                        "type": "string",
+                        "maxLength": 2000
+                    }
+                }
+            },
+            "AdminVerificationDetail": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "user": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "profile": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "submitted_at": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "verification_notes": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "verified_at": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "verified_by": {
+                        "type": "string",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "id",
+                    "profile",
+                    "role",
+                    "status",
+                    "submitted_at",
+                    "updated_at",
+                    "user",
+                    "verification_notes",
+                    "verified_at",
+                    "verified_by"
+                ]
+            },
+            "AdminVerificationList": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "role": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "user": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "profile": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "submitted_at": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "id",
+                    "profile",
+                    "role",
+                    "status",
+                    "submitted_at",
+                    "updated_at",
+                    "user"
                 ]
             },
             "ApprovalStatusEnum": {
@@ -3553,6 +4194,9 @@
                             }
                         ]
                     },
+                    "recommended_specialties": {
+                        "readOnly": true
+                    },
                     "has_emergency_warning": {
                         "type": "boolean",
                         "readOnly": true
@@ -3604,6 +4248,7 @@
                     "duration",
                     "has_emergency_warning",
                     "id",
+                    "recommended_specialties",
                     "recommended_specialty",
                     "selected_specialty",
                     "selected_specialty_other",
@@ -3676,7 +4321,7 @@
                         "readOnly": true
                     },
                     "status": {
-                        "$ref": "#/components/schemas/DispensingRecordStatusEnum"
+                        "$ref": "#/components/schemas/StatusFccEnum"
                     },
                     "dispensed_quantity": {
                         "type": "string",
@@ -3698,14 +4343,6 @@
                     "prescription_item_id",
                     "status"
                 ]
-            },
-            "DispensingRecordStatusEnum": {
-                "enum": [
-                    "dispensed",
-                    "unavailable"
-                ],
-                "type": "string",
-                "description": "* `dispensed` - Dispensed\n* `unavailable` - Unavailable"
             },
             "DoctorProfile": {
                 "type": "object",
@@ -4006,7 +4643,7 @@
                         "$ref": "#/components/schemas/ApprovalStatusEnum"
                     },
                     "processing_status": {
-                        "$ref": "#/components/schemas/ProcessingStatusEnum"
+                        "$ref": "#/components/schemas/KnowledgeDocumentDetailProcessingStatusEnum"
                     },
                     "security_status": {
                         "$ref": "#/components/schemas/SecurityStatusEnum"
@@ -4068,6 +4705,16 @@
                     "updated_at",
                     "uploaded_by_email"
                 ]
+            },
+            "KnowledgeDocumentDetailProcessingStatusEnum": {
+                "enum": [
+                    "uploaded",
+                    "extracted",
+                    "chunked",
+                    "failed"
+                ],
+                "type": "string",
+                "description": "* `uploaded` - Uploaded\n* `extracted` - Extracted\n* `chunked` - Chunked\n* `failed` - Failed"
             },
             "KnowledgeProcessingLog": {
                 "type": "object",
@@ -4852,10 +5499,17 @@
                     "family_history",
                     "smoking_status",
                     "pregnancy_status",
-                    "general_note"
+                    "general_note",
+                    "lab_report",
+                    "sonar_report",
+                    "xray_report",
+                    "radiology_report",
+                    "prescription_report",
+                    "discharge_summary",
+                    "uploaded_medical_report"
                 ],
                 "type": "string",
-                "description": "* `blood_group` - Blood Group\n* `allergy` - Allergy\n* `chronic_condition` - Chronic Condition\n* `current_medication` - Current Medication\n* `past_surgery` - Past Surgery\n* `family_history` - Family History\n* `smoking_status` - Smoking Status\n* `pregnancy_status` - Pregnancy Status\n* `general_note` - General Note"
+                "description": "* `blood_group` - Blood Group\n* `allergy` - Allergy\n* `chronic_condition` - Chronic Condition\n* `current_medication` - Current Medication\n* `past_surgery` - Past Surgery\n* `family_history` - Family History\n* `smoking_status` - Smoking Status\n* `pregnancy_status` - Pregnancy Status\n* `general_note` - General Note\n* `lab_report` - Lab Report\n* `sonar_report` - Sonar Report\n* `xray_report` - X-Ray Report\n* `radiology_report` - Radiology Report\n* `prescription_report` - Prescription Report\n* `discharge_summary` - Discharge Summary\n* `uploaded_medical_report` - Uploaded Medical Report"
             },
             "MedicalRecordEntryDeactivate": {
                 "type": "object",
@@ -5099,6 +5753,37 @@
                         "type": "array",
                         "items": {
                             "$ref": "#/components/schemas/Notification"
+                        }
+                    }
+                }
+            },
+            "PaginatedPharmacistDispensingHistoryList": {
+                "type": "object",
+                "required": [
+                    "count",
+                    "results"
+                ],
+                "properties": {
+                    "count": {
+                        "type": "integer",
+                        "example": 123
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "http://api.example.org/accounts/?offset=400&limit=100"
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true,
+                        "format": "uri",
+                        "example": "http://api.example.org/accounts/?offset=200&limit=100"
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/PharmacistDispensingHistory"
                         }
                     }
                 }
@@ -5512,6 +6197,43 @@
                     }
                 }
             },
+            "PatientMedicalReportDoctorReview": {
+                "type": "object",
+                "properties": {
+                    "doctor_notes": {
+                        "type": "string"
+                    },
+                    "mark_reviewed": {
+                        "type": "boolean",
+                        "default": true
+                    },
+                    "report_type": {
+                        "$ref": "#/components/schemas/ReportTypeEnum"
+                    },
+                    "is_medical_report": {
+                        "type": "boolean"
+                    },
+                    "processing_status": {
+                        "$ref": "#/components/schemas/PatientMedicalReportDoctorReviewProcessingStatusEnum"
+                    }
+                }
+            },
+            "PatientMedicalReportDoctorReviewProcessingStatusEnum": {
+                "enum": [
+                    "uploaded",
+                    "queued",
+                    "ocr_pending",
+                    "ocr_completed",
+                    "llm_pending",
+                    "llm_completed",
+                    "accepted",
+                    "rejected",
+                    "failed",
+                    "doctor_reviewed"
+                ],
+                "type": "string",
+                "description": "* `uploaded` - Uploaded\n* `queued` - Queued\n* `ocr_pending` - OCR Pending\n* `ocr_completed` - OCR Completed\n* `llm_pending` - LLM Pending\n* `llm_completed` - LLM Completed\n* `accepted` - Accepted\n* `rejected` - Rejected\n* `failed` - Failed\n* `doctor_reviewed` - Doctor Reviewed"
+            },
             "PatientProfile": {
                 "type": "object",
                 "properties": {
@@ -5546,6 +6268,106 @@
                 "required": [
                     "created_at",
                     "id",
+                    "updated_at"
+                ]
+            },
+            "PharmacistDispensingHistory": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "prescription_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "prescription_status": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "item_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "readOnly": true
+                    },
+                    "medication_name": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "strength": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "dosage": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "frequency": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "duration": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "route": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "quantity": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "dispensed_quantity": {
+                        "type": "string",
+                        "maxLength": 100
+                    },
+                    "status": {
+                        "$ref": "#/components/schemas/StatusFccEnum"
+                    },
+                    "dispensed_at": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "patient": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "doctor": {
+                        "type": "string",
+                        "readOnly": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "readOnly": true
+                    }
+                },
+                "required": [
+                    "created_at",
+                    "dispensed_at",
+                    "doctor",
+                    "dosage",
+                    "duration",
+                    "frequency",
+                    "id",
+                    "item_id",
+                    "medication_name",
+                    "patient",
+                    "prescription_id",
+                    "prescription_status",
+                    "quantity",
+                    "route",
+                    "status",
+                    "strength",
                     "updated_at"
                 ]
             },
@@ -5955,16 +6777,6 @@
                 "type": "string",
                 "description": "* `low` - Low\n* `normal` - Normal\n* `high` - High\n* `urgent` - Urgent"
             },
-            "ProcessingStatusEnum": {
-                "enum": [
-                    "uploaded",
-                    "extracted",
-                    "chunked",
-                    "failed"
-                ],
-                "type": "string",
-                "description": "* `uploaded` - Uploaded\n* `extracted` - Extracted\n* `chunked` - Chunked\n* `failed` - Failed"
-            },
             "RecommendationTypeEnum": {
                 "enum": [
                     "general_advice",
@@ -6012,6 +6824,27 @@
                     "password_confirm",
                     "user_type"
                 ]
+            },
+            "ReportTypeEnum": {
+                "enum": [
+                    "lab_report",
+                    "sonar_report",
+                    "xray_report",
+                    "ct_scan",
+                    "mri",
+                    "ecg",
+                    "prescription_image",
+                    "discharge_summary",
+                    "doctor_note",
+                    "pathology_report",
+                    "microbiology_report",
+                    "radiology_report",
+                    "other_medical_report",
+                    "not_medical_report",
+                    "unknown"
+                ],
+                "type": "string",
+                "description": "* `lab_report` - Lab Report\n* `sonar_report` - Sonar Report\n* `xray_report` - X-Ray Report\n* `ct_scan` - CT Scan\n* `mri` - MRI\n* `ecg` - ECG\n* `prescription_image` - Prescription Image\n* `discharge_summary` - Discharge Summary\n* `doctor_note` - Doctor Note\n* `pathology_report` - Pathology Report\n* `microbiology_report` - Microbiology Report\n* `radiology_report` - Radiology Report\n* `other_medical_report` - Other Medical Report\n* `not_medical_report` - Not Medical Report\n* `unknown` - Unknown"
             },
             "RequestPasswordReset": {
                 "type": "object",
@@ -6142,6 +6975,14 @@
                 ],
                 "type": "string",
                 "description": "* `completed` - Completed\n* `unavailable` - Unavailable"
+            },
+            "StatusFccEnum": {
+                "enum": [
+                    "dispensed",
+                    "unavailable"
+                ],
+                "type": "string",
+                "description": "* `dispensed` - Dispensed\n* `unavailable` - Unavailable"
             },
             "Symptom": {
                 "type": "object",
@@ -6282,10 +7123,11 @@
                     "patient",
                     "doctor",
                     "pharmacist",
-                    "laboratorian"
+                    "laboratorian",
+                    "staff"
                 ],
                 "type": "string",
-                "description": "* `patient` - Patient\n* `doctor` - Doctor\n* `pharmacist` - Pharmacist\n* `laboratorian` - Laboratorian"
+                "description": "* `patient` - Patient\n* `doctor` - Doctor\n* `pharmacist` - Pharmacist\n* `laboratorian` - Laboratorian\n* `staff` - Staff / Admin"
             },
             "ValueTypeEnum": {
                 "enum": [

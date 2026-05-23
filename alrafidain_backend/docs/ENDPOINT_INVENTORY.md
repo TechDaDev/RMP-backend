@@ -174,6 +174,11 @@ Legend:
 | GET | `/api/patient-records/patients/<patient_id>/` | `DoctorPatientMedicalRecordView` | Yes | doctor (approved with assigned consultation in accepted/doctor_responded/closed) | `PatientMedicalRecordSerializer` | Relationship required via consultation access policy | stable |
 | POST | `/api/patient-records/<id>/blood-group/` | `SetBloodGroupView` | Yes | patient \| doctor | — | Laboratorian must use verify endpoint | stable |
 | POST | `/api/patient-records/patients/<patient_id>/blood-group/verify/` | `LaboratorianVerifyBloodGroupView` | Yes | laboratorian (approved) | — | — | stable |
+| GET | `/api/patient/medical-reports/` | `PatientMedicalReportListView` | Yes | patient | `PatientMedicalReportListSerializer` | Own reports only | stable |
+| GET | `/api/patient/medical-reports/<report_id>/` | `PatientMedicalReportDetailView` | Yes | patient | `PatientMedicalReportDetailSerializer` | Own reports only, patient-safe fields | stable |
+| GET | `/api/doctor/consultations/<consultation_id>/medical-reports/` | `DoctorConsultationMedicalReportListView` | Yes | doctor (assigned) | `PatientMedicalReportListSerializer` | Consultation relationship required | stable |
+| GET | `/api/doctor/medical-reports/<report_id>/` | `DoctorMedicalReportDetailView` | Yes | doctor (assigned) | `PatientMedicalReportDetailSerializer` | Doctor-only enriched fields | stable |
+| POST | `/api/doctor/medical-reports/<report_id>/review/` | `DoctorMedicalReportReviewView` | Yes | doctor (assigned) | `PatientMedicalReportDoctorReviewSerializer` | Doctor review only | stable |
 
 ---
 
@@ -263,11 +268,11 @@ Legend:
 | Prescriptions | 8 |
 | Lab Orders | 8 |
 | Lab Results | 10 |
-| Patient Records | 7 |
+| Patient Records | 12 |
 | Notifications | 4 |
 | Knowledge Base | 10 |
 | RAG Queries | 3 |
 | RAG Feedback | 2 |
 | RAG Admin Feedback | 2 |
 | RAG Admin Analytics/Export | 2 |
-| **Total** | **92** |
+| **Total** | **97** |
