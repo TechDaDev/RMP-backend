@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     DoctorConsultationMedicalReportListView,
     DoctorMedicalReportDetailView,
+    DoctorMedicalReportProcessOCRView,
     DoctorMedicalReportReviewView,
 )
 
@@ -21,5 +22,10 @@ urlpatterns = [
         "medical-reports/<uuid:report_id>/review/",
         DoctorMedicalReportReviewView.as_view(),
         name="doctor-medical-report-review",
+    ),
+    path(
+        "medical-reports/<uuid:report_id>/process-ocr/",
+        DoctorMedicalReportProcessOCRView.as_view(),
+        name="doctor-medical-report-process-ocr",
     ),
 ]

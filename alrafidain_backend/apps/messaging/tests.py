@@ -294,10 +294,13 @@ class MessagingTests(TestCase):
         self.assertTrue(attachments[0]["file_url"])
 
     def test_message_broadcast_still_runs_if_notification_enqueue_fails(self):
-        with patch(
-            "apps.notifications.tasks.publish_notification_event_task.delay",
-            side_effect=RuntimeError("broker unavailable"),
-        ), patch("apps.realtime.services.broadcast_message_created") as broadcast_message_created:
+        with (
+            patch(
+                "apps.notifications.tasks.publish_notification_event_task.delay",
+                side_effect=RuntimeError("broker unavailable"),
+            ),
+            patch("apps.realtime.services.broadcast_message_created") as broadcast_message_created,
+        ):
             with self.captureOnCommitCallbacks(execute=True):
                 response = self.patient_client.post(
                     self.msg_url(),

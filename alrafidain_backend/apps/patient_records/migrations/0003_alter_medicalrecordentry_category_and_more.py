@@ -8,7 +8,6 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
         ("consultations", "0003_consultation_recommended_specialties"),
         ("messaging", "0002_consultationmessage_messaging_c_consult_0503f2_idx_and_more"),

@@ -705,6 +705,35 @@ paths:
       responses:
         '200':
           description: No response body
+  /api/doctor/medical-reports/{report_id}/process-ocr/:
+    post:
+      operationId: doctor_medical_reports_process_ocr_create
+      summary: Process OCR for medical report candidate
+      parameters:
+      - in: path
+        name: report_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Patient Medical Reports
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientMedicalReportOCRProcess'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatientMedicalReportOCRProcess'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatientMedicalReportOCRProcess'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
   /api/doctor/medical-reports/{report_id}/review/:
     post:
       operationId: doctor_medical_reports_review_create
@@ -4229,6 +4258,12 @@ components:
         * `rejected` - Rejected
         * `failed` - Failed
         * `doctor_reviewed` - Doctor Reviewed
+    PatientMedicalReportOCRProcess:
+      type: object
+      properties:
+        force:
+          type: boolean
+          default: false
     PatientProfile:
       type: object
       properties:

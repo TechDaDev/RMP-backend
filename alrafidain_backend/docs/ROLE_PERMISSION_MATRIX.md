@@ -173,10 +173,11 @@ Notes:
 | List consultation medical report candidates | ❌ | ✅ (assigned) | ❌ | ❌ | ✅ |
 | View medical report candidate detail | ❌ | ✅ (assigned) | ❌ | ❌ | ✅ |
 | Review medical report candidate | ❌ | ✅ (assigned) | ❌ | ❌ | ✅ |
+| Trigger OCR processing for report candidate | ❌ | ✅ (assigned) | ❌ | ❌ | ✅ |
 | Set blood group | ❌ | ❌ | ✅ | ❌ | ❌ |
 | Verify blood group | ❌ | ❌ | ✅ | ❌ | ❌ |
 
-> **Privacy rule**: Doctors can only view patient records and medical report candidates when they are assigned to the consultation relationship.
+> **Privacy rule**: Doctors can only view/review/process patient medical report candidates when they are assigned to the consultation relationship.
 
 ---
 

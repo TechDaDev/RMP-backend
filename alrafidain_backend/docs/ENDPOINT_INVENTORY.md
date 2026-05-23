@@ -179,6 +179,7 @@ Legend:
 | GET | `/api/doctor/consultations/<consultation_id>/medical-reports/` | `DoctorConsultationMedicalReportListView` | Yes | doctor (assigned) | `PatientMedicalReportListSerializer` | Consultation relationship required | stable |
 | GET | `/api/doctor/medical-reports/<report_id>/` | `DoctorMedicalReportDetailView` | Yes | doctor (assigned) | `PatientMedicalReportDetailSerializer` | Doctor-only enriched fields | stable |
 | POST | `/api/doctor/medical-reports/<report_id>/review/` | `DoctorMedicalReportReviewView` | Yes | doctor (assigned) | `PatientMedicalReportDoctorReviewSerializer` | Doctor review only | stable |
+| POST | `/api/doctor/medical-reports/<report_id>/process-ocr/` | `DoctorMedicalReportProcessOCRView` | Yes | doctor (assigned) | `PatientMedicalReportOCRProcessSerializer` | OCR trigger with safe status output | stable |
 
 ---
 
@@ -268,11 +269,11 @@ Legend:
 | Prescriptions | 8 |
 | Lab Orders | 8 |
 | Lab Results | 10 |
-| Patient Records | 12 |
+| Patient Records | 13 |
 | Notifications | 4 |
 | Knowledge Base | 10 |
 | RAG Queries | 3 |
 | RAG Feedback | 2 |
 | RAG Admin Feedback | 2 |
 | RAG Admin Analytics/Export | 2 |
-| **Total** | **97** |
+| **Total** | **98** |

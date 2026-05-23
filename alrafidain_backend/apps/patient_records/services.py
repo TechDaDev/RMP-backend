@@ -1,3 +1,4 @@
+import logging
 import os
 
 from django.conf import settings
@@ -17,11 +18,13 @@ from apps.common.choices import (
     VerificationStatus,
 )
 from apps.common.policies import ClinicalAccessPolicy
+from apps.common.report_extraction import extract_clinical_report_text, secure_extracted_report_text
 from apps.notifications.services import create_notification
 
 from .models import BloodGroupRecord, MedicalRecordEntry, PatientMedicalRecord, PatientMedicalReport
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 def _is_approved_laboratorian(user) -> bool:
@@ -305,6 +308,311 @@ def _is_supported_clinical_attachment(attachment) -> bool:
     )
 
 
+def _safe_processing_error(exc: Exception) -> str:
+    message = (str(exc) or exc.__class__.__name__).strip()
+    if not message:
+        message = "Unexpected OCR processing error."
+    return message[:300]
+
+
+def _resolve_report_source_file(report):
+    source_attachment = getattr(report, "source_attachment", None)
+    if source_attachment and getattr(source_attachment, "file", None):
+        return source_attachment.file
+
+    if getattr(report, "original_file", None):
+        return report.original_file
+
+    return None
+
+
+def _build_ocr_payload(*, accepted: bool, gate_payload: dict) -> dict:
+    return {
+        "ocr": {
+            "accepted": accepted,
+            "reason": gate_payload.get("reason", "unknown"),
+            "has_prompt_injection": bool(gate_payload.get("has_prompt_injection", False)),
+            "is_medical_report": bool(gate_payload.get("is_medical_report", False)),
+            "extractor": "existing_report_extraction",
+            "phase": "10B",
+        }
+    }
+
+
+def process_medical_report_ocr(*, report, request=None, force=False):
+    if (
+        report.processing_status == MedicalReportProcessingStatus.OCR_COMPLETED
+        and bool(report.raw_ocr_text)
+        and not force
+    ):
+        return report
+
+    source_file = _resolve_report_source_file(report)
+    now = timezone.now()
+
+    if source_file is None:
+        report.processing_status = MedicalReportProcessingStatus.FAILED
+        report.processing_error = "No source file available for OCR."
+        report.processed_at = now
+        report.save(
+            update_fields=[
+                "processing_status",
+                "processing_error",
+                "processed_at",
+                "updated_at",
+            ]
+        )
+        create_audit_log(
+            actor=request.user if request else None,
+            action="medical_report_ocr_failed",
+            target=report,
+            metadata={
+                "report_id": str(report.id),
+                "patient_id": str(report.patient_id),
+                "consultation_id": str(report.consultation_id) if report.consultation_id else None,
+                "source_attachment_id": (
+                    str(report.source_attachment_id) if report.source_attachment_id else None
+                ),
+                "processing_status": report.processing_status,
+                "rejection_reason": "",
+                "has_prompt_injection": False,
+                "is_medical_report": False,
+                "raw_text_length": 0,
+                "cleaned_text_length": 0,
+            },
+            request=request,
+        )
+        return report
+
+    report.processing_status = MedicalReportProcessingStatus.OCR_PENDING
+    report.processing_error = ""
+    report.save(update_fields=["processing_status", "processing_error", "updated_at"])
+    create_audit_log(
+        actor=request.user if request else None,
+        action="medical_report_ocr_started",
+        target=report,
+        metadata={
+            "report_id": str(report.id),
+            "patient_id": str(report.patient_id),
+            "consultation_id": str(report.consultation_id) if report.consultation_id else None,
+            "source_attachment_id": (
+                str(report.source_attachment_id) if report.source_attachment_id else None
+            ),
+            "processing_status": report.processing_status,
+            "rejection_reason": "",
+            "has_prompt_injection": False,
+            "is_medical_report": False,
+            "raw_text_length": 0,
+            "cleaned_text_length": 0,
+        },
+        request=request,
+    )
+
+    try:
+        raw_text = extract_clinical_report_text(source_file)
+        report.raw_ocr_text = raw_text or ""
+
+        if not raw_text:
+            report.cleaned_report_text = ""
+            report.is_medical_report = False
+            report.report_type = MedicalReportType.UNKNOWN
+            report.processing_status = MedicalReportProcessingStatus.REJECTED
+            report.rejection_reason = "empty_ocr_text"
+            report.processing_error = ""
+            report.structured_payload = {
+                **(report.structured_payload or {}),
+                **_build_ocr_payload(
+                    accepted=False,
+                    gate_payload={
+                        "reason": "empty_ocr_text",
+                        "has_prompt_injection": False,
+                        "is_medical_report": False,
+                    },
+                ),
+            }
+            report.processed_at = now
+            report.save(
+                update_fields=[
+                    "raw_ocr_text",
+                    "cleaned_report_text",
+                    "is_medical_report",
+                    "report_type",
+                    "processing_status",
+                    "rejection_reason",
+                    "processing_error",
+                    "structured_payload",
+                    "processed_at",
+                    "updated_at",
+                ]
+            )
+            create_audit_log(
+                actor=request.user if request else None,
+                action="medical_report_ocr_rejected",
+                target=report,
+                metadata={
+                    "report_id": str(report.id),
+                    "patient_id": str(report.patient_id),
+                    "consultation_id": (
+                        str(report.consultation_id) if report.consultation_id else None
+                    ),
+                    "source_attachment_id": (
+                        str(report.source_attachment_id) if report.source_attachment_id else None
+                    ),
+                    "processing_status": report.processing_status,
+                    "rejection_reason": report.rejection_reason,
+                    "has_prompt_injection": False,
+                    "is_medical_report": False,
+                    "raw_text_length": 0,
+                    "cleaned_text_length": 0,
+                },
+                request=request,
+            )
+            return report
+
+        secure_payload = secure_extracted_report_text(raw_text)
+        report.processed_at = now
+        report.processing_error = ""
+        report.structured_payload = {
+            **(report.structured_payload or {}),
+            **_build_ocr_payload(
+                accepted=bool(secure_payload.get("accepted", False)),
+                gate_payload=secure_payload,
+            ),
+        }
+
+        if secure_payload.get("accepted"):
+            report.cleaned_report_text = secure_payload.get("sanitized_text", "") or ""
+            report.is_medical_report = True
+            report.processing_status = MedicalReportProcessingStatus.OCR_COMPLETED
+            report.rejection_reason = ""
+            report.save(
+                update_fields=[
+                    "raw_ocr_text",
+                    "cleaned_report_text",
+                    "is_medical_report",
+                    "processing_status",
+                    "rejection_reason",
+                    "processing_error",
+                    "structured_payload",
+                    "processed_at",
+                    "updated_at",
+                ]
+            )
+            create_audit_log(
+                actor=request.user if request else None,
+                action="medical_report_ocr_completed",
+                target=report,
+                metadata={
+                    "report_id": str(report.id),
+                    "patient_id": str(report.patient_id),
+                    "consultation_id": (
+                        str(report.consultation_id) if report.consultation_id else None
+                    ),
+                    "source_attachment_id": (
+                        str(report.source_attachment_id) if report.source_attachment_id else None
+                    ),
+                    "processing_status": report.processing_status,
+                    "rejection_reason": "",
+                    "has_prompt_injection": bool(secure_payload.get("has_prompt_injection", False)),
+                    "is_medical_report": True,
+                    "raw_text_length": len(report.raw_ocr_text or ""),
+                    "cleaned_text_length": len(report.cleaned_report_text or ""),
+                },
+                request=request,
+            )
+            return report
+
+        report.cleaned_report_text = ""
+        report.is_medical_report = False
+        report.report_type = MedicalReportType.NOT_MEDICAL_REPORT
+        report.processing_status = MedicalReportProcessingStatus.REJECTED
+        report.rejection_reason = secure_payload.get("reason", "not_medical_report")
+        report.save(
+            update_fields=[
+                "raw_ocr_text",
+                "cleaned_report_text",
+                "is_medical_report",
+                "report_type",
+                "processing_status",
+                "rejection_reason",
+                "processing_error",
+                "structured_payload",
+                "processed_at",
+                "updated_at",
+            ]
+        )
+        create_audit_log(
+            actor=request.user if request else None,
+            action="medical_report_ocr_rejected",
+            target=report,
+            metadata={
+                "report_id": str(report.id),
+                "patient_id": str(report.patient_id),
+                "consultation_id": str(report.consultation_id) if report.consultation_id else None,
+                "source_attachment_id": (
+                    str(report.source_attachment_id) if report.source_attachment_id else None
+                ),
+                "processing_status": report.processing_status,
+                "rejection_reason": report.rejection_reason,
+                "has_prompt_injection": bool(secure_payload.get("has_prompt_injection", False)),
+                "is_medical_report": False,
+                "raw_text_length": len(report.raw_ocr_text or ""),
+                "cleaned_text_length": 0,
+            },
+            request=request,
+        )
+        return report
+    except Exception as exc:
+        safe_error = _safe_processing_error(exc)
+        report.processing_status = MedicalReportProcessingStatus.FAILED
+        report.processing_error = safe_error
+        report.processed_at = timezone.now()
+        report.save(
+            update_fields=[
+                "processing_status",
+                "processing_error",
+                "processed_at",
+                "updated_at",
+            ]
+        )
+        create_audit_log(
+            actor=request.user if request else None,
+            action="medical_report_ocr_failed",
+            target=report,
+            metadata={
+                "report_id": str(report.id),
+                "patient_id": str(report.patient_id),
+                "consultation_id": str(report.consultation_id) if report.consultation_id else None,
+                "source_attachment_id": (
+                    str(report.source_attachment_id) if report.source_attachment_id else None
+                ),
+                "processing_status": report.processing_status,
+                "rejection_reason": "",
+                "has_prompt_injection": False,
+                "is_medical_report": False,
+                "raw_text_length": len(report.raw_ocr_text or ""),
+                "cleaned_text_length": len(report.cleaned_report_text or ""),
+            },
+            request=request,
+        )
+        logger.exception(
+            "Medical report OCR processing failed",
+            extra={"report_id": str(report.id)},
+        )
+        if force:
+            raise
+        return report
+
+
+def process_medical_report_ocr_by_id(report_id, request=None, force=False):
+    report = PatientMedicalReport.objects.select_related(
+        "source_attachment",
+        "source_message",
+        "consultation",
+    ).get(id=report_id)
+    return process_medical_report_ocr(report=report, request=request, force=force)
+
+
 def create_patient_medical_report_from_message_attachment(*, attachment, request=None):
     message = attachment.message
     consultation = message.consultation
@@ -333,6 +641,12 @@ def create_patient_medical_report_from_message_attachment(*, attachment, request
         if raw_file is not None:
             mime_type = getattr(raw_file, "content_type", "") or ""
 
+    run_ocr_on_upload = bool(getattr(settings, "CLINICAL_REPORT_OCR_ON_UPLOAD", False))
+    sync_ocr_on_upload = bool(getattr(settings, "CLINICAL_REPORT_OCR_SYNC_ON_UPLOAD", False))
+    initial_status = MedicalReportProcessingStatus.UPLOADED
+    if run_ocr_on_upload and not sync_ocr_on_upload:
+        initial_status = MedicalReportProcessingStatus.QUEUED
+
     report = PatientMedicalReport.objects.create(
         patient=patient,
         consultation=consultation,
@@ -340,7 +654,7 @@ def create_patient_medical_report_from_message_attachment(*, attachment, request
         source_attachment=attachment,
         source=MedicalReportSource.CHAT_ATTACHMENT,
         report_type=MedicalReportType.UNKNOWN,
-        processing_status=MedicalReportProcessingStatus.UPLOADED,
+        processing_status=initial_status,
         title=attachment.original_name or "Uploaded medical report",
         original_filename=attachment.original_name or "",
         mime_type=mime_type,
@@ -361,6 +675,26 @@ def create_patient_medical_report_from_message_attachment(*, attachment, request
         },
         request=request,
     )
+
+    if run_ocr_on_upload and sync_ocr_on_upload:
+        max_inline_mb = int(getattr(settings, "CLINICAL_REPORT_OCR_MAX_INLINE_MB", 5))
+        max_inline_bytes = max_inline_mb * 1024 * 1024
+        can_run_inline = file_size is None or file_size <= max_inline_bytes
+        if can_run_inline:
+            try:
+                process_medical_report_ocr(report=report, request=request, force=False)
+            except Exception:
+                logger.exception(
+                    "Inline OCR processing failed after report candidate creation",
+                    extra={
+                        "report_id": str(report.id),
+                        "source_attachment_id": str(attachment.id),
+                    },
+                )
+        else:
+            report.processing_status = MedicalReportProcessingStatus.QUEUED
+            report.save(update_fields=["processing_status", "updated_at"])
+
     return report
 
 

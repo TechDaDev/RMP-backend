@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -10,6 +10,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from apps.common.choices import (
     ConsultationDuration,
     ConsultationStatus,
+    MedicalReportProcessingStatus,
     MedicalSpecialty,
     SeverityLevel,
     UserType,
@@ -83,6 +84,35 @@ class MessageReportCandidateHookTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(PatientMedicalReport.objects.count(), 1)
 
+    @override_settings(CLINICAL_REPORT_OCR_ON_UPLOAD=True, CLINICAL_REPORT_OCR_SYNC_ON_UPLOAD=False)
+    @patch("apps.patient_records.services.process_medical_report_ocr")
+    def test_sync_disabled_does_not_run_ocr(self, mock_process):
+        file_obj = SimpleUploadedFile("chat-report.jpg", b"binary", content_type="image/jpeg")
+        response = self.patient_client.post(
+            self.msg_url(),
+            {"attachments": [file_obj]},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        report = PatientMedicalReport.objects.get()
+        self.assertEqual(report.processing_status, MedicalReportProcessingStatus.QUEUED)
+        mock_process.assert_not_called()
+
+    @override_settings(CLINICAL_REPORT_OCR_ON_UPLOAD=True, CLINICAL_REPORT_OCR_SYNC_ON_UPLOAD=True)
+    @patch("apps.patient_records.services.process_medical_report_ocr")
+    def test_sync_enabled_runs_ocr(self, mock_process):
+        file_obj = SimpleUploadedFile("chat-report.jpg", b"binary", content_type="image/jpeg")
+        response = self.patient_client.post(
+            self.msg_url(),
+            {"attachments": [file_obj]},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(PatientMedicalReport.objects.count(), 1)
+        mock_process.assert_called_once()
+
     def test_doctor_attachment_does_not_create_report_candidate(self):
         file_obj = SimpleUploadedFile("doctor-file.jpg", b"binary", content_type="image/jpeg")
         response = self.doctor_client.post(
@@ -106,3 +136,19 @@ class MessageReportCandidateHookTests(TestCase):
             )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+    @override_settings(CLINICAL_REPORT_OCR_ON_UPLOAD=True, CLINICAL_REPORT_OCR_SYNC_ON_UPLOAD=True)
+    @patch(
+        "apps.patient_records.services.process_medical_report_ocr",
+        side_effect=RuntimeError("ocr explosion"),
+    )
+    def test_ocr_failure_does_not_block_message_send_when_sync_enabled(self, _mock_process):
+        file_obj = SimpleUploadedFile("report.jpg", b"binary", content_type="image/jpeg")
+        response = self.patient_client.post(
+            self.msg_url(),
+            {"attachments": [file_obj]},
+            format="multipart",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(PatientMedicalReport.objects.count(), 1)

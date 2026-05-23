@@ -2004,7 +2004,54 @@ Review a report candidate and set doctor notes/classification.
 }
 ```
 
-> Phase 10A note: chat attachments create report candidates only. OCR/LLM extraction and automatic medical-record linking are not auto-triggered in this phase.
+---
+
+### `POST /api/doctor/medical-reports/<report_id>/process-ocr/`
+
+Run OCR processing for a medical report candidate.
+
+- **Auth required**: Yes
+- **Allowed roles**: Doctor (approved, assigned via consultation)
+
+**Request body:**
+```json
+{
+  "force": false
+}
+```
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Medical report OCR processed.",
+  "data": {
+    "id": "uuid",
+    "processing_status": "ocr_completed",
+    "is_medical_report": true,
+    "processed_at": "2026-05-23T12:12:00Z",
+    "structured_payload": {
+      "ocr": {
+        "accepted": true,
+        "reason": "ok",
+        "has_prompt_injection": false,
+        "is_medical_report": true,
+        "extractor": "existing_report_extraction",
+        "phase": "10B"
+      }
+    }
+  }
+}
+```
+
+Phase 10B status lifecycle:
+- Candidate created: `uploaded` (or `queued` when OCR-on-upload is enabled but deferred)
+- OCR started: `ocr_pending`
+- OCR accepted by security gate: `ocr_completed`
+- OCR extracted but rejected by security gate: `rejected`
+- OCR failure (missing file/unreadable/error): `failed`
+
+> Phase 10B note: OCR and report security-gate processing are implemented. LLM cleanup/classification, RAG auto-trigger, and doctor AI assistant generation remain deferred.
 
 ---
 

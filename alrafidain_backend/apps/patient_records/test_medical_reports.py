@@ -1,8 +1,10 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import IntegrityError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -24,6 +26,7 @@ from apps.patient_records.models import MedicalRecordEntry, PatientMedicalReport
 from apps.patient_records.services import (
     create_patient_medical_report_from_message_attachment,
     get_or_create_patient_medical_record,
+    process_medical_report_ocr,
 )
 from apps.profiles.models import DoctorProfile, PatientProfile, UserProfile
 
@@ -218,6 +221,133 @@ class PatientMedicalReportServiceTests(TestCase):
         report = create_patient_medical_report_from_message_attachment(attachment=attachment)
         self.assertIsNone(report)
 
+    @patch("apps.patient_records.services.secure_extracted_report_text")
+    @patch("apps.patient_records.services.extract_clinical_report_text")
+    def test_ocr_accepted_text_updates_report(self, mock_extract, mock_secure):
+        attachment = self._create_message_attachment(self.patient)
+        report = create_patient_medical_report_from_message_attachment(attachment=attachment)
+        mock_extract.return_value = "lab report text"
+        mock_secure.return_value = {
+            "accepted": True,
+            "reason": "ok",
+            "sanitized_text": "cleaned report text",
+            "is_medical_report": True,
+            "has_prompt_injection": False,
+        }
+
+        processed = process_medical_report_ocr(report=report)
+        processed.refresh_from_db()
+
+        self.assertEqual(processed.processing_status, "ocr_completed")
+        self.assertTrue(processed.is_medical_report)
+        self.assertEqual(processed.raw_ocr_text, "lab report text")
+        self.assertEqual(processed.cleaned_report_text, "cleaned report text")
+        self.assertIsNotNone(processed.processed_at)
+
+    @patch("apps.patient_records.services.secure_extracted_report_text")
+    @patch("apps.patient_records.services.extract_clinical_report_text")
+    def test_ocr_rejected_not_medical(self, mock_extract, mock_secure):
+        attachment = self._create_message_attachment(self.patient)
+        report = create_patient_medical_report_from_message_attachment(attachment=attachment)
+        mock_extract.return_value = "spam text"
+        mock_secure.return_value = {
+            "accepted": False,
+            "reason": "not_medical_report",
+            "sanitized_text": "",
+            "is_medical_report": False,
+            "has_prompt_injection": False,
+        }
+
+        processed = process_medical_report_ocr(report=report)
+        processed.refresh_from_db()
+
+        self.assertEqual(processed.processing_status, "rejected")
+        self.assertFalse(processed.is_medical_report)
+        self.assertEqual(processed.rejection_reason, "not_medical_report")
+        self.assertEqual(processed.report_type, MedicalReportType.NOT_MEDICAL_REPORT)
+
+    @patch("apps.patient_records.services.extract_clinical_report_text")
+    def test_ocr_empty_extraction_rejected_without_crash(self, mock_extract):
+        attachment = self._create_message_attachment(self.patient)
+        report = create_patient_medical_report_from_message_attachment(attachment=attachment)
+        mock_extract.return_value = ""
+
+        processed = process_medical_report_ocr(report=report)
+        processed.refresh_from_db()
+
+        self.assertEqual(processed.processing_status, "rejected")
+        self.assertFalse(processed.is_medical_report)
+        self.assertEqual(processed.rejection_reason, "empty_ocr_text")
+
+    @patch("apps.patient_records.services.extract_clinical_report_text")
+    def test_ocr_exception_marks_failed_without_raising(self, mock_extract):
+        attachment = self._create_message_attachment(self.patient)
+        report = create_patient_medical_report_from_message_attachment(attachment=attachment)
+        mock_extract.side_effect = RuntimeError("ocr failure")
+
+        processed = process_medical_report_ocr(report=report)
+        processed.refresh_from_db()
+
+        self.assertEqual(processed.processing_status, "failed")
+        self.assertIn("ocr failure", processed.processing_error)
+
+    @patch("apps.patient_records.services.secure_extracted_report_text")
+    @patch("apps.patient_records.services.extract_clinical_report_text")
+    def test_force_false_does_not_reprocess_completed_report(self, mock_extract, mock_secure):
+        attachment = self._create_message_attachment(self.patient)
+        report = create_patient_medical_report_from_message_attachment(attachment=attachment)
+        report.processing_status = "ocr_completed"
+        report.raw_ocr_text = "existing"
+        report.cleaned_report_text = "existing-cleaned"
+        report.save(
+            update_fields=[
+                "processing_status",
+                "raw_ocr_text",
+                "cleaned_report_text",
+                "updated_at",
+            ]
+        )
+
+        processed = process_medical_report_ocr(report=report, force=False)
+        processed.refresh_from_db()
+
+        self.assertEqual(processed.raw_ocr_text, "existing")
+        mock_extract.assert_not_called()
+        mock_secure.assert_not_called()
+
+    @patch("apps.patient_records.services.secure_extracted_report_text")
+    @patch("apps.patient_records.services.extract_clinical_report_text")
+    def test_force_true_reprocesses_completed_report(self, mock_extract, mock_secure):
+        attachment = self._create_message_attachment(self.patient)
+        report = create_patient_medical_report_from_message_attachment(attachment=attachment)
+        report.processing_status = "ocr_completed"
+        report.raw_ocr_text = "existing"
+        report.cleaned_report_text = "existing-cleaned"
+        report.save(
+            update_fields=[
+                "processing_status",
+                "raw_ocr_text",
+                "cleaned_report_text",
+                "updated_at",
+            ]
+        )
+
+        mock_extract.return_value = "new raw text"
+        mock_secure.return_value = {
+            "accepted": True,
+            "reason": "ok",
+            "sanitized_text": "new cleaned text",
+            "is_medical_report": True,
+            "has_prompt_injection": False,
+        }
+
+        processed = process_medical_report_ocr(report=report, force=True)
+        processed.refresh_from_db()
+
+        self.assertEqual(processed.raw_ocr_text, "new raw text")
+        self.assertEqual(processed.cleaned_report_text, "new cleaned text")
+        mock_extract.assert_called_once()
+
 
 class PatientMedicalReportAPITests(TestCase):
     def setUp(self):
@@ -336,3 +466,73 @@ class PatientMedicalReportAPITests(TestCase):
         linked = response.data["data"]["linked_medical_record_entry"]
         self.assertEqual(linked["id"], str(entry.id))
         self.assertEqual(linked["title"], "Note")
+
+    @patch("apps.patient_records.services.secure_extracted_report_text")
+    @patch("apps.patient_records.services.extract_clinical_report_text")
+    def test_assigned_doctor_can_trigger_process_ocr(self, mock_extract, mock_secure):
+        mock_extract.return_value = "ocr raw"
+        mock_secure.return_value = {
+            "accepted": True,
+            "reason": "ok",
+            "sanitized_text": "ocr cleaned",
+            "is_medical_report": True,
+            "has_prompt_injection": False,
+        }
+        response = self.doctor_client.post(
+            f"/api/doctor/medical-reports/{self.report.id}/process-ocr/",
+            {"force": True},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["data"]["processing_status"], "ocr_completed")
+
+    def test_unassigned_doctor_cannot_trigger_process_ocr(self):
+        response = self.doctor2_client.post(
+            f"/api/doctor/medical-reports/{self.report.id}/process-ocr/",
+            {"force": False},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_patient_cannot_trigger_process_ocr(self):
+        response = self.patient_client.post(
+            f"/api/doctor/medical-reports/{self.report.id}/process-ocr/",
+            {"force": False},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @patch("apps.patient_records.services.secure_extracted_report_text")
+    @patch("apps.patient_records.services.extract_clinical_report_text")
+    def test_process_ocr_response_is_safe_for_doctor_detail(self, mock_extract, mock_secure):
+        mock_extract.return_value = "raw"
+        mock_secure.return_value = {
+            "accepted": False,
+            "reason": "not_medical_report",
+            "sanitized_text": "",
+            "is_medical_report": False,
+            "has_prompt_injection": False,
+        }
+        response = self.doctor_client.post(
+            f"/api/doctor/medical-reports/{self.report.id}/process-ocr/",
+            {"force": True},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        source_attachment = response.data["data"].get("source_attachment") or {}
+        file_url = source_attachment.get("file_url", "")
+        self.assertNotIn("/home/", file_url)
+
+    @patch("apps.patient_records.services.extract_clinical_report_text")
+    @override_settings(CLINICAL_REPORT_OCR_SYNC_ON_UPLOAD=True, CLINICAL_REPORT_OCR_ON_UPLOAD=True)
+    def test_patient_detail_does_not_expose_internal_processing_error(self, mock_extract):
+        mock_extract.side_effect = RuntimeError("internal ocr issue")
+        self.doctor_client.post(
+            f"/api/doctor/medical-reports/{self.report.id}/process-ocr/",
+            {"force": True},
+            format="json",
+        )
+
+        response = self.patient_client.get(f"/api/patient/medical-reports/{self.report.id}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn("processing_error", response.data["data"])

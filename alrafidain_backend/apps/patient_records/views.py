@@ -8,6 +8,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 
+from apps.audit.services import create_audit_log
 from apps.common.choices import (
     MedicalRecordVerificationStatus,
     MedicalReportProcessingStatus,
@@ -30,6 +31,7 @@ from .serializers import (
     PatientMedicalReportDetailSerializer,
     PatientMedicalReportDoctorReviewSerializer,
     PatientMedicalReportListSerializer,
+    PatientMedicalReportOCRProcessSerializer,
     SetBloodGroupSerializer,
 )
 from .services import (
@@ -38,6 +40,7 @@ from .services import (
     deactivate_medical_record_entry,
     doctor_can_access_patient_record,
     get_or_create_patient_medical_record,
+    process_medical_report_ocr,
     set_blood_group,
 )
 
@@ -527,3 +530,63 @@ class DoctorMedicalReportReviewView(APIView):
             message="Medical report reviewed.",
             data=PatientMedicalReportDetailSerializer(report, context={"request": request}).data,
         )
+
+
+@extend_schema(tags=["Patient Medical Reports"])
+class DoctorMedicalReportProcessOCRView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Process OCR for medical report candidate",
+        request=PatientMedicalReportOCRProcessSerializer,
+    )
+    def post(self, request, report_id):
+        if not (request.user.user_type == UserType.DOCTOR or request.user.is_staff):
+            return error_response(
+                "Only doctors can access this endpoint.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        report = get_object_or_404(
+            PatientMedicalReport.objects.select_related(
+                "patient",
+                "consultation",
+                "source_message",
+                "source_attachment",
+                "linked_medical_record_entry",
+                "reviewed_by",
+            ),
+            id=report_id,
+        )
+
+        if not can_review_medical_report(request.user, report):
+            return error_response("Not found.", status_code=status.HTTP_404_NOT_FOUND)
+
+        serializer = PatientMedicalReportOCRProcessSerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response(
+                "Invalid input.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        force = serializer.validated_data.get("force", False)
+        create_audit_log(
+            actor=request.user,
+            action="medical_report_ocr_triggered_by_doctor",
+            target=report,
+            metadata={
+                "report_id": str(report.id),
+                "patient_id": str(report.patient_id),
+                "consultation_id": str(report.consultation_id) if report.consultation_id else None,
+                "source_attachment_id": (
+                    str(report.source_attachment_id) if report.source_attachment_id else None
+                ),
+                "processing_status": report.processing_status,
+                "force": bool(force),
+            },
+            request=request,
+        )
+        report = process_medical_report_ocr(report=report, request=request, force=force)
+        data = PatientMedicalReportDetailSerializer(report, context={"request": request}).data
+        return success_response(message="Medical report OCR processed.", data=data)

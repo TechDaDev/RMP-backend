@@ -612,7 +612,7 @@ Notes:
 - Approve accepts optional `note`.
 - Self-approval is denied by backend policy.
 
-### 10.6 Medical Report Candidates (Phase 10A)
+### 10.6 Medical Report Candidates (Phase 10B)
 
 When a patient uploads a consultation chat attachment, the backend now creates a `PatientMedicalReport` candidate record.
 
@@ -622,17 +622,26 @@ Available endpoints:
 - `GET /api/doctor/consultations/{consultation_id}/medical-reports/`
 - `GET /api/doctor/medical-reports/{report_id}/`
 - `POST /api/doctor/medical-reports/{report_id}/review/`
+- `POST /api/doctor/medical-reports/{report_id}/process-ocr/`
 
-Phase 10A behavior contract:
+Phase 10B behavior contract:
 - Candidate creation is non-blocking and does not break chat send flow.
-- No automatic OCR/LLM processing is triggered yet.
+- OCR processing can be triggered by assigned doctors using `process-ocr`.
+- If OCR-on-upload settings are enabled server-side, processing may run inline or queued.
 - No automatic insertion into canonical patient medical record entries is triggered yet.
 
 Frontend implementation notes:
 - Treat these as review candidates, not final verified medical record entries.
 - Continue using existing chat message flow; no request-body changes are required.
 - Use `file_url` for image/document preview, not storage-relative `file` paths.
-- For patient view, show high-level status only; detailed raw fields are doctor-only.
+- For patient view, show high-level OCR status only; raw OCR text and processing internals are hidden.
+- Show OCR statuses as: `uploaded`, `queued`, `ocr_pending`, `ocr_completed`, `rejected`, `failed`.
+
+Deferred after Phase 10B:
+- LLM cleanup/classification
+- Structured lab value extraction
+- Automatic RAG updates from OCR output
+- Doctor AI assistant messages based on extracted report context
 
 ---
 

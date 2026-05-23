@@ -170,6 +170,7 @@ class PatientMedicalReportDetailSerializer(PatientMedicalReportListSerializer):
         fields = PatientMedicalReportListSerializer.Meta.fields + [
             "raw_ocr_text",
             "cleaned_report_text",
+            "processing_error",
             "structured_payload",
             "removed_noise_summary",
             "doctor_notes",
@@ -186,6 +187,9 @@ class PatientMedicalReportDetailSerializer(PatientMedicalReportListSerializer):
         if user and user.user_type == UserType.PATIENT:
             data.pop("raw_ocr_text", None)
             data.pop("patient", None)
+            data.pop("processing_error", None)
+            if not instance.is_medical_report:
+                data.pop("cleaned_report_text", None)
 
         return data
 
@@ -202,6 +206,10 @@ class PatientMedicalReportDoctorReviewSerializer(serializers.Serializer):
         choices=MedicalReportProcessingStatus.choices,
         required=False,
     )
+
+
+class PatientMedicalReportOCRProcessSerializer(serializers.Serializer):
+    force = serializers.BooleanField(required=False, default=False)
 
 
 class PatientMedicalRecordSerializer(serializers.ModelSerializer):

@@ -273,6 +273,13 @@ OCR_LANGUAGES = config("OCR_LANGUAGES", cast=Csv(), default="ar,en,ku")
 OCR_USE_GPU = config("OCR_USE_GPU", default=False, cast=bool)
 OCR_MAX_EXTRACTED_CHARS = config("OCR_MAX_EXTRACTED_CHARS", default=6000, cast=int)
 OCR_MIN_MEDICAL_TERM_HITS = config("OCR_MIN_MEDICAL_TERM_HITS", default=2, cast=int)
+CLINICAL_REPORT_OCR_ON_UPLOAD = config("CLINICAL_REPORT_OCR_ON_UPLOAD", default=False, cast=bool)
+CLINICAL_REPORT_OCR_SYNC_ON_UPLOAD = config(
+    "CLINICAL_REPORT_OCR_SYNC_ON_UPLOAD", default=False, cast=bool
+)
+CLINICAL_REPORT_OCR_MAX_INLINE_MB = config(
+    "CLINICAL_REPORT_OCR_MAX_INLINE_MB", default=5, cast=int
+)
 
 # ── Phase 12E — Dataset export salt ────────────────────────────────────
 # Used to hash doctor/object IDs in exported datasets.
