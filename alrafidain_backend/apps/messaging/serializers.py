@@ -18,12 +18,27 @@ class MessageSenderSummarySerializer(serializers.ModelSerializer):
 
 class MessageAttachmentSerializer(serializers.ModelSerializer):
     file = serializers.FileField(read_only=True, use_url=False)
+    file_url = serializers.SerializerMethodField()
     uploaded_by = MessageSenderSummarySerializer(read_only=True)
 
     class Meta:
         model = MessageAttachment
-        fields = ["id", "file", "original_name", "uploaded_by", "created_at"]
+        fields = ["id", "file", "file_url", "original_name", "uploaded_by", "created_at"]
         read_only_fields = ["id", "original_name", "uploaded_by", "created_at"]
+
+    def get_file_url(self, obj):
+        if not obj.file:
+            return ""
+
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(obj.file.url)
+
+        # Fallback for realtime events without HTTP request context.
+        url = obj.file.url
+        if url and not url.startswith("/"):
+            url = f"/{url}"
+        return url
 
 
 class ConsultationMessageSerializer(serializers.ModelSerializer):

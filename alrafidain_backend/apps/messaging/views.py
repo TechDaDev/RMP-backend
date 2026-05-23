@@ -63,7 +63,7 @@ class ConsultationMessageCreateView(APIView):
         )
         return success_response(
             message="Message sent successfully.",
-            data=ConsultationMessageSerializer(message).data,
+            data=ConsultationMessageSerializer(message, context={"request": request}).data,
             status_code=status.HTTP_201_CREATED,
         )
 
@@ -90,7 +90,13 @@ class ConsultationMessageListView(APIView):
             .prefetch_related("attachments__uploaded_by")
             .order_by("created_at")
         )
-        return success_response(data=ConsultationMessageSerializer(queryset, many=True).data)
+        return success_response(
+            data=ConsultationMessageSerializer(
+                queryset,
+                many=True,
+                context={"request": request},
+            ).data
+        )
 
     @extend_schema(
         summary="Create consultation message", request=ConsultationMessageCreateSerializer

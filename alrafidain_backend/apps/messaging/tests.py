@@ -267,6 +267,7 @@ class MessagingTests(TestCase):
         )
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         self.assertTrue(MessageAttachment.objects.exists())
+        self.assertTrue(resp.data["data"]["attachments"][0]["file_url"])
 
     def test_doctor_can_create_message_with_attachment(self):
         file_obj = SimpleUploadedFile("xray.png", b"binary", content_type="image/png")
@@ -281,6 +282,16 @@ class MessagingTests(TestCase):
         att = MessageAttachment.objects.latest("created_at")
         self.assertEqual(att.uploaded_by_id, self.patient.id)
         self.assertEqual(att.original_name, "lab-result.txt")
+
+    def test_message_list_includes_attachment_file_url(self):
+        file_obj = SimpleUploadedFile("xray.png", b"binary", content_type="image/png")
+        self.patient_client.post(self.msg_url(), {"attachments": [file_obj]}, format="multipart")
+
+        resp = self.doctor_client.get(self.msg_url())
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        attachments = resp.data["data"][0]["attachments"]
+        self.assertEqual(len(attachments), 1)
+        self.assertTrue(attachments[0]["file_url"])
 
     def test_message_broadcast_still_runs_if_notification_enqueue_fails(self):
         with patch(
