@@ -175,6 +175,7 @@ Notes:
 | Review medical report candidate | ❌ | ✅ (assigned) | ❌ | ❌ | ✅ |
 | Trigger OCR processing for report candidate | ❌ | ✅ (assigned) | ❌ | ❌ | ✅ |
 | Trigger LLM classification for report candidate | ❌ | ✅ (assigned) | ❌ | ❌ | ✅ |
+| Save report candidate to canonical patient record | ❌ | ✅ (assigned) | ❌ | ❌ | ❌ |
 | Set blood group | ❌ | ❌ | ✅ | ❌ | ❌ |
 | Verify blood group | ❌ | ❌ | ✅ | ❌ | ❌ |
 

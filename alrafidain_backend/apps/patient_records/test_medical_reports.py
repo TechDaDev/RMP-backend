@@ -9,9 +9,11 @@ from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from apps.audit.models import AuditLog
 from apps.common.choices import (
     ConsultationDuration,
     ConsultationStatus,
+    MedicalRecordVerificationStatus,
     MedicalReportProcessingStatus,
     MedicalReportSource,
     MedicalReportType,
@@ -28,7 +30,9 @@ from apps.patient_records.services import (
     classify_medical_report_with_llm,
     create_patient_medical_report_from_message_attachment,
     get_or_create_patient_medical_record,
+    medical_report_type_to_record_category,
     process_medical_report_ocr,
+    save_medical_report_to_patient_record,
 )
 from apps.profiles.models import DoctorProfile, PatientProfile, UserProfile
 
@@ -201,6 +205,40 @@ class PatientMedicalReportServiceTests(TestCase):
             uploaded_by=sender,
         )
         return attachment
+
+    def _create_llm_completed_report(
+        self,
+        *,
+        report_type=MedicalReportType.LAB_REPORT,
+        cleaned_report_text="Hemoglobin 13.5 g/dL",
+        is_medical_report=True,
+    ):
+        attachment = self._create_message_attachment(self.patient)
+        report = create_patient_medical_report_from_message_attachment(attachment=attachment)
+        report.report_type = report_type
+        report.processing_status = MedicalReportProcessingStatus.LLM_COMPLETED
+        report.is_medical_report = is_medical_report
+        report.cleaned_report_text = cleaned_report_text
+        report.structured_payload = {
+            "structured_data": {"lab_values": [{"name": "Hemoglobin", "value": "13.5"}]}
+        }
+        report.llm_confidence = 0.9100
+        report.detected_language = "arabic"
+        report.removed_noise_summary = ["phone number"]
+        report.save(
+            update_fields=[
+                "report_type",
+                "processing_status",
+                "is_medical_report",
+                "cleaned_report_text",
+                "structured_payload",
+                "llm_confidence",
+                "detected_language",
+                "removed_noise_summary",
+                "updated_at",
+            ]
+        )
+        return report
 
     def test_patient_chat_attachment_creates_report_candidate(self):
         attachment = self._create_message_attachment(self.patient)
@@ -659,6 +697,105 @@ class PatientMedicalReportServiceTests(TestCase):
         processed.refresh_from_db()
         self.assertEqual(processed.processing_status, MedicalReportProcessingStatus.OCR_COMPLETED)
 
+    def test_medical_report_type_mapping_lab_report(self):
+        self.assertEqual(medical_report_type_to_record_category("lab_report"), "lab_report")
+
+    def test_medical_report_type_mapping_sonar_report(self):
+        self.assertEqual(medical_report_type_to_record_category("sonar_report"), "sonar_report")
+
+    def test_medical_report_type_mapping_xray_report(self):
+        self.assertEqual(medical_report_type_to_record_category("xray_report"), "xray_report")
+
+    def test_medical_report_type_mapping_ct_and_mri_to_radiology(self):
+        self.assertEqual(medical_report_type_to_record_category("ct_scan"), "radiology_report")
+        self.assertEqual(medical_report_type_to_record_category("mri"), "radiology_report")
+
+    def test_llm_completed_report_saves_to_medical_record_and_links_entry(self):
+        report = self._create_llm_completed_report()
+        entry = save_medical_report_to_patient_record(report=report)
+        report.refresh_from_db()
+
+        self.assertIsNotNone(entry)
+        self.assertEqual(entry.category, "lab_report")
+        self.assertEqual(report.linked_medical_record_entry_id, entry.id)
+        self.assertEqual(entry.verification_status, MedicalRecordVerificationStatus.SELF_REPORTED)
+
+    def test_not_medical_report_is_not_saved(self):
+        report = self._create_llm_completed_report(
+            report_type=MedicalReportType.NOT_MEDICAL_REPORT,
+            cleaned_report_text="",
+            is_medical_report=False,
+        )
+        with self.assertRaises(ValueError):
+            save_medical_report_to_patient_record(report=report)
+
+    def test_report_without_cleaned_text_and_structured_data_fails_safely(self):
+        report = self._create_llm_completed_report(cleaned_report_text="")
+        report.structured_payload = {}
+        report.save(update_fields=["structured_payload", "updated_at"])
+
+        with self.assertRaises(ValueError):
+            save_medical_report_to_patient_record(report=report)
+
+    def test_repeated_save_without_force_returns_existing_entry_without_duplicate(self):
+        report = self._create_llm_completed_report()
+        first_entry = save_medical_report_to_patient_record(report=report)
+        second_entry = save_medical_report_to_patient_record(report=report, force=False)
+
+        self.assertEqual(first_entry.id, second_entry.id)
+        self.assertEqual(
+            MedicalRecordEntry.objects.filter(medical_record__patient=self.patient).count(),
+            1,
+        )
+
+    def test_force_true_updates_existing_entry(self):
+        report = self._create_llm_completed_report(cleaned_report_text="old value")
+        entry = save_medical_report_to_patient_record(report=report)
+        report.cleaned_report_text = "updated value"
+        report.save(update_fields=["cleaned_report_text", "updated_at"])
+
+        updated = save_medical_report_to_patient_record(report=report, force=True)
+        updated.refresh_from_db()
+        self.assertEqual(updated.id, entry.id)
+        self.assertIn("updated value", updated.value)
+
+    def test_confirm_by_doctor_sets_doctor_confirmed_and_verified_fields(self):
+        report = self._create_llm_completed_report()
+        entry = save_medical_report_to_patient_record(
+            report=report,
+            doctor=self.doctor,
+            confirm_by_doctor=True,
+        )
+        report.refresh_from_db()
+        self.assertEqual(
+            entry.verification_status,
+            MedicalRecordVerificationStatus.DOCTOR_CONFIRMED,
+        )
+        self.assertEqual(entry.verified_by_id, self.doctor.id)
+        self.assertIsNotNone(entry.verified_at)
+        self.assertEqual(report.reviewed_by_id, self.doctor.id)
+
+    def test_non_assigned_doctor_cannot_confirm_save(self):
+        other_doctor = create_doctor("another-doctor@example.com")
+        report = self._create_llm_completed_report()
+        with self.assertRaises(PermissionError):
+            save_medical_report_to_patient_record(
+                report=report,
+                doctor=other_doctor,
+                confirm_by_doctor=True,
+            )
+
+    def test_save_to_record_creates_audit_log(self):
+        report = self._create_llm_completed_report()
+        entry = save_medical_report_to_patient_record(report=report)
+
+        self.assertTrue(
+            AuditLog.objects.filter(
+                action="medical_report_saved_to_patient_record",
+                target_id=str(entry.id),
+            ).exists()
+        )
+
 
 class PatientMedicalReportAPITests(TestCase):
     def setUp(self):
@@ -939,6 +1076,135 @@ class PatientMedicalReportAPITests(TestCase):
         payload = response.data["data"].get("structured_payload") or {}
         self.assertNotIn("prompt", payload)
         self.assertNotIn("raw_response", payload)
+
+    def test_assigned_doctor_can_post_save_to_record(self):
+        self.report.processing_status = MedicalReportProcessingStatus.LLM_COMPLETED
+        self.report.is_medical_report = True
+        self.report.report_type = MedicalReportType.LAB_REPORT
+        self.report.cleaned_report_text = "Hemoglobin 13.5 g/dL"
+        self.report.save(
+            update_fields=[
+                "processing_status",
+                "is_medical_report",
+                "report_type",
+                "cleaned_report_text",
+                "updated_at",
+            ]
+        )
+
+        response = self.doctor_client.post(
+            f"/api/doctor/medical-reports/{self.report.id}/save-to-record/",
+            {"force": False, "confirm_by_doctor": False},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.report.refresh_from_db()
+        self.assertIsNotNone(self.report.linked_medical_record_entry_id)
+
+    def test_patient_cannot_post_save_to_record(self):
+        response = self.patient_client.post(
+            f"/api/doctor/medical-reports/{self.report.id}/save-to-record/",
+            {"force": False, "confirm_by_doctor": False},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_unassigned_doctor_cannot_post_save_to_record(self):
+        response = self.doctor2_client.post(
+            f"/api/doctor/medical-reports/{self.report.id}/save-to-record/",
+            {"force": False, "confirm_by_doctor": False},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_save_to_record_response_includes_linked_entry_summary(self):
+        self.report.processing_status = MedicalReportProcessingStatus.LLM_COMPLETED
+        self.report.is_medical_report = True
+        self.report.report_type = MedicalReportType.LAB_REPORT
+        self.report.cleaned_report_text = "Hemoglobin 13.5 g/dL"
+        self.report.save(
+            update_fields=[
+                "processing_status",
+                "is_medical_report",
+                "report_type",
+                "cleaned_report_text",
+                "updated_at",
+            ]
+        )
+
+        response = self.doctor_client.post(
+            f"/api/doctor/medical-reports/{self.report.id}/save-to-record/",
+            {"force": False, "confirm_by_doctor": False},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        linked = response.data["data"]["linked_medical_record_entry"]
+        self.assertIn("id", linked)
+        self.assertIn("category", linked)
+        self.assertIn("verification_status", linked)
+
+    def test_save_to_record_response_does_not_expose_prompt_or_local_paths(self):
+        self.report.processing_status = MedicalReportProcessingStatus.LLM_COMPLETED
+        self.report.is_medical_report = True
+        self.report.report_type = MedicalReportType.LAB_REPORT
+        self.report.cleaned_report_text = "Hemoglobin 13.5 g/dL"
+        self.report.structured_payload = {
+            "llm": {"provider": "deepseek"},
+            "raw_provider_payload": {"token": "nope"},
+        }
+        self.report.save(
+            update_fields=[
+                "processing_status",
+                "is_medical_report",
+                "report_type",
+                "cleaned_report_text",
+                "structured_payload",
+                "updated_at",
+            ]
+        )
+
+        response = self.doctor_client.post(
+            f"/api/doctor/medical-reports/{self.report.id}/save-to-record/",
+            {"force": False, "confirm_by_doctor": False},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data["data"].get("structured_payload") or {}
+        self.assertNotIn("raw_provider_payload", payload)
+        source_attachment = response.data["data"].get("source_attachment") or {}
+        self.assertNotIn("/home/", source_attachment.get("file_url", ""))
+
+    def test_confirm_by_doctor_request_produces_doctor_confirmed_entry(self):
+        self.report.processing_status = MedicalReportProcessingStatus.LLM_COMPLETED
+        self.report.is_medical_report = True
+        self.report.report_type = MedicalReportType.LAB_REPORT
+        self.report.cleaned_report_text = "Hemoglobin 13.5 g/dL"
+        self.report.save(
+            update_fields=[
+                "processing_status",
+                "is_medical_report",
+                "report_type",
+                "cleaned_report_text",
+                "updated_at",
+            ]
+        )
+
+        response = self.doctor_client.post(
+            f"/api/doctor/medical-reports/{self.report.id}/save-to-record/",
+            {"confirm_by_doctor": True, "doctor_notes": "doctor reviewed"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.report.refresh_from_db()
+        entry = self.report.linked_medical_record_entry
+        self.assertIsNotNone(entry)
+        self.assertEqual(
+            entry.verification_status,
+            MedicalRecordVerificationStatus.DOCTOR_CONFIRMED,
+        )
+        self.assertEqual(entry.verified_by_id, self.doctor.id)
+        self.assertEqual(self.report.doctor_notes, "doctor reviewed")
 
     def test_patient_detail_does_not_expose_raw_ocr_or_processing_error_after_llm(self):
         self.report.raw_ocr_text = "private raw text"

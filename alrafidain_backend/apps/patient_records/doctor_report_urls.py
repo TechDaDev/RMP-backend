@@ -6,6 +6,7 @@ from .views import (
     DoctorMedicalReportDetailView,
     DoctorMedicalReportProcessOCRView,
     DoctorMedicalReportReviewView,
+    DoctorMedicalReportSaveToRecordView,
 )
 
 urlpatterns = [
@@ -33,5 +34,10 @@ urlpatterns = [
         "medical-reports/<uuid:report_id>/classify-llm/",
         DoctorMedicalReportClassifyLLMView.as_view(),
         name="doctor-medical-report-classify-llm",
+    ),
+    path(
+        "medical-reports/<uuid:report_id>/save-to-record/",
+        DoctorMedicalReportSaveToRecordView.as_view(),
+        name="doctor-medical-report-save-to-record",
     ),
 ]

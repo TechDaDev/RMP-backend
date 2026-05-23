@@ -120,12 +120,20 @@ class ConsultationMessageSummarySerializer(serializers.Serializer):
 class MedicalRecordEntrySummarySerializer(serializers.ModelSerializer):
     class Meta:
         model = MedicalRecordEntry
-        fields = ["id", "category", "title", "verification_status"]
+        fields = [
+            "id",
+            "category",
+            "title",
+            "verification_status",
+            "created_at",
+            "updated_at",
+        ]
         read_only_fields = fields
 
 
 class PatientMedicalReportListSerializer(serializers.ModelSerializer):
     patient = serializers.SerializerMethodField()
+    linked_medical_record_entry = MedicalRecordEntrySummarySerializer(read_only=True)
 
     class Meta:
         model = PatientMedicalReport
@@ -147,6 +155,7 @@ class PatientMedicalReportListSerializer(serializers.ModelSerializer):
             "updated_at",
             "processed_at",
             "reviewed_at",
+            "linked_medical_record_entry",
         ]
         read_only_fields = fields
 
@@ -214,7 +223,11 @@ class PatientMedicalReportDetailSerializer(PatientMedicalReportListSerializer):
             data.pop("raw_ocr_text", None)
             data.pop("patient", None)
             data.pop("processing_error", None)
-            if not instance.is_medical_report:
+            if not instance.is_medical_report or instance.processing_status not in {
+                MedicalReportProcessingStatus.LLM_COMPLETED,
+                MedicalReportProcessingStatus.DOCTOR_REVIEWED,
+                MedicalReportProcessingStatus.ACCEPTED,
+            }:
                 data.pop("cleaned_report_text", None)
 
         return data
@@ -240,6 +253,12 @@ class PatientMedicalReportOCRProcessSerializer(serializers.Serializer):
 
 class PatientMedicalReportLLMClassifySerializer(serializers.Serializer):
     force = serializers.BooleanField(required=False, default=False)
+
+
+class PatientMedicalReportSaveToRecordSerializer(serializers.Serializer):
+    force = serializers.BooleanField(required=False, default=False)
+    confirm_by_doctor = serializers.BooleanField(required=False, default=False)
+    doctor_notes = serializers.CharField(required=False, allow_blank=True)
 
 
 class PatientMedicalRecordSerializer(serializers.ModelSerializer):

@@ -1,8 +1,10 @@
 from django.conf import settings
 from django.contrib import admin, messages
 
+from apps.common.choices import MedicalReportProcessingStatus, MedicalReportType
+
 from .models import BloodGroupRecord, MedicalRecordEntry, PatientMedicalRecord, PatientMedicalReport
-from .services import classify_medical_report_with_llm
+from .services import classify_medical_report_with_llm, save_medical_report_to_patient_record
 
 
 @admin.register(PatientMedicalRecord)
@@ -78,7 +80,7 @@ class PatientMedicalReportAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     )
-    actions = ["run_llm_classification"]
+    actions = ["run_llm_classification", "save_to_patient_record"]
 
     @admin.action(description="Run LLM classification for selected reports")
     def run_llm_classification(self, request, queryset):
@@ -102,5 +104,47 @@ class PatientMedicalReportAdmin(admin.ModelAdmin):
         self.message_user(
             request,
             f"LLM classification finished. Completed: {completed}, Failed: {failed}.",
+            level=messages.INFO,
+        )
+
+    @admin.action(description="Save selected reports to patient record")
+    def save_to_patient_record(self, request, queryset):
+        saved = 0
+        skipped = 0
+        failed = 0
+        allowed_statuses = {
+            MedicalReportProcessingStatus.LLM_COMPLETED,
+            MedicalReportProcessingStatus.DOCTOR_REVIEWED,
+            MedicalReportProcessingStatus.ACCEPTED,
+        }
+
+        for report in queryset:
+            if (
+                not report.is_medical_report
+                or report.report_type == MedicalReportType.NOT_MEDICAL_REPORT
+            ):
+                skipped += 1
+                continue
+            if report.processing_status not in allowed_statuses:
+                skipped += 1
+                continue
+            try:
+                existing_link_id = report.linked_medical_record_entry_id
+                save_medical_report_to_patient_record(
+                    report=report,
+                    request=request,
+                    force=False,
+                    confirm_by_doctor=False,
+                )
+                if existing_link_id:
+                    skipped += 1
+                else:
+                    saved += 1
+            except Exception:
+                failed += 1
+
+        self.message_user(
+            request,
+            f"Save-to-record finished. Saved: {saved}, Skipped: {skipped}, Failed: {failed}.",
             level=messages.INFO,
         )

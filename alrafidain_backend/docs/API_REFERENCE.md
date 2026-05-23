@@ -2114,12 +2114,61 @@ Run LLM cleanup/classification for a medical report candidate.
 }
 ```
 
-Phase 10C status lifecycle:
+---
+
+### `POST /api/doctor/medical-reports/<report_id>/save-to-record/`
+
+Save an accepted/classified report candidate into canonical patient medical record entries.
+
+- **Auth required**: Yes
+- **Allowed roles**: Doctor (approved, assigned via consultation)
+
+**Request body:**
+```json
+{
+  "force": false,
+  "confirm_by_doctor": false,
+  "doctor_notes": "optional"
+}
+```
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Medical report saved to patient record.",
+  "data": {
+    "id": "uuid",
+    "processing_status": "llm_completed",
+    "is_medical_report": true,
+    "report_type": "lab_report",
+    "linked_medical_record_entry": {
+      "id": "uuid",
+      "category": "lab_report",
+      "title": "Lab Report - report.jpg",
+      "verification_status": "self_reported",
+      "created_at": "2026-05-23T12:22:00Z",
+      "updated_at": "2026-05-23T12:22:00Z"
+    }
+  }
+}
+```
+
+Behavior rules:
+- Only medical report candidates are saved (`is_medical_report=true`).
+- `not_medical_report` candidates are rejected and not saved.
+- Duplicate prevention: when already linked and `force=false`, existing linked entry is returned.
+- With `force=true`, linked entry is updated in place instead of creating a duplicate.
+- Verification defaults to `self_reported`.
+- `doctor_confirmed` is set only when `confirm_by_doctor=true` and caller is the assigned doctor.
+
+Phase 10D status lifecycle:
 - Candidate created: `uploaded` (or `queued` when OCR-on-upload is enabled but deferred)
 - OCR started: `ocr_pending`
 - OCR accepted by security gate: `ocr_completed`
 - LLM started: `llm_pending`
 - LLM accepted and persisted: `llm_completed`
+- Optional doctor confirmation after save-to-record: `doctor_reviewed`
 - LLM rejected (not medical or low confidence): `rejected`
 - OCR or LLM failure (missing file/unreadable/invalid model output/error): `failed`
 
@@ -2127,8 +2176,9 @@ Privacy notes:
 - Patient-facing report detail remains sanitized and does not expose `raw_ocr_text` or internal processing errors.
 - `structured_payload` responses are filtered to safe keys (`ocr`, `llm`, `structured_data`, `safety`).
 - Prompt text and raw provider payload are not exposed via this API.
+- Local file paths, secrets, and raw provider internals are not exposed.
 
-> Phase 10C note: OCR + LLM cleanup/classification are implemented. RAG auto-trigger and doctor AI assistant generation remain deferred.
+> Phase 10D note: OCR + LLM classification + canonical save-to-record are implemented. RAG auto-trigger and doctor AI assistant generation remain deferred.
 
 ---
 

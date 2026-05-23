@@ -80,7 +80,28 @@ Delivered:
 
 Prompt text and raw provider payload are not exposed via report APIs.
 
-## Deferred Beyond 10C
+## Phase 10D (Completed)
+
+Delivered:
+- Canonical save/link service: `save_medical_report_to_patient_record(...)`
+- Report-type to record-category mapping for medical record entry creation
+- Safe report-to-entry payload builder using cleaned text + bounded structured summary
+- Linked-entry idempotency and duplicate prevention (`force=false` returns existing link)
+- Update-in-place behavior (`force=true`) for already linked entries
+- Doctor-trigger endpoint: `POST /api/doctor/medical-reports/{id}/save-to-record/`
+- Verification safeguards:
+	- default `self_reported`
+	- `doctor_confirmed` only with assigned doctor explicit confirmation
+- `linked_medical_record_entry` safe summary exposure in report detail/list serializers
+
+### Phase 10D Behavior Highlights
+
+- `not_medical_report` is never saved into canonical patient records.
+- Save requires medical report acceptance/classification state (`llm_completed` / `doctor_reviewed` / `accepted`, with limited OCR fallback).
+- Source attribution is persisted on entry (`source_user`, `source_role`) with consultation/message/attachment IDs in entry notes.
+- No prompt/provider raw payload/local paths are persisted into canonical entry fields.
+
+## Deferred Beyond 10D
 
 - Structured lab value extraction
 - RAG context auto-update from report OCR

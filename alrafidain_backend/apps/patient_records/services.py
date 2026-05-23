@@ -1063,3 +1063,263 @@ def link_medical_report_to_record_entry(report, entry):
     report.linked_medical_record_entry = entry
     report.save(update_fields=["linked_medical_record_entry", "updated_at"])
     return report
+
+
+def medical_report_type_to_record_category(report_type: str) -> str:
+    mapping = {
+        MedicalReportType.LAB_REPORT: "lab_report",
+        MedicalReportType.MICROBIOLOGY_REPORT: "lab_report",
+        MedicalReportType.PATHOLOGY_REPORT: "uploaded_medical_report",
+        MedicalReportType.SONAR_REPORT: "sonar_report",
+        MedicalReportType.XRAY_REPORT: "xray_report",
+        MedicalReportType.RADIOLOGY_REPORT: "radiology_report",
+        MedicalReportType.CT_SCAN: "radiology_report",
+        MedicalReportType.MRI: "radiology_report",
+        MedicalReportType.ECG: "uploaded_medical_report",
+        MedicalReportType.PRESCRIPTION_IMAGE: "prescription_report",
+        MedicalReportType.DISCHARGE_SUMMARY: "discharge_summary",
+        MedicalReportType.DOCTOR_NOTE: "general_note",
+        MedicalReportType.OTHER_MEDICAL_REPORT: "uploaded_medical_report",
+        MedicalReportType.UNKNOWN: "uploaded_medical_report",
+    }
+    return mapping.get(report_type, "uploaded_medical_report")
+
+
+def _truncate_for_record(text: str, max_chars: int) -> str:
+    text = (text or "").strip()
+    if len(text) <= max_chars:
+        return text
+    return f"{text[:max_chars].rstrip()}..."
+
+
+def _safe_structured_observations(report) -> str:
+    payload = report.structured_payload if isinstance(report.structured_payload, dict) else {}
+    structured_data = payload.get("structured_data")
+    if not isinstance(structured_data, dict) or not structured_data:
+        return ""
+
+    observations = []
+    for key in ["lab_values", "findings", "impression", "observations", "sections"]:
+        value = structured_data.get(key)
+        if value is None:
+            continue
+        summary_value = _truncate_for_record(str(value), 400)
+        if summary_value:
+            observations.append(f"{key}: {summary_value}")
+
+    if not observations:
+        compact = _truncate_for_record(str(structured_data), 400)
+        return compact
+
+    return _truncate_for_record("; ".join(observations), 800)
+
+
+def build_medical_record_entry_from_report_payload(report) -> dict:
+    category = medical_report_type_to_record_category(report.report_type)
+    report_label = report.get_report_type_display() or "Uploaded Medical Report"
+    title_base = report.original_filename or report.title or report_label
+    title = _truncate_for_record(f"{report_label} - {title_base}", 255)
+
+    main_value = _truncate_for_record(report.cleaned_report_text or "", 8000)
+    if not main_value:
+        structured_observations = _safe_structured_observations(report)
+        if structured_observations:
+            main_value = f"Structured observations: {structured_observations}"
+
+    removed_noise = (
+        report.removed_noise_summary if isinstance(report.removed_noise_summary, list) else []
+    )
+    removed_noise_summary = ", ".join(
+        [str(item).strip() for item in removed_noise if str(item).strip()]
+    )
+    if removed_noise_summary:
+        removed_noise_summary = _truncate_for_record(removed_noise_summary, 400)
+
+    confidence = ""
+    if report.llm_confidence is not None:
+        confidence = f"{float(report.llm_confidence):.4f}".rstrip("0").rstrip(".")
+
+    note_lines = [
+        "Source: patient uploaded report in consultation chat.",
+        f"Report type: {report.report_type}.",
+    ]
+    if confidence:
+        note_lines.append(f"LLM confidence: {confidence}.")
+    if report.detected_language:
+        note_lines.append(f"Detected language: {report.detected_language}.")
+    if removed_noise_summary:
+        note_lines.append(f"Removed noise: {removed_noise_summary}.")
+
+    structured_observations = _safe_structured_observations(report)
+    if structured_observations:
+        note_lines.append(f"Structured observations: {structured_observations}.")
+
+    note_lines.append(
+        "Source IDs: "
+        f"consultation={report.consultation_id or 'none'}, "
+        f"message={report.source_message_id or 'none'}, "
+        f"attachment={report.source_attachment_id or 'none'}, "
+        f"filename={report.original_filename or 'unknown'}."
+    )
+    note_lines.append(
+        "This entry was created from AI-assisted extraction and requires clinical review."
+    )
+
+    notes = _truncate_for_record(" ".join(note_lines), 4000)
+    return {
+        "category": category,
+        "title": title or _truncate_for_record(report_label, 255),
+        "value": main_value,
+        "notes": notes,
+    }
+
+
+def _can_confirm_report_by_doctor(*, report, doctor) -> bool:
+    if not doctor or doctor.user_type != UserType.DOCTOR:
+        return False
+    if report.consultation_id is None:
+        return False
+    return report.consultation and report.consultation.assigned_doctor_id == doctor.id
+
+
+@transaction.atomic
+def save_medical_report_to_patient_record(
+    *,
+    report,
+    doctor=None,
+    request=None,
+    force=False,
+    confirm_by_doctor=False,
+):
+    if not report or not report.patient_id:
+        raise ValueError("Report with valid patient is required.")
+
+    if not report.is_medical_report:
+        raise ValueError("Only accepted medical reports can be saved to patient record.")
+
+    if report.report_type == MedicalReportType.NOT_MEDICAL_REPORT:
+        raise ValueError("Non-medical reports cannot be saved to patient record.")
+
+    allowed_statuses = {
+        MedicalReportProcessingStatus.LLM_COMPLETED,
+        MedicalReportProcessingStatus.DOCTOR_REVIEWED,
+        MedicalReportProcessingStatus.ACCEPTED,
+    }
+    if report.processing_status not in allowed_statuses and not (
+        report.processing_status == MedicalReportProcessingStatus.OCR_COMPLETED
+        and bool((report.cleaned_report_text or "").strip())
+    ):
+        raise ValueError("Report must be classified before saving to patient record.")
+
+    payload = build_medical_record_entry_from_report_payload(report)
+    if not payload["value"]:
+        raise ValueError("No safe report content available for medical record entry.")
+
+    if report.linked_medical_record_entry_id and not force:
+        return report.linked_medical_record_entry
+
+    can_confirm = False
+    if confirm_by_doctor:
+        can_confirm = _can_confirm_report_by_doctor(report=report, doctor=doctor)
+        if not can_confirm:
+            raise PermissionError("Only the assigned doctor can confirm this report save.")
+
+    record = get_or_create_patient_medical_record(report.patient)
+    now = timezone.now()
+
+    if doctor and doctor.user_type == UserType.DOCTOR:
+        source_user = doctor
+        source_role = MedicalRecordSourceRole.DOCTOR
+    elif report.source == MedicalReportSource.CHAT_ATTACHMENT:
+        source_user = report.patient
+        source_role = MedicalRecordSourceRole.PATIENT
+    else:
+        source_user = None
+        source_role = MedicalRecordSourceRole.SYSTEM
+
+    verification_status = MedicalRecordVerificationStatus.SELF_REPORTED
+    verified_by = None
+    verified_at = None
+    if can_confirm:
+        verification_status = MedicalRecordVerificationStatus.DOCTOR_CONFIRMED
+        verified_by = doctor
+        verified_at = now
+
+    entry = report.linked_medical_record_entry
+    if entry:
+        entry.category = payload["category"]
+        entry.title = payload["title"]
+        entry.value = payload["value"]
+        entry.notes = payload["notes"]
+        entry.source_user = source_user
+        entry.source_role = source_role
+        entry.verification_status = verification_status
+        entry.verified_by = verified_by
+        entry.verified_at = verified_at
+        entry.is_active = True
+        entry.save(
+            update_fields=[
+                "category",
+                "title",
+                "value",
+                "notes",
+                "source_user",
+                "source_role",
+                "verification_status",
+                "verified_by",
+                "verified_at",
+                "is_active",
+                "updated_at",
+            ]
+        )
+    else:
+        entry = MedicalRecordEntry.objects.create(
+            medical_record=record,
+            category=payload["category"],
+            title=payload["title"],
+            value=payload["value"],
+            notes=payload["notes"],
+            source_user=source_user,
+            source_role=source_role,
+            verification_status=verification_status,
+            verified_by=verified_by,
+            verified_at=verified_at,
+            is_active=True,
+        )
+
+    report.linked_medical_record_entry = entry
+    if can_confirm:
+        report.reviewed_by = doctor
+        report.reviewed_at = now
+        report.processing_status = MedicalReportProcessingStatus.DOCTOR_REVIEWED
+    report.save(
+        update_fields=[
+            "linked_medical_record_entry",
+            "reviewed_by",
+            "reviewed_at",
+            "processing_status",
+            "updated_at",
+        ]
+    )
+
+    actor = doctor
+    if actor is None and request and getattr(request, "user", None):
+        actor = request.user if request.user.is_authenticated else None
+
+    create_audit_log(
+        actor=actor,
+        action="medical_report_saved_to_patient_record",
+        target=entry,
+        metadata={
+            "report_id": str(report.id),
+            "patient_id": str(report.patient_id),
+            "consultation_id": str(report.consultation_id) if report.consultation_id else None,
+            "entry_id": str(entry.id),
+            "category": entry.category,
+            "confirm_by_doctor": bool(can_confirm),
+            "verification_status": entry.verification_status,
+        },
+        request=request,
+    )
+
+    return entry

@@ -612,7 +612,7 @@ Notes:
 - Approve accepts optional `note`.
 - Self-approval is denied by backend policy.
 
-### 10.6 Medical Report Candidates (Phase 10C)
+### 10.6 Medical Report Candidates (Phase 10D)
 
 When a patient uploads a consultation chat attachment, the backend now creates a `PatientMedicalReport` candidate record.
 
@@ -624,24 +624,28 @@ Available endpoints:
 - `POST /api/doctor/medical-reports/{report_id}/review/`
 - `POST /api/doctor/medical-reports/{report_id}/process-ocr/`
 - `POST /api/doctor/medical-reports/{report_id}/classify-llm/`
+- `POST /api/doctor/medical-reports/{report_id}/save-to-record/`
 
-Phase 10C behavior contract:
+Phase 10D behavior contract:
 - Candidate creation is non-blocking and does not break chat send flow.
 - OCR processing can be triggered by assigned doctors using `process-ocr`.
 - LLM cleanup/classification can be triggered by assigned doctors using `classify-llm`.
+- Assigned doctors can persist accepted/classified reports into canonical medical records using `save-to-record`.
 - If OCR-on-upload settings are enabled server-side, processing may run inline or queued.
 - If LLM-sync-after-OCR is enabled server-side, accepted OCR results may automatically continue into LLM classification.
-- No automatic insertion into canonical patient medical record entries is triggered yet.
+- Duplicate record entries are prevented by default using linked-entry idempotency.
+- Verification defaults to `self_reported`; `doctor_confirmed` is only set when doctor explicitly submits `confirm_by_doctor=true`.
 
 Frontend implementation notes:
 - Treat these as review candidates, not final verified medical record entries.
 - Continue using existing chat message flow; no request-body changes are required.
 - Use `file_url` for image/document preview, not storage-relative `file` paths.
 - For patient view, show high-level OCR status only; raw OCR text and processing internals are hidden.
-- Show report processing statuses as: `uploaded`, `queued`, `ocr_pending`, `ocr_completed`, `llm_pending`, `llm_completed`, `rejected`, `failed`.
+- Show report processing statuses as: `uploaded`, `queued`, `ocr_pending`, `ocr_completed`, `llm_pending`, `llm_completed`, `doctor_reviewed`, `rejected`, `failed`.
 - `structured_payload` is safe-filtered; frontend should only rely on `ocr`, `llm`, `structured_data`, and `safety` keys.
+- Report detail includes a safe `linked_medical_record_entry` summary when saved.
 
-Deferred after Phase 10C:
+Deferred after Phase 10D:
 - Structured lab value extraction
 - Automatic RAG updates from OCR output
 - Doctor AI assistant messages based on extracted report context

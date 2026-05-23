@@ -34,6 +34,7 @@ from .serializers import (
     PatientMedicalReportListSerializer,
     PatientMedicalReportLLMClassifySerializer,
     PatientMedicalReportOCRProcessSerializer,
+    PatientMedicalReportSaveToRecordSerializer,
     SetBloodGroupSerializer,
 )
 from .services import (
@@ -44,6 +45,7 @@ from .services import (
     doctor_can_access_patient_record,
     get_or_create_patient_medical_record,
     process_medical_report_ocr,
+    save_medical_report_to_patient_record,
     set_blood_group,
 )
 
@@ -664,3 +666,88 @@ class DoctorMedicalReportClassifyLLMView(APIView):
         )
         data = PatientMedicalReportDetailSerializer(report, context={"request": request}).data
         return success_response(message="Medical report LLM classification processed.", data=data)
+
+
+@extend_schema(tags=["Patient Medical Reports"])
+class DoctorMedicalReportSaveToRecordView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Save medical report candidate to patient record",
+        request=PatientMedicalReportSaveToRecordSerializer,
+    )
+    def post(self, request, report_id):
+        if request.user.user_type != UserType.DOCTOR:
+            return error_response(
+                "Only doctors can access this endpoint.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        report = get_object_or_404(
+            PatientMedicalReport.objects.select_related(
+                "patient",
+                "consultation",
+                "source_message",
+                "source_attachment",
+                "linked_medical_record_entry",
+                "reviewed_by",
+            ),
+            id=report_id,
+        )
+
+        if not can_review_medical_report(request.user, report):
+            return error_response("Not found.", status_code=status.HTTP_404_NOT_FOUND)
+
+        serializer = PatientMedicalReportSaveToRecordSerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response(
+                "Invalid input.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        force = serializer.validated_data.get("force", False)
+        confirm_by_doctor = serializer.validated_data.get("confirm_by_doctor", False)
+        doctor_notes = serializer.validated_data.get("doctor_notes")
+
+        if doctor_notes is not None:
+            report.doctor_notes = doctor_notes
+            report.save(update_fields=["doctor_notes", "updated_at"])
+
+        create_audit_log(
+            actor=request.user,
+            action="medical_report_save_to_record_triggered_by_doctor",
+            target=report,
+            metadata={
+                "report_id": str(report.id),
+                "patient_id": str(report.patient_id),
+                "consultation_id": str(report.consultation_id) if report.consultation_id else None,
+                "source_attachment_id": (
+                    str(report.source_attachment_id) if report.source_attachment_id else None
+                ),
+                "processing_status": report.processing_status,
+                "force": bool(force),
+                "confirm_by_doctor": bool(confirm_by_doctor),
+            },
+            request=request,
+        )
+
+        try:
+            save_medical_report_to_patient_record(
+                report=report,
+                doctor=request.user,
+                request=request,
+                force=force,
+                confirm_by_doctor=confirm_by_doctor,
+            )
+        except PermissionError:
+            return error_response(
+                "You are not allowed to confirm this report.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+        except ValueError as exc:
+            return error_response(str(exc), status_code=status.HTTP_400_BAD_REQUEST)
+
+        report.refresh_from_db()
+        data = PatientMedicalReportDetailSerializer(report, context={"request": request}).data
+        return success_response(message="Medical report saved to patient record.", data=data)

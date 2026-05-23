@@ -792,6 +792,35 @@ paths:
       responses:
         '200':
           description: No response body
+  /api/doctor/medical-reports/{report_id}/save-to-record/:
+    post:
+      operationId: doctor_medical_reports_save_to_record_create
+      summary: Save medical report candidate to patient record
+      parameters:
+      - in: path
+        name: report_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - Patient Medical Reports
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatientMedicalReportSaveToRecord'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatientMedicalReportSaveToRecord'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatientMedicalReportSaveToRecord'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
   /api/health/:
     get:
       operationId: health_retrieve
@@ -4299,6 +4328,17 @@ components:
         force:
           type: boolean
           default: false
+    PatientMedicalReportSaveToRecord:
+      type: object
+      properties:
+        force:
+          type: boolean
+          default: false
+        confirm_by_doctor:
+          type: boolean
+          default: false
+        doctor_notes:
+          type: string
     PatientProfile:
       type: object
       properties:
