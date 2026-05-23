@@ -118,10 +118,32 @@ Delivered:
 - Includes linked medical record entry context when available.
 - Does not auto-save generated RAG output into patient records.
 
-## Deferred Beyond 10E
+## Phase 10F (Completed)
+
+Delivered:
+- Persistent doctor-only assistant stream model in RAG domain (`DoctorAIAssistantMessage`)
+- Assistant generation service from report case-update RAG responses
+- Doctor-only assistant APIs:
+	- `GET /api/rag/consultations/{id}/doctor-ai-messages/`
+	- `POST /api/rag/medical-reports/{id}/doctor-ai-message/`
+	- `GET /api/rag/doctor-ai-messages/{id}/`
+	- `POST /api/rag/doctor-ai-messages/{id}/mark-read/`
+- Assistant message read/unread status workflow
+- Safe source summary exposure (citations metadata only)
+- Audit logging for assistant message creation and read-status updates
+- Doctor-only notification and user-socket realtime event (`doctor_ai.message.created`)
+
+### Phase 10F Safety and Privacy Guarantees
+
+- Assistant messages are strictly doctor-facing and never patient-visible.
+- Assistant messages are not written into normal consultation chat messages.
+- Assistant APIs do not expose prompts, provider raw payloads, API credentials, or local file paths.
+- Assistant output is advisory and does not auto-diagnose, auto-prescribe, auto-change consultation status, or auto-save to patient record.
+
+## Deferred Beyond 10F
 
 - Structured lab value extraction
-- Doctor AI assistant response generation from extracted report context (Phase 10F)
+- Frontend integration and UX orchestration for doctor AI panel
 
 ## Configuration Flags (Phase 10B)
 

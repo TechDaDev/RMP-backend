@@ -3674,6 +3674,36 @@
                 }
             }
         },
+        "/api/rag/consultations/{consultation_id}/doctor-ai-messages/": {
+            "get": {
+                "operationId": "rag_consultations_doctor_ai_messages_retrieve",
+                "description": "GET /api/rag/consultations/<uuid:consultation_id>/doctor-ai-messages/.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "consultation_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "rag"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
         "/api/rag/consultations/{consultation_id}/support/": {
             "post": {
                 "operationId": "rag_consultations_support_create",
@@ -3682,6 +3712,66 @@
                     {
                         "in": "path",
                         "name": "consultation_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "rag"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/rag/doctor-ai-messages/{message_id}/": {
+            "get": {
+                "operationId": "rag_doctor_ai_messages_retrieve",
+                "description": "GET /api/rag/doctor-ai-messages/<uuid:message_id>/.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "message_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "rag"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/rag/doctor-ai-messages/{message_id}/mark-read/": {
+            "post": {
+                "operationId": "rag_doctor_ai_messages_mark_read_create",
+                "description": "POST /api/rag/doctor-ai-messages/<uuid:message_id>/mark-read/.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "message_id",
                         "schema": {
                             "type": "string",
                             "format": "uuid"
@@ -3776,6 +3866,36 @@
             "post": {
                 "operationId": "rag_medical_reports_case_update_create",
                 "description": "POST /api/rag/medical-reports/<uuid:report_id>/case-update/.\n\nRun doctor-facing RAG update using a saved medical report context.",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "report_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "rag"
+                ],
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
+        "/api/rag/medical-reports/{report_id}/doctor-ai-message/": {
+            "post": {
+                "operationId": "rag_medical_reports_doctor_ai_message_create",
+                "description": "POST /api/rag/medical-reports/<uuid:report_id>/doctor-ai-message/.",
                 "parameters": [
                     {
                         "in": "path",

@@ -1,7 +1,11 @@
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.common.choices import (
+    DoctorAIAssistantMessageStatus,
+    DoctorAIAssistantSafetyLevel,
+    DoctorAIAssistantTriggerType,
     RAGFeedbackRating,
     RAGFeedbackReviewStatus,
     RAGResponseStatus,
@@ -109,6 +113,141 @@ class RAGResponse(BaseModel):
         self.patient_visible = False
         self.doctor_review_required = True
         super().save(*args, **kwargs)
+
+
+class DoctorAIAssistantMessage(BaseModel):
+    consultation = models.ForeignKey(
+        "consultations.Consultation",
+        on_delete=models.CASCADE,
+        related_name="doctor_ai_messages",
+    )
+    doctor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="doctor_ai_assistant_messages",
+    )
+    patient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="patient_ai_case_messages",
+    )
+    trigger_type = models.CharField(
+        max_length=40,
+        choices=DoctorAIAssistantTriggerType.choices,
+    )
+    status = models.CharField(
+        max_length=20,
+        choices=DoctorAIAssistantMessageStatus.choices,
+        default=DoctorAIAssistantMessageStatus.UNREAD,
+    )
+    safety_level = models.CharField(
+        max_length=20,
+        choices=DoctorAIAssistantSafetyLevel.choices,
+        default=DoctorAIAssistantSafetyLevel.DOCTOR_ONLY,
+    )
+    title = models.CharField(max_length=255)
+    body = models.TextField()
+    summary = models.JSONField(default=dict, blank=True)
+    source_report = models.ForeignKey(
+        "patient_records.PatientMedicalReport",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="doctor_ai_messages",
+    )
+    source_rag_response = models.ForeignKey(
+        "RAGResponse",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="doctor_ai_messages",
+    )
+    source_medical_record_entry = models.ForeignKey(
+        "patient_records.MedicalRecordEntry",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="doctor_ai_messages",
+    )
+    source_metadata = models.JSONField(default=dict, blank=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+    archived_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["consultation", "doctor", "-created_at"]),
+            models.Index(fields=["doctor", "status", "-created_at"]),
+            models.Index(fields=["source_report"]),
+            models.Index(fields=["source_rag_response"]),
+            models.Index(fields=["trigger_type", "-created_at"]),
+        ]
+
+    def clean(self):
+        from apps.common.choices import RAGServiceContext, UserType
+
+        if not (self.body or "").strip():
+            raise ValidationError({"body": "Assistant message body cannot be empty."})
+
+        if (
+            self.consultation_id
+            and self.patient_id
+            and self.consultation.patient_id != self.patient_id
+        ):
+            raise ValidationError(
+                {"patient": "Consultation patient must match assistant message patient."}
+            )
+
+        if (
+            self.consultation_id
+            and self.doctor_id
+            and self.consultation.assigned_doctor_id != self.doctor_id
+        ):
+            raise ValidationError(
+                {"doctor": "Doctor must be the assigned doctor for this consultation."}
+            )
+
+        if self.doctor_id and self.doctor.user_type != UserType.DOCTOR:
+            raise ValidationError({"doctor": "Doctor AI message owner must be a doctor user."})
+
+        if self.patient_id and self.patient.user_type != UserType.PATIENT:
+            raise ValidationError({"patient": "Doctor AI message patient must be a patient user."})
+
+        if self.source_report_id:
+            if self.source_report.patient_id != self.patient_id:
+                raise ValidationError(
+                    {"source_report": "Source report patient must match assistant message patient."}
+                )
+            if (
+                self.source_report.consultation_id
+                and self.source_report.consultation_id != self.consultation_id
+            ):
+                raise ValidationError(
+                    {
+                        "source_report": (
+                            "Source report consultation must match assistant consultation."
+                        )
+                    }
+                )
+
+        if self.source_rag_response_id and self.source_report_id:
+            rag_query = self.source_rag_response.rag_query
+            if (
+                rag_query.service_context == RAGServiceContext.REPORT_CASE_UPDATE
+                and rag_query.object_id
+                and str(rag_query.object_id) != str(self.source_report_id)
+            ):
+                raise ValidationError(
+                    {
+                        "source_rag_response": (
+                            "For report_case_update responses, rag object_id must "
+                            "match source report."
+                        )
+                    }
+                )
+
+    def __str__(self):
+        return f"AI assistant message for consultation {self.consultation_id}"
 
 
 class RAGResponseFeedback(BaseModel):

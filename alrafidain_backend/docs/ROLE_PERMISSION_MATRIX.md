@@ -220,8 +220,13 @@ Notes:
 | Consultation RAG support | ❌ | ❌ | ✅ (assigned) | ❌ | ❌ | ❌ |
 | Lab result RAG support | ❌ | ❌ | ✅ (assigned) | ❌ | ❌ | ❌ |
 | Medical report case-update RAG support | ❌ | ❌ | ✅ (assigned) | ❌ | ❌ | ❌ |
+| List doctor AI assistant messages | ❌ | ❌ | ✅ (assigned, owner) | ❌ | ❌ | ❌ |
+| Generate doctor AI message from report | ❌ | ❌ | ✅ (assigned) | ❌ | ❌ | ❌ |
+| View doctor AI assistant message detail | ❌ | ❌ | ✅ (assigned, owner) | ❌ | ❌ | ❌ |
+| Mark doctor AI assistant message read/unread | ❌ | ❌ | ✅ (assigned, owner) | ❌ | ❌ | ❌ |
 
 > **Privacy rule**: Patients cannot use any RAG endpoint. RAG is exclusively for approved doctors.
+> **Assistant stream rule**: Doctor AI assistant messages are never inserted into consultation chat and are never patient-visible.
 
 ---
 

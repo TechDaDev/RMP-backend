@@ -410,3 +410,25 @@ class RAGSourceRelevance(models.TextChoices):
     PARTIALLY_RELEVANT = "partially_relevant", "Partially Relevant"
     NOT_RELEVANT = "not_relevant", "Not Relevant"
     UNKNOWN = "unknown", "Unknown"
+
+
+class DoctorAIAssistantTriggerType(models.TextChoices):
+    MEDICAL_REPORT_CASE_UPDATE = "medical_report_case_update", "Medical Report Case Update"
+    MANUAL_RAG_CASE_UPDATE = "manual_rag_case_update", "Manual RAG Case Update"
+    CONSULTATION_CONTEXT_UPDATE = "consultation_context_update", "Consultation Context Update"
+    LAB_RESULT_CONTEXT_UPDATE = "lab_result_context_update", "Lab Result Context Update"
+    SYSTEM = "system", "System"
+
+
+class DoctorAIAssistantMessageStatus(models.TextChoices):
+    UNREAD = "unread", "Unread"
+    READ = "read", "Read"
+    ARCHIVED = "archived", "Archived"
+
+
+class DoctorAIAssistantSafetyLevel(models.TextChoices):
+    DOCTOR_ONLY = "doctor_only", "Doctor Only"
+    NEEDS_REVIEW = "needs_review", "Needs Review"
+    LOW_CONFIDENCE = "low_confidence", "Low Confidence"
+    NO_CONTEXT = "no_context", "No Context"
+    FAILED = "failed", "Failed"

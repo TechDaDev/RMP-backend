@@ -5,10 +5,14 @@ from .views import (
     AdminRAGDatasetExportView,
     AdminRAGFeedbackListView,
     AdminRAGFeedbackReviewView,
+    ConsultationDoctorAIAssistantMessageListView,
     ConsultationRAGSupportView,
+    DoctorAIAssistantMessageDetailView,
+    DoctorAIAssistantMessageMarkReadView,
     DoctorGeneralRAGQueryView,
     LabResultRAGSupportView,
     MedicalReportCaseUpdateRAGView,
+    MedicalReportDoctorAIAssistantGenerateView,
     MyRAGFeedbackListView,
     RAGResponseFeedbackCreateView,
     RAGResponseSaveToPatientRecordView,
@@ -31,6 +35,26 @@ urlpatterns = [
         "medical-reports/<uuid:report_id>/case-update/",
         MedicalReportCaseUpdateRAGView.as_view(),
         name="rag-medical-report-case-update",
+    ),
+    path(
+        "consultations/<uuid:consultation_id>/doctor-ai-messages/",
+        ConsultationDoctorAIAssistantMessageListView.as_view(),
+        name="rag-consultation-doctor-ai-messages",
+    ),
+    path(
+        "medical-reports/<uuid:report_id>/doctor-ai-message/",
+        MedicalReportDoctorAIAssistantGenerateView.as_view(),
+        name="rag-medical-report-doctor-ai-message-generate",
+    ),
+    path(
+        "doctor-ai-messages/<uuid:message_id>/",
+        DoctorAIAssistantMessageDetailView.as_view(),
+        name="rag-doctor-ai-message-detail",
+    ),
+    path(
+        "doctor-ai-messages/<uuid:message_id>/mark-read/",
+        DoctorAIAssistantMessageMarkReadView.as_view(),
+        name="rag-doctor-ai-message-mark-read",
     ),
     # Phase 12D — Feedback
     path(

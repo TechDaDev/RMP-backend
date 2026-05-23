@@ -163,6 +163,38 @@ def broadcast_message_created(message):
         )
 
 
+def broadcast_doctor_ai_message_created(message):
+    """
+    Broadcast doctor_ai.message.created event to the owning doctor's user socket.
+
+    Args:
+        message: DoctorAIAssistantMessage instance
+    """
+    try:
+        event_data = {
+            "type": "doctor_ai.message.created",
+            "consultation_id": str(message.consultation_id),
+            "message_id": str(message.id),
+            "doctor_id": str(message.doctor_id),
+            "trigger_type": message.trigger_type,
+            "status": message.status,
+            "safety_level": message.safety_level,
+            "title": message.title,
+            "created_at": message.created_at.isoformat() if message.created_at else None,
+        }
+
+        send_to_group_safe(user_group_name(message.doctor_id), event_data)
+    except Exception:
+        logger.exception(
+            "Failed to broadcast doctor_ai.message.created",
+            extra={
+                "consultation_id": str(message.consultation_id),
+                "message_id": str(message.id),
+                "doctor_id": str(message.doctor_id),
+            },
+        )
+
+
 def broadcast_messages_marked_read(consultation, reader, count):
     """
     Broadcast chat.messages.read event to consultation socket.

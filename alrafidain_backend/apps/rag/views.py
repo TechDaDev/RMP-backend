@@ -7,12 +7,22 @@ from rest_framework.views import APIView
 from apps.audit.services import create_audit_log, record_security_event
 from apps.common.choices import RAGServiceContext
 from apps.common.permissions import CanExportRagDataset
+from apps.consultations.models import Consultation
 from apps.patient_records.models import PatientMedicalReport
 
-from .models import RAGResponse, RAGResponseFeedback
-from .permissions import can_access_consultation_rag, can_access_lab_result_rag
+from .assistant_services import generate_doctor_ai_message_for_report, mark_doctor_ai_message_read
+from .models import DoctorAIAssistantMessage, RAGResponse, RAGResponseFeedback
+from .permissions import (
+    can_access_consultation_rag,
+    can_access_doctor_ai_assistant_message,
+    can_access_lab_result_rag,
+    can_list_doctor_ai_messages_for_consultation,
+)
 from .serializers import (
     ConsultationRAGSupportSerializer,
+    DoctorAIAssistantGenerateFromReportSerializer,
+    DoctorAIAssistantMarkReadSerializer,
+    DoctorAIAssistantMessageSerializer,
     DoctorRAGQuerySerializer,
     LabResultRAGSupportSerializer,
     MedicalReportRAGSupportSerializer,
@@ -218,6 +228,127 @@ class MedicalReportCaseUpdateRAGView(APIView):
             return Response({"detail": str(exc)}, status=400)
 
         return Response(RAGResponseSerializer(rag_response).data, status=200)
+
+
+class ConsultationDoctorAIAssistantMessageListView(APIView):
+    """GET /api/rag/consultations/<uuid:consultation_id>/doctor-ai-messages/."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, consultation_id):
+        consultation = get_object_or_404(Consultation, pk=consultation_id)
+        if not can_list_doctor_ai_messages_for_consultation(request.user, consultation):
+            return Response(
+                {"detail": "You do not have permission to view AI assistant messages."},
+                status=403,
+            )
+
+        qs = DoctorAIAssistantMessage.objects.filter(
+            consultation=consultation,
+            doctor=request.user,
+        ).select_related(
+            "source_report",
+            "source_rag_response",
+            "source_medical_record_entry",
+        )
+
+        status_value = request.query_params.get("status")
+        if status_value:
+            qs = qs.filter(status=status_value)
+
+        trigger_type = request.query_params.get("trigger_type")
+        if trigger_type:
+            qs = qs.filter(trigger_type=trigger_type)
+
+        source_report = request.query_params.get("source_report")
+        if source_report:
+            qs = qs.filter(source_report_id=source_report)
+
+        return Response(DoctorAIAssistantMessageSerializer(qs, many=True).data, status=200)
+
+
+class DoctorAIAssistantMessageDetailView(APIView):
+    """GET /api/rag/doctor-ai-messages/<uuid:message_id>/."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, message_id):
+        message = get_object_or_404(
+            DoctorAIAssistantMessage.objects.select_related(
+                "consultation",
+                "source_report",
+                "source_rag_response",
+                "source_medical_record_entry",
+            ),
+            pk=message_id,
+        )
+        if not can_access_doctor_ai_assistant_message(request.user, message):
+            return Response(
+                {"detail": "You do not have permission to view this AI assistant message."},
+                status=403,
+            )
+        return Response(DoctorAIAssistantMessageSerializer(message).data, status=200)
+
+
+class MedicalReportDoctorAIAssistantGenerateView(APIView):
+    """POST /api/rag/medical-reports/<uuid:report_id>/doctor-ai-message/."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, report_id):
+        report = get_object_or_404(
+            PatientMedicalReport.objects.select_related(
+                "patient",
+                "consultation",
+                "linked_medical_record_entry",
+            ),
+            pk=report_id,
+        )
+
+        serializer = DoctorAIAssistantGenerateFromReportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        try:
+            message = generate_doctor_ai_message_for_report(
+                doctor=request.user,
+                report=report,
+                question=data.get("question"),
+                top_k=data.get("top_k"),
+                force=data.get("force", False),
+                create_if_exists=data.get("create_if_exists", False),
+                save_rag_response=data.get("save_rag_response", True),
+                request=request,
+            )
+        except PermissionError as exc:
+            return Response({"detail": str(exc)}, status=403)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=400)
+
+        return Response(DoctorAIAssistantMessageSerializer(message).data, status=200)
+
+
+class DoctorAIAssistantMessageMarkReadView(APIView):
+    """POST /api/rag/doctor-ai-messages/<uuid:message_id>/mark-read/."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, message_id):
+        message = get_object_or_404(DoctorAIAssistantMessage, pk=message_id)
+        serializer = DoctorAIAssistantMarkReadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            updated = mark_doctor_ai_message_read(
+                message,
+                request.user,
+                read=serializer.validated_data.get("read", True),
+                request=request,
+            )
+        except PermissionError as exc:
+            return Response({"detail": str(exc)}, status=403)
+
+        return Response(DoctorAIAssistantMessageSerializer(updated).data, status=200)
 
 
 # ---------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from .models import (
+    DoctorAIAssistantMessage,
     RAGQuery,
     RAGResponse,
     RAGResponseFeedback,
@@ -94,4 +95,28 @@ class RAGRetrievedChunkFeedbackAdmin(admin.ModelAdmin):
     list_filter = ["relevance"]
     search_fields = ["feedback__doctor__email", "comment"]
     readonly_fields = ["id", "created_at", "updated_at"]
+    ordering = ["-created_at"]
+
+
+@admin.register(DoctorAIAssistantMessage)
+class DoctorAIAssistantMessageAdmin(admin.ModelAdmin):
+    list_display = [
+        "id",
+        "consultation",
+        "doctor",
+        "patient",
+        "trigger_type",
+        "status",
+        "safety_level",
+        "created_at",
+    ]
+    list_filter = ["trigger_type", "status", "safety_level", "created_at"]
+    search_fields = [
+        "title",
+        "body",
+        "doctor__email",
+        "patient__email",
+        "consultation__id",
+    ]
+    readonly_fields = ["id", "created_at", "updated_at", "read_at", "archived_at"]
     ordering = ["-created_at"]

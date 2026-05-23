@@ -8,6 +8,7 @@ All pgvector semantic search calls are mocked (CosineDistance not supported in S
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -16,6 +17,9 @@ from apps.audit.models import AuditLog
 from apps.common.choices import (
     ConsultationDuration,
     ConsultationStatus,
+    DoctorAIAssistantMessageStatus,
+    DoctorAIAssistantSafetyLevel,
+    DoctorAIAssistantTriggerType,
     KnowledgeApprovalStatus,
     KnowledgeAudience,
     KnowledgeDocumentType,
@@ -34,6 +38,7 @@ from apps.common.choices import (
     VerificationStatus,
 )
 from apps.knowledge_base.models import KnowledgeChunk, KnowledgeDocument
+from apps.messaging.models import ConsultationMessage
 from apps.patient_records.models import (
     MedicalRecordEntry,
     PatientMedicalRecord,
@@ -41,7 +46,13 @@ from apps.patient_records.models import (
 )
 from apps.profiles.models import DoctorProfile, PatientProfile, UserProfile
 
-from .models import RAGQuery, RAGRetrievedChunk
+from .assistant_services import (
+    build_doctor_ai_message_from_rag_response,
+    create_doctor_ai_assistant_message,
+    generate_doctor_ai_message_for_report,
+    mark_doctor_ai_message_read,
+)
+from .models import DoctorAIAssistantMessage, RAGQuery, RAGRetrievedChunk
 from .permissions import (
     can_access_consultation_rag,
     can_access_lab_result_rag,
@@ -886,6 +897,337 @@ class MedicalReportCaseUpdateRAGViewTest(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertNotIn("prompt_text", resp.data)
         self.assertNotIn("raw_response", resp.data)
+
+
+class DoctorAIAssistantMessageServiceTest(TestCase):
+    def setUp(self):
+        self.doctor = create_doctor(email="assistant_svc_doc@example.com")
+        self.other_doctor = create_doctor(email="assistant_svc_other@example.com")
+        self.patient = create_patient(email="assistant_svc_patient@example.com")
+        self.consultation, self.report = create_medical_report_for_rag(
+            patient=self.patient,
+            doctor=self.doctor,
+        )
+        self.rag_query = RAGQuery.objects.create(
+            requested_by=self.doctor,
+            service_context=RAGServiceContext.REPORT_CASE_UPDATE,
+            object_id=self.report.pk,
+            query_text="report update",
+            top_k=3,
+            filters={},
+        )
+        self.rag_response = self._create_rag_response()
+
+    def _create_rag_response(self, status=RAGResponseStatus.SUCCESS, confidence=0.88):
+        from .models import RAGResponse
+
+        return RAGResponse.objects.create(
+            rag_query=self.rag_query,
+            response_text="Doctor-facing AI support answer with sources.",
+            model_name="deepseek-chat",
+            provider="deepseek",
+            status=status,
+            raw_response={
+                "safety": {
+                    "confidence": confidence,
+                    "source_count": 1,
+                    "document_titles": ["Guideline A"],
+                },
+                "prompt_text": "hidden",
+                "raw_payload": {"secret": "hidden"},
+            },
+        )
+
+    def test_model_requires_assigned_doctor(self):
+        message = DoctorAIAssistantMessage(
+            consultation=self.consultation,
+            doctor=self.other_doctor,
+            patient=self.patient,
+            trigger_type=DoctorAIAssistantTriggerType.MEDICAL_REPORT_CASE_UPDATE,
+            title="Title",
+            body="Body",
+        )
+        with self.assertRaises(ValidationError):
+            message.full_clean()
+
+    def test_model_rejects_non_patient_in_patient_field(self):
+        message = DoctorAIAssistantMessage(
+            consultation=self.consultation,
+            doctor=self.doctor,
+            patient=self.doctor,
+            trigger_type=DoctorAIAssistantTriggerType.MEDICAL_REPORT_CASE_UPDATE,
+            title="Title",
+            body="Body",
+        )
+        with self.assertRaises(ValidationError):
+            message.full_clean()
+
+    def test_model_requires_consultation_patient_match(self):
+        other_patient = create_patient(email="assistant_other_patient@example.com")
+        message = DoctorAIAssistantMessage(
+            consultation=self.consultation,
+            doctor=self.doctor,
+            patient=other_patient,
+            trigger_type=DoctorAIAssistantTriggerType.MEDICAL_REPORT_CASE_UPDATE,
+            title="Title",
+            body="Body",
+        )
+        with self.assertRaises(ValidationError):
+            message.full_clean()
+
+    def test_build_message_payload_excludes_prompt_and_raw_in_summary(self):
+        payload = build_doctor_ai_message_from_rag_response(
+            consultation=self.consultation,
+            doctor=self.doctor,
+            patient=self.patient,
+            rag_response=self.rag_response,
+            source_report=self.report,
+            source_medical_record_entry=self.report.linked_medical_record_entry,
+        )
+        summary = payload["summary"]
+        self.assertIn("document_titles", summary)
+        self.assertNotIn("prompt_text", summary)
+        self.assertNotIn("raw_payload", summary)
+
+    def test_create_message_creates_audit_log(self):
+        before = AuditLog.objects.count()
+        message = create_doctor_ai_assistant_message(
+            consultation=self.consultation,
+            doctor=self.doctor,
+            patient=self.patient,
+            title="AI update",
+            body="Doctor-only body",
+            trigger_type=DoctorAIAssistantTriggerType.MEDICAL_REPORT_CASE_UPDATE,
+            safety_level=DoctorAIAssistantSafetyLevel.DOCTOR_ONLY,
+            source_report=self.report,
+            source_rag_response=self.rag_response,
+        )
+        self.assertEqual(message.doctor_id, self.doctor.id)
+        self.assertGreater(AuditLog.objects.count(), before)
+        self.assertTrue(
+            AuditLog.objects.filter(
+                action="doctor_ai_assistant_message_created",
+                target_id=str(message.id),
+            ).exists()
+        )
+
+    @patch("apps.rag.assistant_services.run_medical_report_case_update_rag")
+    def test_generate_calls_report_case_update_rag(self, mock_runner):
+        mock_runner.return_value = (MagicMock(), self.rag_response)
+        message = generate_doctor_ai_message_for_report(
+            doctor=self.doctor,
+            report=self.report,
+            question="Focus on red flags",
+            top_k=5,
+        )
+        self.assertEqual(
+            message.trigger_type,
+            DoctorAIAssistantTriggerType.MEDICAL_REPORT_CASE_UPDATE,
+        )
+        mock_runner.assert_called_once()
+
+    @patch("apps.rag.assistant_services.run_medical_report_case_update_rag")
+    def test_duplicate_prevention_returns_existing_when_not_forced(self, mock_runner):
+        existing = create_doctor_ai_assistant_message(
+            consultation=self.consultation,
+            doctor=self.doctor,
+            patient=self.patient,
+            title="Existing",
+            body="Existing body",
+            trigger_type=DoctorAIAssistantTriggerType.MEDICAL_REPORT_CASE_UPDATE,
+            safety_level=DoctorAIAssistantSafetyLevel.DOCTOR_ONLY,
+            source_report=self.report,
+            source_rag_response=self.rag_response,
+        )
+
+        message = generate_doctor_ai_message_for_report(
+            doctor=self.doctor,
+            report=self.report,
+            force=False,
+        )
+        self.assertEqual(message.id, existing.id)
+        mock_runner.assert_not_called()
+
+    @patch("apps.rag.assistant_services.run_medical_report_case_update_rag")
+    def test_force_true_creates_new_message(self, mock_runner):
+        mock_runner.return_value = (MagicMock(), self.rag_response)
+        create_doctor_ai_assistant_message(
+            consultation=self.consultation,
+            doctor=self.doctor,
+            patient=self.patient,
+            title="Existing",
+            body="Existing body",
+            trigger_type=DoctorAIAssistantTriggerType.MEDICAL_REPORT_CASE_UPDATE,
+            safety_level=DoctorAIAssistantSafetyLevel.DOCTOR_ONLY,
+            source_report=self.report,
+            source_rag_response=self.rag_response,
+        )
+
+        before = DoctorAIAssistantMessage.objects.count()
+        generate_doctor_ai_message_for_report(
+            doctor=self.doctor,
+            report=self.report,
+            force=True,
+        )
+        self.assertEqual(DoctorAIAssistantMessage.objects.count(), before + 1)
+
+    def test_mark_read_and_unread_updates_status_and_timestamp(self):
+        message = create_doctor_ai_assistant_message(
+            consultation=self.consultation,
+            doctor=self.doctor,
+            patient=self.patient,
+            title="AI update",
+            body="Doctor-only body",
+            trigger_type=DoctorAIAssistantTriggerType.MEDICAL_REPORT_CASE_UPDATE,
+            safety_level=DoctorAIAssistantSafetyLevel.DOCTOR_ONLY,
+            source_report=self.report,
+            source_rag_response=self.rag_response,
+        )
+
+        marked = mark_doctor_ai_message_read(message, self.doctor, read=True)
+        self.assertEqual(marked.status, DoctorAIAssistantMessageStatus.READ)
+        self.assertIsNotNone(marked.read_at)
+
+        unmarked = mark_doctor_ai_message_read(message, self.doctor, read=False)
+        self.assertEqual(unmarked.status, DoctorAIAssistantMessageStatus.UNREAD)
+        self.assertIsNone(unmarked.read_at)
+
+
+class DoctorAIAssistantMessageEndpointsTest(TestCase):
+    def setUp(self):
+        self.doctor = create_doctor(email="assistant_api_doc@example.com")
+        self.other_doctor = create_doctor(email="assistant_api_other@example.com")
+        self.patient = create_patient(email="assistant_api_patient@example.com")
+        self.consultation, self.report = create_medical_report_for_rag(
+            patient=self.patient,
+            doctor=self.doctor,
+        )
+        self.rag_query = RAGQuery.objects.create(
+            requested_by=self.doctor,
+            service_context=RAGServiceContext.REPORT_CASE_UPDATE,
+            object_id=self.report.pk,
+            query_text="report update",
+            top_k=3,
+            filters={},
+        )
+
+        from .models import RAGResponse
+
+        self.rag_response = RAGResponse.objects.create(
+            rag_query=self.rag_query,
+            response_text="Assistant message body.",
+            model_name="deepseek-chat",
+            provider="deepseek",
+            status=RAGResponseStatus.SUCCESS,
+            raw_response={"safety": {"confidence": 0.85, "source_count": 1}},
+        )
+        self.ai_message = create_doctor_ai_assistant_message(
+            consultation=self.consultation,
+            doctor=self.doctor,
+            patient=self.patient,
+            title="AI update",
+            body="Doctor-only body",
+            trigger_type=DoctorAIAssistantTriggerType.MEDICAL_REPORT_CASE_UPDATE,
+            safety_level=DoctorAIAssistantSafetyLevel.DOCTOR_ONLY,
+            source_report=self.report,
+            source_rag_response=self.rag_response,
+        )
+
+    def list_url(self):
+        return f"/api/rag/consultations/{self.consultation.pk}/doctor-ai-messages/"
+
+    def generate_url(self):
+        return f"/api/rag/medical-reports/{self.report.pk}/doctor-ai-message/"
+
+    def detail_url(self):
+        return f"/api/rag/doctor-ai-messages/{self.ai_message.pk}/"
+
+    def mark_url(self):
+        return f"/api/rag/doctor-ai-messages/{self.ai_message.pk}/mark-read/"
+
+    def test_assigned_approved_doctor_can_list(self):
+        client = auth_client(self.doctor)
+        resp = client.get(self.list_url())
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(len(resp.data), 1)
+
+    def test_patient_cannot_list(self):
+        client = auth_client(self.patient)
+        resp = client.get(self.list_url())
+        self.assertEqual(resp.status_code, 403)
+
+    def test_unassigned_doctor_cannot_list(self):
+        client = auth_client(self.other_doctor)
+        resp = client.get(self.list_url())
+        self.assertEqual(resp.status_code, 403)
+
+    @patch("apps.rag.views.generate_doctor_ai_message_for_report")
+    def test_assigned_doctor_can_generate_from_report(self, mock_generate):
+        mock_generate.return_value = self.ai_message
+        client = auth_client(self.doctor)
+        resp = client.post(self.generate_url(), {"question": "Focus"}, format="json")
+        self.assertEqual(resp.status_code, 200)
+        mock_generate.assert_called_once()
+
+    @patch("apps.rag.views.generate_doctor_ai_message_for_report")
+    def test_patient_cannot_generate(self, mock_generate):
+        mock_generate.side_effect = PermissionError("forbidden")
+        client = auth_client(self.patient)
+        resp = client.post(self.generate_url(), {}, format="json")
+        self.assertEqual(resp.status_code, 403)
+
+    @patch("apps.rag.views.generate_doctor_ai_message_for_report")
+    def test_unassigned_doctor_cannot_generate(self, mock_generate):
+        mock_generate.side_effect = PermissionError("forbidden")
+        client = auth_client(self.other_doctor)
+        resp = client.post(self.generate_url(), {}, format="json")
+        self.assertEqual(resp.status_code, 403)
+
+    @patch("apps.rag.views.generate_doctor_ai_message_for_report")
+    def test_generate_response_shape(self, mock_generate):
+        mock_generate.return_value = self.ai_message
+        client = auth_client(self.doctor)
+        resp = client.post(self.generate_url(), {}, format="json")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("id", resp.data)
+        self.assertIn("title", resp.data)
+        self.assertIn("body", resp.data)
+
+    @patch("apps.rag.views.generate_doctor_ai_message_for_report")
+    def test_generate_does_not_create_consultation_message(self, mock_generate):
+        before = ConsultationMessage.objects.count()
+        mock_generate.return_value = self.ai_message
+        client = auth_client(self.doctor)
+        client.post(self.generate_url(), {}, format="json")
+        self.assertEqual(ConsultationMessage.objects.count(), before)
+
+    def test_assigned_doctor_can_mark_read(self):
+        client = auth_client(self.doctor)
+        resp = client.post(self.mark_url(), {"read": True}, format="json")
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.data["status"], DoctorAIAssistantMessageStatus.READ)
+
+    def test_patient_cannot_mark_read(self):
+        client = auth_client(self.patient)
+        resp = client.post(self.mark_url(), {"read": True}, format="json")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_unassigned_doctor_cannot_mark_read(self):
+        client = auth_client(self.other_doctor)
+        resp = client.post(self.mark_url(), {"read": True}, format="json")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_detail_does_not_expose_prompt_or_raw_provider_payload(self):
+        client = auth_client(self.doctor)
+        resp = client.get(self.detail_url())
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotIn("prompt_text", resp.data)
+        self.assertNotIn("raw_response", resp.data)
+
+    def test_no_patient_facing_route_returns_assistant_messages(self):
+        patient_client = auth_client(self.patient)
+        resp = patient_client.get(self.list_url())
+        self.assertEqual(resp.status_code, 403)
 
 
 # ---------------------------------------------------------------------------

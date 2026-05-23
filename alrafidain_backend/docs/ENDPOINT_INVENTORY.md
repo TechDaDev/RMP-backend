@@ -223,6 +223,10 @@ Legend:
 | POST | `/api/rag/consultations/<id>/support/` | `ConsultationRAGSupportView` | Yes | doctor (approved, assigned) | `RAGQueryRequestSerializer` | stable |
 | POST | `/api/rag/lab-results/<id>/support/` | `LabResultRAGSupportView` | Yes | doctor (approved, assigned) | `RAGQueryRequestSerializer` | stable |
 | POST | `/api/rag/medical-reports/<id>/case-update/` | `MedicalReportCaseUpdateRAGView` | Yes | doctor (approved, assigned) | `MedicalReportRAGSupportSerializer` | stable |
+| GET | `/api/rag/consultations/<id>/doctor-ai-messages/` | `ConsultationDoctorAIAssistantMessageListView` | Yes | doctor (approved, assigned) | — | stable |
+| POST | `/api/rag/medical-reports/<id>/doctor-ai-message/` | `MedicalReportDoctorAIAssistantGenerateView` | Yes | doctor (approved, assigned) | `DoctorAIAssistantGenerateFromReportSerializer` | stable |
+| GET | `/api/rag/doctor-ai-messages/<id>/` | `DoctorAIAssistantMessageDetailView` | Yes | doctor (approved, owner) | — | stable |
+| POST | `/api/rag/doctor-ai-messages/<id>/mark-read/` | `DoctorAIAssistantMessageMarkReadView` | Yes | doctor (approved, owner) | `DoctorAIAssistantMarkReadSerializer` | stable |
 
 > Response shape: raw `RAGResponseSerializer` data (not wrapped in `{"success": true, "data": ...}`). See [API Response Contract](API_RESPONSE_CONTRACT.md).
 

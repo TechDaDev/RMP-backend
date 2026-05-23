@@ -1,9 +1,14 @@
 from django.conf import settings
 from rest_framework import serializers
 
-from apps.common.choices import RAGFeedbackRating, RAGFeedbackReviewStatus, RAGSourceRelevance
+from apps.common.choices import (
+    RAGFeedbackRating,
+    RAGFeedbackReviewStatus,
+    RAGSourceRelevance,
+)
 
 from .models import (
+    DoctorAIAssistantMessage,
     RAGResponse,
     RAGResponseFeedback,
     RAGRetrievedChunk,
@@ -210,6 +215,81 @@ class MedicalReportRAGSupportSerializer(serializers.Serializer):
         fields = super().get_fields()
         fields["top_k"].default = getattr(settings, "RAG_DEFAULT_TOP_K", 6)
         return fields
+
+
+class DoctorAIAssistantMessageSerializer(serializers.ModelSerializer):
+    def _safe_source_metadata(self, value):
+        if not isinstance(value, dict):
+            return {}
+        safe_keys = {
+            "service_context",
+            "source_count",
+            "document_titles",
+            "fallback_reason",
+            "source_report_id",
+            "linked_medical_record_entry_id",
+        }
+        return {k: value.get(k) for k in safe_keys if k in value}
+
+    source_metadata = serializers.SerializerMethodField()
+
+    class Meta:
+        model = DoctorAIAssistantMessage
+        fields = [
+            "id",
+            "consultation",
+            "trigger_type",
+            "status",
+            "safety_level",
+            "title",
+            "body",
+            "summary",
+            "source_report",
+            "source_rag_response",
+            "source_medical_record_entry",
+            "source_metadata",
+            "read_at",
+            "archived_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+    def get_source_metadata(self, obj):
+        return self._safe_source_metadata(obj.source_metadata)
+
+
+class DoctorAIAssistantGenerateFromReportSerializer(serializers.Serializer):
+    question = serializers.CharField(max_length=2000, required=False, allow_blank=True, default="")
+    top_k = serializers.IntegerField(required=False, min_value=1)
+    force = serializers.BooleanField(required=False, default=False)
+    save_rag_response = serializers.BooleanField(required=False, default=True)
+    create_if_exists = serializers.BooleanField(required=False, default=False)
+
+    def validate_top_k(self, value):
+        max_k = getattr(settings, "RAG_MAX_TOP_K", 12)
+        if value > max_k:
+            raise serializers.ValidationError(f"top_k may not exceed {max_k}.")
+        return value
+
+    def validate_question(self, value):
+        if not value:
+            return value
+        max_query_len = getattr(settings, "RAG_MAX_QUERY_LENGTH", 2000)
+        if len(value) > max_query_len:
+            raise serializers.ValidationError(
+                f"question may not exceed {max_query_len} characters."
+            )
+        return value
+
+    def get_fields(self):
+        fields = super().get_fields()
+        fields["top_k"].default = getattr(settings, "RAG_DEFAULT_TOP_K", 6)
+        return fields
+
+
+class DoctorAIAssistantMarkReadSerializer(serializers.Serializer):
+    read = serializers.BooleanField(required=False, default=True)
 
 
 class RAGResponseSaveToRecordSerializer(serializers.Serializer):

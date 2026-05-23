@@ -2178,7 +2178,7 @@ Privacy notes:
 - Prompt text and raw provider payload are not exposed via this API.
 - Local file paths, secrets, and raw provider internals are not exposed.
 
-> Phase 10E note: OCR + LLM classification + canonical save-to-record are implemented, and doctor report case-update RAG is available. Assistant message generation remains deferred to 10F.
+> Phase 10F note: OCR + LLM classification + canonical save-to-record are implemented, doctor report case-update RAG is available, and doctor-only AI assistant stream endpoints are available.
 
 ---
 
@@ -2894,6 +2894,108 @@ Backend context enrichment:
 | `top_k` | int | no | Number of chunks to retrieve |
 
 **Response:** `RAGResponse` object.
+
+---
+
+### GET `/api/rag/consultations/<consultation_id>/doctor-ai-messages/`
+
+List doctor-only AI assistant messages for a consultation.
+Caller must be the approved doctor assigned to that consultation.
+
+Optional query params:
+- `status` (`unread|read|archived`)
+- `trigger_type`
+- `source_report` (UUID)
+
+**Response:** array of `DoctorAIAssistantMessage` objects.
+
+---
+
+### POST `/api/rag/medical-reports/<report_id>/doctor-ai-message/`
+
+Generate and persist a doctor-only AI assistant message from medical report case-update RAG.
+
+Request body:
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `question` | string | no | Optional custom prompt context |
+| `top_k` | int | no | Number of chunks to retrieve |
+| `force` | bool | no | Force fresh generation even if prior assistant message exists |
+| `save_rag_response` | bool | no | Keep linkage to underlying persisted RAG response |
+| `create_if_exists` | bool | no | Create new message even when prior message exists |
+
+**Response:** `DoctorAIAssistantMessage` object.
+
+---
+
+### GET `/api/rag/doctor-ai-messages/<message_id>/`
+
+Retrieve one doctor-only AI assistant message.
+Caller must be owning assigned approved doctor.
+
+**Response:** `DoctorAIAssistantMessage` object.
+
+---
+
+### POST `/api/rag/doctor-ai-messages/<message_id>/mark-read/`
+
+Mark assistant message read/unread.
+Caller must be owning assigned approved doctor.
+
+Request body:
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `read` | bool | no | `true` to mark read, `false` to mark unread |
+
+**Response:** `DoctorAIAssistantMessage` object.
+
+---
+
+### DoctorAIAssistantMessage Schema
+
+```json
+{
+  "id": "uuid",
+  "consultation": "uuid",
+  "trigger_type": "medical_report_case_update",
+  "status": "unread",
+  "safety_level": "doctor_only",
+  "title": "AI case update from uploaded medical report",
+  "body": "Doctor-facing AI support text",
+  "summary": {
+    "rag_response_id": "uuid",
+    "rag_query_id": "uuid",
+    "service_context": "report_case_update",
+    "source_count": 2,
+    "document_titles": ["Guideline A", "Guideline B"],
+    "confidence": 0.82,
+    "fallback_reason": null,
+    "source_report_id": "uuid",
+    "linked_medical_record_entry_id": "uuid"
+  },
+  "source_report": "uuid",
+  "source_rag_response": "uuid",
+  "source_medical_record_entry": "uuid",
+  "source_metadata": {
+    "service_context": "report_case_update",
+    "source_count": 2,
+    "document_titles": ["Guideline A", "Guideline B"],
+    "fallback_reason": null
+  },
+  "read_at": null,
+  "archived_at": null,
+  "created_at": "2026-05-23T00:00:00Z",
+  "updated_at": "2026-05-23T00:00:00Z"
+}
+```
+
+Privacy and safety invariants for assistant stream:
+- Assistant messages are doctor-only and never available to patients.
+- Assistant messages are separate from normal consultation chat and never saved as `ConsultationMessage`.
+- Assistant APIs do not expose RAG `prompt_text`, provider raw payload, API secrets, or local file paths.
+- Assistant output is advisory only and does not auto-diagnose, auto-prescribe, auto-change consultation state, or auto-write to patient medical record.
 
 ---
 
