@@ -183,9 +183,11 @@ class ConsultationAcceptView(APIView):
 
     @extend_schema(summary="Accept consultation")
     def post(self, request, consultation_id):
-        consultation = Consultation.objects.select_related("assigned_doctor", "patient").get(
-            id=consultation_id
-        )
+        consultation = Consultation.objects.select_related("assigned_doctor", "patient").prefetch_related(
+            "responses__doctor",
+            "attachments__uploaded_by",
+            "consultation_symptoms__symptom__category",
+        ).get(id=consultation_id)
 
         serializer = ConsultationAcceptSerializer(
             data=request.data,
@@ -195,7 +197,10 @@ class ConsultationAcceptView(APIView):
 
         accept_consultation(consultation=consultation, doctor=request.user, request=request)
 
-        return success_response(message="Consultation accepted successfully.")
+        return success_response(
+            message="Consultation accepted successfully.",
+            data=ConsultationDoctorDetailSerializer(consultation).data,
+        )
 
 
 @extend_schema(tags=["Consultations"])

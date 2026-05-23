@@ -416,6 +416,10 @@ class ConsultationFlowTests(TestCase):
         c = Consultation.objects.first()
         resp = self.doctor_client.post(f"/api/consultations/{c.id}/accept/", {}, format="json")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertIn("ai_case_summary", resp.data["data"])
+        self.assertIn("symptoms", resp.data["data"])
+        self.assertIn("Clinical interpretation", resp.data["data"]["ai_case_summary"])
+        self.assertIn("Focused diagnostic directions", resp.data["data"]["ai_case_summary"])
         c.refresh_from_db()
         self.assertEqual(c.assigned_doctor_id, self.doctor.id)
         self.assertEqual(c.status, ConsultationStatus.ACCEPTED)
@@ -443,6 +447,8 @@ class ConsultationFlowTests(TestCase):
         resp = self.doctor_client.get(f"/api/consultations/{c.id}/")
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertIn("ai_predicted_disease", resp.data["data"])
+        self.assertIn("ai_case_summary", resp.data["data"])
+        self.assertIn("Clinical interpretation", resp.data["data"]["ai_case_summary"])
 
     def test_unassigned_doctor_cannot_view_detail(self):
         self.create_consultation()

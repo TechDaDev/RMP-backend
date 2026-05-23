@@ -1,3 +1,5 @@
+from collections import defaultdict
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
@@ -14,6 +16,34 @@ from apps.common.choices import (
 )
 from apps.common.models import BaseModel
 from apps.common.upload_paths import consultation_attachment_upload_path
+
+
+SPECIALTY_CLINICAL_HINTS = {
+    MedicalSpecialty.CARDIOLOGY: (
+        "consider cardiac ischemia, rhythm disturbance, or hemodynamic stress indicators"
+    ),
+    MedicalSpecialty.GASTROENTEROLOGY: (
+        "consider acute GI inflammation, infectious gastroenteritis, or upper/lower tract irritation"
+    ),
+    MedicalSpecialty.PULMONOLOGY: (
+        "consider airway inflammation, infection, bronchospasm, or gas-exchange compromise"
+    ),
+    MedicalSpecialty.NEUROLOGY: (
+        "consider primary neurologic causes, intracranial pathology, or secondary neurologic effects"
+    ),
+    MedicalSpecialty.ENT: (
+        "consider upper airway/ear-throat inflammatory or infectious processes"
+    ),
+    MedicalSpecialty.INTERNAL_MEDICINE: (
+        "consider systemic or multi-organ etiologies that need broad internal medicine workup"
+    ),
+    MedicalSpecialty.GENERAL_MEDICINE: (
+        "consider common outpatient etiologies while ruling out evolving serious disease"
+    ),
+    MedicalSpecialty.EMERGENCY_MEDICINE: (
+        "consider time-sensitive causes requiring immediate stabilization and urgent escalation"
+    ),
+}
 
 
 class SymptomCategory(BaseModel):
@@ -156,6 +186,90 @@ class Consultation(BaseModel):
 
     def matches_specialty(self, specialty):
         return specialty in self.get_recommended_specialties()
+
+    def get_ai_case_summary(self):
+        consultation_symptoms = [
+            consultation_symptom
+            for consultation_symptom in self.consultation_symptoms.all()
+            if consultation_symptom.symptom_id and consultation_symptom.symptom.is_active
+        ]
+        symptom_names = [consultation_symptom.symptom.name for consultation_symptom in consultation_symptoms]
+        symptom_ids = [consultation_symptom.symptom_id for consultation_symptom in consultation_symptoms]
+        category_names = list(
+            dict.fromkeys(
+                consultation_symptom.symptom.category.name
+                for consultation_symptom in consultation_symptoms
+                if consultation_symptom.symptom.category_id
+            )
+        )
+        recommended_specialties = self.get_recommended_specialties()
+
+        specialty_scores = defaultdict(int)
+        for rule in SymptomSpecialtyRule.objects.filter(symptom_id__in=symptom_ids, is_active=True):
+            specialty_scores[rule.specialty] += rule.weight
+
+        ranked_score_items = sorted(
+            specialty_scores.items(), key=lambda item: (-item[1], item[0])
+        )[:3]
+        specialty_labels = {value: label for value, label in MedicalSpecialty.choices}
+
+        parts = []
+        if symptom_names:
+            parts.append("Reported symptoms: " + ", ".join(symptom_names[:5]) + ".")
+
+        if category_names:
+            parts.append(
+                "Clinical interpretation: the symptom cluster spans "
+                + ", ".join(category_names[:3])
+                + " systems, which increases the likelihood of a multi-system differential."
+            )
+
+        if self.severity:
+            parts.append(f"Severity reported as {self.severity}.")
+
+        if self.duration:
+            parts.append(f"Duration reported as {self.duration}.")
+
+        if self.has_emergency_warning:
+            parts.append("Emergency warning is present, so the case should be reviewed urgently.")
+
+        if ranked_score_items:
+            weighted_ranking_text = ", ".join(
+                f"{specialty_labels.get(specialty, specialty)} (signal {score})"
+                for specialty, score in ranked_score_items
+            )
+            parts.append(
+                "Weighted symptom-to-specialty signal: " + weighted_ranking_text + "."
+            )
+
+        if recommended_specialties:
+            parts.append(
+                "AI routing focus: "
+                + ", ".join(
+                    specialty_labels.get(specialty, specialty)
+                    for specialty in recommended_specialties[:3]
+                )
+                + "."
+            )
+
+        clinical_hints = [
+            SPECIALTY_CLINICAL_HINTS[specialty]
+            for specialty in recommended_specialties
+            if specialty in SPECIALTY_CLINICAL_HINTS
+        ]
+        if clinical_hints:
+            parts.append(
+                "Focused diagnostic directions: " + "; ".join(clinical_hints[:2]) + "."
+            )
+
+        if not parts:
+            return "No AI summary is available for this consultation yet."
+
+        parts.append(
+            "This summary is generated from the consultation symptoms and routing data, "
+            "and does not replace the doctor's clinical judgment."
+        )
+        return " ".join(parts)
 
     def clean(self):
         if self.patient and self.patient.user_type != UserType.PATIENT:

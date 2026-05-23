@@ -144,12 +144,18 @@ class ConsultationPatientDetailSerializer(ConsultationDetailSerializer):
 
 
 class ConsultationDoctorDetailSerializer(ConsultationDetailSerializer):
+    ai_case_summary = serializers.SerializerMethodField()
+
     class Meta(ConsultationDetailSerializer.Meta):
         fields = ConsultationDetailSerializer.Meta.fields + [
             "ai_predicted_disease",
             "ai_predicted_disease_confidence",
             "ai_prediction_notes",
+            "ai_case_summary",
         ]
+
+    def get_ai_case_summary(self, obj):
+        return obj.get_ai_case_summary()
 
 
 class ConsultationCreateSerializer(serializers.ModelSerializer):
