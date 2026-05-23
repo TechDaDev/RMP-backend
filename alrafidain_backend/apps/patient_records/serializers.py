@@ -179,10 +179,36 @@ class PatientMedicalReportDetailSerializer(PatientMedicalReportListSerializer):
             "source_attachment",
         ]
 
+    def _sanitize_structured_payload(self, payload):
+        payload = payload if isinstance(payload, dict) else {}
+        safe = {}
+
+        ocr_data = payload.get("ocr")
+        if isinstance(ocr_data, dict):
+            safe["ocr"] = ocr_data
+
+        llm_data = payload.get("llm")
+        if isinstance(llm_data, dict):
+            safe["llm"] = llm_data
+
+        structured_data = payload.get("structured_data")
+        if isinstance(structured_data, dict):
+            safe["structured_data"] = structured_data
+
+        safety_data = payload.get("safety")
+        if isinstance(safety_data, dict):
+            safe["safety"] = safety_data
+
+        return safe
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
         request = self.context.get("request")
         user = getattr(request, "user", None)
+
+        data["structured_payload"] = self._sanitize_structured_payload(
+            data.get("structured_payload")
+        )
 
         if user and user.user_type == UserType.PATIENT:
             data.pop("raw_ocr_text", None)
@@ -209,6 +235,10 @@ class PatientMedicalReportDoctorReviewSerializer(serializers.Serializer):
 
 
 class PatientMedicalReportOCRProcessSerializer(serializers.Serializer):
+    force = serializers.BooleanField(required=False, default=False)
+
+
+class PatientMedicalReportLLMClassifySerializer(serializers.Serializer):
     force = serializers.BooleanField(required=False, default=False)
 
 

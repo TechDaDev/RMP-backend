@@ -27,13 +27,13 @@ _weak_secret_values = {
     "test-secret",
 }
 
-if ENVIRONMENT in {"production", "staging"}:
-    if _normalized_secret in _weak_secret_values or _normalized_secret.startswith(
-        "django-insecure"
-    ):
-        raise ImproperlyConfigured(
-            "SECRET_KEY is weak for staging/production. Please set a strong secret."
-        )
+if ENVIRONMENT in {"production", "staging"} and (
+    _normalized_secret in _weak_secret_values
+    or _normalized_secret.startswith("django-insecure")
+):
+    raise ImproperlyConfigured(
+        "SECRET_KEY is weak for staging/production. Please set a strong secret."
+    )
 
 INSTALLED_APPS = [
     "daphne",
@@ -279,6 +279,23 @@ CLINICAL_REPORT_OCR_SYNC_ON_UPLOAD = config(
 )
 CLINICAL_REPORT_OCR_MAX_INLINE_MB = config(
     "CLINICAL_REPORT_OCR_MAX_INLINE_MB", default=5, cast=int
+)
+CLINICAL_REPORT_LLM_ENABLED = config("CLINICAL_REPORT_LLM_ENABLED", default=False, cast=bool)
+CLINICAL_REPORT_LLM_SYNC_AFTER_OCR = config(
+    "CLINICAL_REPORT_LLM_SYNC_AFTER_OCR", default=False, cast=bool
+)
+CLINICAL_REPORT_LLM_MODEL = config("CLINICAL_REPORT_LLM_MODEL", default=DEEPSEEK_MODEL)
+CLINICAL_REPORT_LLM_MAX_INPUT_CHARS = config(
+    "CLINICAL_REPORT_LLM_MAX_INPUT_CHARS", default=6000, cast=int
+)
+CLINICAL_REPORT_LLM_MAX_OUTPUT_CHARS = config(
+    "CLINICAL_REPORT_LLM_MAX_OUTPUT_CHARS", default=4000, cast=int
+)
+CLINICAL_REPORT_LLM_MIN_CONFIDENCE = config(
+    "CLINICAL_REPORT_LLM_MIN_CONFIDENCE", default=0.60, cast=float
+)
+CLINICAL_REPORT_LLM_TIMEOUT_SECONDS = config(
+    "CLINICAL_REPORT_LLM_TIMEOUT_SECONDS", default=30, cast=int
 )
 
 # ── Phase 12E — Dataset export salt ────────────────────────────────────

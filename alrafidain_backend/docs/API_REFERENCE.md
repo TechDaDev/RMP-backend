@@ -2044,14 +2044,91 @@ Run OCR processing for a medical report candidate.
 }
 ```
 
-Phase 10B status lifecycle:
+---
+
+### `POST /api/doctor/medical-reports/<report_id>/classify-llm/`
+
+Run LLM cleanup/classification for a medical report candidate.
+
+- **Auth required**: Yes
+- **Allowed roles**: Doctor (approved, assigned via consultation), Staff/Admin
+
+**Request body:**
+```json
+{
+  "force": false
+}
+```
+
+**Response `200`:**
+```json
+{
+  "status": "success",
+  "message": "Medical report LLM classification completed.",
+  "data": {
+    "id": "uuid",
+    "processing_status": "llm_completed",
+    "is_medical_report": true,
+    "report_type": "lab_report",
+    "cleaned_report_text": "CBC result: Hemoglobin 12.4 g/dL ...",
+    "structured_payload": {
+      "ocr": {
+        "accepted": true,
+        "reason": "ok",
+        "has_prompt_injection": false,
+        "is_medical_report": true,
+        "extractor": "existing_report_extraction",
+        "phase": "10B"
+      },
+      "llm": {
+        "phase": "10C",
+        "accepted": true,
+        "reason": "ok",
+        "model": "deepseek-chat",
+        "confidence": "0.91",
+        "detected_language": "en"
+      },
+      "structured_data": {
+        "lab_values": [
+          {
+            "name": "Hemoglobin",
+            "value": "12.4",
+            "unit": "g/dL"
+          }
+        ]
+      },
+      "safety": {
+        "contains_prompt_injection": false,
+        "contains_sensitive_personal_data": false
+      }
+    }
+  }
+}
+```
+
+**Response `503` when disabled:**
+```json
+{
+  "status": "error",
+  "message": "LLM report classification is disabled."
+}
+```
+
+Phase 10C status lifecycle:
 - Candidate created: `uploaded` (or `queued` when OCR-on-upload is enabled but deferred)
 - OCR started: `ocr_pending`
 - OCR accepted by security gate: `ocr_completed`
-- OCR extracted but rejected by security gate: `rejected`
-- OCR failure (missing file/unreadable/error): `failed`
+- LLM started: `llm_pending`
+- LLM accepted and persisted: `llm_completed`
+- LLM rejected (not medical or low confidence): `rejected`
+- OCR or LLM failure (missing file/unreadable/invalid model output/error): `failed`
 
-> Phase 10B note: OCR and report security-gate processing are implemented. LLM cleanup/classification, RAG auto-trigger, and doctor AI assistant generation remain deferred.
+Privacy notes:
+- Patient-facing report detail remains sanitized and does not expose `raw_ocr_text` or internal processing errors.
+- `structured_payload` responses are filtered to safe keys (`ocr`, `llm`, `structured_data`, `safety`).
+- Prompt text and raw provider payload are not exposed via this API.
+
+> Phase 10C note: OCR + LLM cleanup/classification are implemented. RAG auto-trigger and doctor AI assistant generation remain deferred.
 
 ---
 

@@ -1179,6 +1179,55 @@
                 }
             }
         },
+        "/api/doctor/medical-reports/{report_id}/classify-llm/": {
+            "post": {
+                "operationId": "doctor_medical_reports_classify_llm_create",
+                "summary": "Classify medical report candidate with LLM",
+                "parameters": [
+                    {
+                        "in": "path",
+                        "name": "report_id",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "required": true
+                    }
+                ],
+                "tags": [
+                    "Patient Medical Reports"
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatientMedicalReportLLMClassify"
+                            }
+                        },
+                        "application/x-www-form-urlencoded": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatientMedicalReportLLMClassify"
+                            }
+                        },
+                        "multipart/form-data": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PatientMedicalReportLLMClassify"
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "jwtAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "No response body"
+                    }
+                }
+            }
+        },
         "/api/doctor/medical-reports/{report_id}/process-ocr/": {
             "post": {
                 "operationId": "doctor_medical_reports_process_ocr_create",
@@ -6282,6 +6331,15 @@
                 ],
                 "type": "string",
                 "description": "* `uploaded` - Uploaded\n* `queued` - Queued\n* `ocr_pending` - OCR Pending\n* `ocr_completed` - OCR Completed\n* `llm_pending` - LLM Pending\n* `llm_completed` - LLM Completed\n* `accepted` - Accepted\n* `rejected` - Rejected\n* `failed` - Failed\n* `doctor_reviewed` - Doctor Reviewed"
+            },
+            "PatientMedicalReportLLMClassify": {
+                "type": "object",
+                "properties": {
+                    "force": {
+                        "type": "boolean",
+                        "default": false
+                    }
+                }
             },
             "PatientMedicalReportOCRProcess": {
                 "type": "object",

@@ -1,5 +1,6 @@
 import logging
 import os
+from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -20,8 +21,14 @@ from apps.common.choices import (
 from apps.common.policies import ClinicalAccessPolicy
 from apps.common.report_extraction import extract_clinical_report_text, secure_extracted_report_text
 from apps.notifications.services import create_notification
+from apps.rag.llm_clients.deepseek_client import DeepSeekClient
 
 from .models import BloodGroupRecord, MedicalRecordEntry, PatientMedicalRecord, PatientMedicalReport
+from .report_llm import (
+    build_medical_report_classification_prompt,
+    parse_medical_report_llm_response,
+    validate_medical_report_llm_payload,
+)
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -339,6 +346,330 @@ def _build_ocr_payload(*, accepted: bool, gate_payload: dict) -> dict:
     }
 
 
+def _build_llm_payload(*, accepted: bool, reason: str, confidence: float, model_name: str) -> dict:
+    return {
+        "llm": {
+            "accepted": accepted,
+            "reason": reason,
+            "confidence": confidence,
+            "provider": "deepseek",
+            "model": model_name,
+            "phase": "10C",
+        }
+    }
+
+
+def _source_attachment_id(report):
+    return str(report.source_attachment_id) if report.source_attachment_id else None
+
+
+def _consultation_id(report):
+    return str(report.consultation_id) if report.consultation_id else None
+
+
+def _get_ocr_input_text(report) -> str:
+    cleaned = (report.cleaned_report_text or "").strip()
+    if cleaned:
+        return cleaned
+    return (report.raw_ocr_text or "").strip()
+
+
+def _save_report_classification_state(report):
+    report.save(
+        update_fields=[
+            "is_medical_report",
+            "report_type",
+            "title",
+            "cleaned_report_text",
+            "removed_noise_summary",
+            "structured_payload",
+            "detected_language",
+            "llm_confidence",
+            "processing_status",
+            "rejection_reason",
+            "processing_error",
+            "processed_at",
+            "updated_at",
+        ]
+    )
+
+
+def classify_medical_report_with_llm(*, report, request=None, force=False, llm_client=None):
+    if (
+        report.processing_status == MedicalReportProcessingStatus.LLM_COMPLETED
+        and report.llm_confidence is not None
+        and not force
+    ):
+        return report
+
+    source_text = _get_ocr_input_text(report)
+    if not source_text:
+        report.processing_status = MedicalReportProcessingStatus.FAILED
+        report.processing_error = "No OCR text available for LLM classification."
+        report.processed_at = timezone.now()
+        _save_report_classification_state(report)
+        create_audit_log(
+            actor=request.user if request else None,
+            action="medical_report_llm_failed",
+            target=report,
+            metadata={
+                "report_id": str(report.id),
+                "patient_id": str(report.patient_id),
+                "consultation_id": _consultation_id(report),
+                "source_attachment_id": _source_attachment_id(report),
+                "old_status": report.processing_status,
+                "new_status": report.processing_status,
+                "report_type": report.report_type,
+                "confidence": 0,
+                "rejection_reason": "",
+                "raw_ocr_text_length": len(report.raw_ocr_text or ""),
+                "cleaned_text_length": len(report.cleaned_report_text or ""),
+                "removed_noise_count": len(report.removed_noise_summary or []),
+                "llm_provider": "deepseek",
+                "llm_model": getattr(settings, "CLINICAL_REPORT_LLM_MODEL", "deepseek-chat"),
+            },
+            request=request,
+        )
+        return report
+
+    old_status = report.processing_status
+    report.processing_status = MedicalReportProcessingStatus.LLM_PENDING
+    report.processing_error = ""
+    report.save(update_fields=["processing_status", "processing_error", "updated_at"])
+
+    model_name = getattr(settings, "CLINICAL_REPORT_LLM_MODEL", "deepseek-chat")
+    create_audit_log(
+        actor=request.user if request else None,
+        action="medical_report_llm_started",
+        target=report,
+        metadata={
+            "report_id": str(report.id),
+            "patient_id": str(report.patient_id),
+            "consultation_id": _consultation_id(report),
+            "source_attachment_id": _source_attachment_id(report),
+            "old_status": old_status,
+            "new_status": report.processing_status,
+            "report_type": report.report_type,
+            "confidence": 0,
+            "rejection_reason": "",
+            "raw_ocr_text_length": len(report.raw_ocr_text or ""),
+            "cleaned_text_length": len(report.cleaned_report_text or ""),
+            "removed_noise_count": len(report.removed_noise_summary or []),
+            "llm_provider": "deepseek",
+            "llm_model": model_name,
+        },
+        request=request,
+    )
+
+    try:
+        messages = build_medical_report_classification_prompt(report)
+        if llm_client is None:
+            llm_client = DeepSeekClient(
+                model=model_name,
+                timeout=int(getattr(settings, "CLINICAL_REPORT_LLM_TIMEOUT_SECONDS", 30)),
+            )
+
+        llm_result = llm_client.chat(
+            messages,
+            temperature=0.0,
+            max_tokens=int(getattr(settings, "CLINICAL_REPORT_LLM_MAX_OUTPUT_CHARS", 4000)),
+        )
+        raw_content = llm_result.get("content") or ""
+        parsed = parse_medical_report_llm_response(raw_content)
+        payload = validate_medical_report_llm_payload(parsed)
+
+        confidence = float(payload.get("confidence", 0.0))
+        min_confidence = float(getattr(settings, "CLINICAL_REPORT_LLM_MIN_CONFIDENCE", 0.60))
+        llm_metadata = _build_llm_payload(
+            accepted=bool(payload.get("is_medical_report", False)),
+            reason="ok",
+            confidence=confidence,
+            model_name=llm_result.get("model", model_name),
+        )
+
+        report.structured_payload = {
+            **(report.structured_payload or {}),
+            **llm_metadata,
+            "structured_data": payload.get("structured_data", {}),
+            "safety": payload.get("safety", {}),
+        }
+        report.detected_language = payload.get("detected_language", "")
+        report.llm_confidence = Decimal(f"{confidence:.4f}")
+        report.processed_at = timezone.now()
+        report.processing_error = ""
+
+        if not payload.get("is_medical_report", False):
+            report.is_medical_report = False
+            report.report_type = MedicalReportType.NOT_MEDICAL_REPORT
+            report.processing_status = MedicalReportProcessingStatus.REJECTED
+            report.rejection_reason = "llm_not_medical_report"
+            report.cleaned_report_text = ""
+            report.removed_noise_summary = payload.get("removed_noise_summary", [])
+            _save_report_classification_state(report)
+            create_audit_log(
+                actor=request.user if request else None,
+                action="medical_report_llm_rejected",
+                target=report,
+                metadata={
+                    "report_id": str(report.id),
+                    "patient_id": str(report.patient_id),
+                    "consultation_id": _consultation_id(report),
+                    "source_attachment_id": _source_attachment_id(report),
+                    "old_status": old_status,
+                    "new_status": report.processing_status,
+                    "report_type": report.report_type,
+                    "confidence": confidence,
+                    "rejection_reason": report.rejection_reason,
+                    "raw_ocr_text_length": len(report.raw_ocr_text or ""),
+                    "cleaned_text_length": len(report.cleaned_report_text or ""),
+                    "removed_noise_count": len(report.removed_noise_summary or []),
+                    "llm_provider": "deepseek",
+                    "llm_model": llm_result.get("model", model_name),
+                },
+                request=request,
+            )
+            return report
+
+        if confidence < min_confidence:
+            report.is_medical_report = False
+            report.report_type = MedicalReportType.UNKNOWN
+            report.processing_status = MedicalReportProcessingStatus.REJECTED
+            report.rejection_reason = "low_llm_confidence"
+            report.cleaned_report_text = ""
+            report.removed_noise_summary = payload.get("removed_noise_summary", [])
+            _save_report_classification_state(report)
+            create_audit_log(
+                actor=request.user if request else None,
+                action="medical_report_llm_rejected",
+                target=report,
+                metadata={
+                    "report_id": str(report.id),
+                    "patient_id": str(report.patient_id),
+                    "consultation_id": _consultation_id(report),
+                    "source_attachment_id": _source_attachment_id(report),
+                    "old_status": old_status,
+                    "new_status": report.processing_status,
+                    "report_type": report.report_type,
+                    "confidence": confidence,
+                    "rejection_reason": report.rejection_reason,
+                    "raw_ocr_text_length": len(report.raw_ocr_text or ""),
+                    "cleaned_text_length": len(report.cleaned_report_text or ""),
+                    "removed_noise_count": len(report.removed_noise_summary or []),
+                    "llm_provider": "deepseek",
+                    "llm_model": llm_result.get("model", model_name),
+                },
+                request=request,
+            )
+            return report
+
+        report.is_medical_report = True
+        report.report_type = payload.get("report_type", MedicalReportType.UNKNOWN)
+        if payload.get("title"):
+            report.title = payload["title"]
+        report.cleaned_report_text = payload.get("cleaned_report_text", "")
+        report.removed_noise_summary = payload.get("removed_noise_summary", [])
+        report.processing_status = MedicalReportProcessingStatus.LLM_COMPLETED
+        report.rejection_reason = ""
+        _save_report_classification_state(report)
+        create_audit_log(
+            actor=request.user if request else None,
+            action="medical_report_llm_completed",
+            target=report,
+            metadata={
+                "report_id": str(report.id),
+                "patient_id": str(report.patient_id),
+                "consultation_id": _consultation_id(report),
+                "source_attachment_id": _source_attachment_id(report),
+                "old_status": old_status,
+                "new_status": report.processing_status,
+                "report_type": report.report_type,
+                "confidence": confidence,
+                "rejection_reason": "",
+                "raw_ocr_text_length": len(report.raw_ocr_text or ""),
+                "cleaned_text_length": len(report.cleaned_report_text or ""),
+                "removed_noise_count": len(report.removed_noise_summary or []),
+                "llm_provider": "deepseek",
+                "llm_model": llm_result.get("model", model_name),
+            },
+            request=request,
+        )
+        return report
+    except ValueError:
+        report.processing_status = MedicalReportProcessingStatus.FAILED
+        report.processing_error = "Invalid LLM classification response."
+        report.processed_at = timezone.now()
+        _save_report_classification_state(report)
+        create_audit_log(
+            actor=request.user if request else None,
+            action="medical_report_llm_failed",
+            target=report,
+            metadata={
+                "report_id": str(report.id),
+                "patient_id": str(report.patient_id),
+                "consultation_id": _consultation_id(report),
+                "source_attachment_id": _source_attachment_id(report),
+                "old_status": old_status,
+                "new_status": report.processing_status,
+                "report_type": report.report_type,
+                "confidence": float(report.llm_confidence or 0),
+                "rejection_reason": report.rejection_reason,
+                "raw_ocr_text_length": len(report.raw_ocr_text or ""),
+                "cleaned_text_length": len(report.cleaned_report_text or ""),
+                "removed_noise_count": len(report.removed_noise_summary or []),
+                "llm_provider": "deepseek",
+                "llm_model": model_name,
+            },
+            request=request,
+        )
+        return report
+    except Exception as exc:
+        report.processing_status = MedicalReportProcessingStatus.FAILED
+        report.processing_error = _safe_processing_error(exc)
+        report.processed_at = timezone.now()
+        _save_report_classification_state(report)
+        create_audit_log(
+            actor=request.user if request else None,
+            action="medical_report_llm_failed",
+            target=report,
+            metadata={
+                "report_id": str(report.id),
+                "patient_id": str(report.patient_id),
+                "consultation_id": _consultation_id(report),
+                "source_attachment_id": _source_attachment_id(report),
+                "old_status": old_status,
+                "new_status": report.processing_status,
+                "report_type": report.report_type,
+                "confidence": float(report.llm_confidence or 0),
+                "rejection_reason": report.rejection_reason,
+                "raw_ocr_text_length": len(report.raw_ocr_text or ""),
+                "cleaned_text_length": len(report.cleaned_report_text or ""),
+                "removed_noise_count": len(report.removed_noise_summary or []),
+                "llm_provider": "deepseek",
+                "llm_model": model_name,
+            },
+            request=request,
+        )
+        logger.exception(
+            "Medical report LLM classification failed",
+            extra={"report_id": str(report.id)},
+        )
+        return report
+
+
+def classify_medical_report_with_llm_by_id(report_id, request=None, force=False, llm_client=None):
+    report = PatientMedicalReport.objects.select_related(
+        "source_attachment",
+        "source_message",
+        "consultation",
+    ).get(id=report_id)
+    return classify_medical_report_with_llm(
+        report=report,
+        request=request,
+        force=force,
+        llm_client=llm_client,
+    )
+
+
 def process_medical_report_ocr(*, report, request=None, force=False):
     if (
         report.processing_status == MedicalReportProcessingStatus.OCR_COMPLETED
@@ -520,6 +851,17 @@ def process_medical_report_ocr(*, report, request=None, force=False):
                 },
                 request=request,
             )
+
+            if bool(getattr(settings, "CLINICAL_REPORT_LLM_ENABLED", False)) and bool(
+                getattr(settings, "CLINICAL_REPORT_LLM_SYNC_AFTER_OCR", False)
+            ):
+                try:
+                    classify_medical_report_with_llm(report=report, request=request)
+                except Exception:
+                    logger.exception(
+                        "Automatic LLM classification failed after OCR completion",
+                        extra={"report_id": str(report.id)},
+                    )
             return report
 
         report.cleaned_report_text = ""

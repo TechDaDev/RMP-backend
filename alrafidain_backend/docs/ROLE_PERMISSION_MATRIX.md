@@ -174,6 +174,7 @@ Notes:
 | View medical report candidate detail | ❌ | ✅ (assigned) | ❌ | ❌ | ✅ |
 | Review medical report candidate | ❌ | ✅ (assigned) | ❌ | ❌ | ✅ |
 | Trigger OCR processing for report candidate | ❌ | ✅ (assigned) | ❌ | ❌ | ✅ |
+| Trigger LLM classification for report candidate | ❌ | ✅ (assigned) | ❌ | ❌ | ✅ |
 | Set blood group | ❌ | ❌ | ✅ | ❌ | ❌ |
 | Verify blood group | ❌ | ❌ | ✅ | ❌ | ❌ |
 

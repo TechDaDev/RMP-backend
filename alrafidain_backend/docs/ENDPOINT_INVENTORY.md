@@ -180,6 +180,7 @@ Legend:
 | GET | `/api/doctor/medical-reports/<report_id>/` | `DoctorMedicalReportDetailView` | Yes | doctor (assigned) | `PatientMedicalReportDetailSerializer` | Doctor-only enriched fields | stable |
 | POST | `/api/doctor/medical-reports/<report_id>/review/` | `DoctorMedicalReportReviewView` | Yes | doctor (assigned) | `PatientMedicalReportDoctorReviewSerializer` | Doctor review only | stable |
 | POST | `/api/doctor/medical-reports/<report_id>/process-ocr/` | `DoctorMedicalReportProcessOCRView` | Yes | doctor (assigned) | `PatientMedicalReportOCRProcessSerializer` | OCR trigger with safe status output | stable |
+| POST | `/api/doctor/medical-reports/<report_id>/classify-llm/` | `DoctorMedicalReportClassifyLLMView` | Yes | doctor (assigned) \| staff/admin | `PatientMedicalReportLLMClassifySerializer` | LLM trigger with safe status output | stable |
 
 ---
 

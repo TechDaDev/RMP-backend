@@ -1,6 +1,8 @@
-from django.contrib import admin
+from django.conf import settings
+from django.contrib import admin, messages
 
 from .models import BloodGroupRecord, MedicalRecordEntry, PatientMedicalRecord, PatientMedicalReport
+from .services import classify_medical_report_with_llm
 
 
 @admin.register(PatientMedicalRecord)
@@ -76,3 +78,29 @@ class PatientMedicalReportAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     )
+    actions = ["run_llm_classification"]
+
+    @admin.action(description="Run LLM classification for selected reports")
+    def run_llm_classification(self, request, queryset):
+        if not bool(getattr(settings, "CLINICAL_REPORT_LLM_ENABLED", False)):
+            self.message_user(
+                request,
+                "LLM classification is disabled in settings.",
+                level=messages.WARNING,
+            )
+            return
+
+        completed = 0
+        failed = 0
+        for report in queryset:
+            try:
+                classify_medical_report_with_llm(report=report, request=request, force=True)
+                completed += 1
+            except Exception:
+                failed += 1
+
+        self.message_user(
+            request,
+            f"LLM classification finished. Completed: {completed}, Failed: {failed}.",
+            level=messages.INFO,
+        )

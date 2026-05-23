@@ -612,7 +612,7 @@ Notes:
 - Approve accepts optional `note`.
 - Self-approval is denied by backend policy.
 
-### 10.6 Medical Report Candidates (Phase 10B)
+### 10.6 Medical Report Candidates (Phase 10C)
 
 When a patient uploads a consultation chat attachment, the backend now creates a `PatientMedicalReport` candidate record.
 
@@ -623,11 +623,14 @@ Available endpoints:
 - `GET /api/doctor/medical-reports/{report_id}/`
 - `POST /api/doctor/medical-reports/{report_id}/review/`
 - `POST /api/doctor/medical-reports/{report_id}/process-ocr/`
+- `POST /api/doctor/medical-reports/{report_id}/classify-llm/`
 
-Phase 10B behavior contract:
+Phase 10C behavior contract:
 - Candidate creation is non-blocking and does not break chat send flow.
 - OCR processing can be triggered by assigned doctors using `process-ocr`.
+- LLM cleanup/classification can be triggered by assigned doctors using `classify-llm`.
 - If OCR-on-upload settings are enabled server-side, processing may run inline or queued.
+- If LLM-sync-after-OCR is enabled server-side, accepted OCR results may automatically continue into LLM classification.
 - No automatic insertion into canonical patient medical record entries is triggered yet.
 
 Frontend implementation notes:
@@ -635,10 +638,10 @@ Frontend implementation notes:
 - Continue using existing chat message flow; no request-body changes are required.
 - Use `file_url` for image/document preview, not storage-relative `file` paths.
 - For patient view, show high-level OCR status only; raw OCR text and processing internals are hidden.
-- Show OCR statuses as: `uploaded`, `queued`, `ocr_pending`, `ocr_completed`, `rejected`, `failed`.
+- Show report processing statuses as: `uploaded`, `queued`, `ocr_pending`, `ocr_completed`, `llm_pending`, `llm_completed`, `rejected`, `failed`.
+- `structured_payload` is safe-filtered; frontend should only rely on `ocr`, `llm`, `structured_data`, and `safety` keys.
 
-Deferred after Phase 10B:
-- LLM cleanup/classification
+Deferred after Phase 10C:
 - Structured lab value extraction
 - Automatic RAG updates from OCR output
 - Doctor AI assistant messages based on extracted report context

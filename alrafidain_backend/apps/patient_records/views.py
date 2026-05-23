@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db.models import Prefetch
@@ -31,10 +32,12 @@ from .serializers import (
     PatientMedicalReportDetailSerializer,
     PatientMedicalReportDoctorReviewSerializer,
     PatientMedicalReportListSerializer,
+    PatientMedicalReportLLMClassifySerializer,
     PatientMedicalReportOCRProcessSerializer,
     SetBloodGroupSerializer,
 )
 from .services import (
+    classify_medical_report_with_llm,
     confirm_medical_record_entry,
     create_medical_record_entry,
     deactivate_medical_record_entry,
@@ -590,3 +593,74 @@ class DoctorMedicalReportProcessOCRView(APIView):
         report = process_medical_report_ocr(report=report, request=request, force=force)
         data = PatientMedicalReportDetailSerializer(report, context={"request": request}).data
         return success_response(message="Medical report OCR processed.", data=data)
+
+
+@extend_schema(tags=["Patient Medical Reports"])
+class DoctorMedicalReportClassifyLLMView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        summary="Classify medical report candidate with LLM",
+        request=PatientMedicalReportLLMClassifySerializer,
+    )
+    def post(self, request, report_id):
+        if not (request.user.user_type == UserType.DOCTOR or request.user.is_staff):
+            return error_response(
+                "Only doctors can access this endpoint.",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
+
+        if not bool(getattr(settings, "CLINICAL_REPORT_LLM_ENABLED", False)):
+            return error_response(
+                "LLM classification is disabled.",
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
+        report = get_object_or_404(
+            PatientMedicalReport.objects.select_related(
+                "patient",
+                "consultation",
+                "source_message",
+                "source_attachment",
+                "linked_medical_record_entry",
+                "reviewed_by",
+            ),
+            id=report_id,
+        )
+
+        if not can_review_medical_report(request.user, report):
+            return error_response("Not found.", status_code=status.HTTP_404_NOT_FOUND)
+
+        serializer = PatientMedicalReportLLMClassifySerializer(data=request.data)
+        if not serializer.is_valid():
+            return error_response(
+                "Invalid input.",
+                errors=serializer.errors,
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        force = serializer.validated_data.get("force", False)
+        create_audit_log(
+            actor=request.user,
+            action="medical_report_llm_triggered_by_doctor",
+            target=report,
+            metadata={
+                "report_id": str(report.id),
+                "patient_id": str(report.patient_id),
+                "consultation_id": str(report.consultation_id) if report.consultation_id else None,
+                "source_attachment_id": (
+                    str(report.source_attachment_id) if report.source_attachment_id else None
+                ),
+                "processing_status": report.processing_status,
+                "force": bool(force),
+            },
+            request=request,
+        )
+
+        report = classify_medical_report_with_llm(
+            report=report,
+            request=request,
+            force=force,
+        )
+        data = PatientMedicalReportDetailSerializer(report, context={"request": request}).data
+        return success_response(message="Medical report LLM classification processed.", data=data)

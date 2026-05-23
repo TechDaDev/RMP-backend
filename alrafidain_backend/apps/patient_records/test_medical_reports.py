@@ -12,6 +12,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from apps.common.choices import (
     ConsultationDuration,
     ConsultationStatus,
+    MedicalReportProcessingStatus,
     MedicalReportSource,
     MedicalReportType,
     MedicalReportVisibility,
@@ -24,6 +25,7 @@ from apps.consultations.models import Consultation
 from apps.messaging.models import ConsultationMessage, MessageAttachment
 from apps.patient_records.models import MedicalRecordEntry, PatientMedicalReport
 from apps.patient_records.services import (
+    classify_medical_report_with_llm,
     create_patient_medical_report_from_message_attachment,
     get_or_create_patient_medical_record,
     process_medical_report_ocr,
@@ -348,6 +350,315 @@ class PatientMedicalReportServiceTests(TestCase):
         self.assertEqual(processed.cleaned_report_text, "new cleaned text")
         mock_extract.assert_called_once()
 
+    def test_llm_accepted_lab_report_updates_fields(self):
+        attachment = self._create_message_attachment(self.patient)
+        report = create_patient_medical_report_from_message_attachment(attachment=attachment)
+        report.raw_ocr_text = "Hemoglobin 13.5 g/dL"
+        report.processing_status = MedicalReportProcessingStatus.OCR_COMPLETED
+        report.save(update_fields=["raw_ocr_text", "processing_status", "updated_at"])
+
+        class StubLLMClient:
+            def chat(self, messages, temperature=0.0, max_tokens=4000):
+                return {
+                    "content": (
+                        '{"is_medical_report": true, "report_type": "lab_report", '
+                        '"detected_language": "arabic", "confidence": 0.91, '
+                        '"title": "CBC laboratory report", "cleaned_report_text": '
+                        '"Hemoglobin 13.5 g/dL", "removed_noise_summary": '
+                        '["laboratory address", "phone numbers"], "structured_data": '
+                        '{"sections": [{"name": "CBC", "content": "..."}]}, '
+                        '"safety": {"contains_diagnosis_claim": false, '
+                        '"contains_prescription_instruction": false, '
+                        '"contains_prompt_injection": false, "notes": []}}'
+                    ),
+                    "model": "deepseek-chat",
+                    "usage": {"prompt_tokens": 10, "completion_tokens": 20},
+                    "raw": {"ok": True},
+                }
+
+        processed = classify_medical_report_with_llm(report=report, llm_client=StubLLMClient())
+        processed.refresh_from_db()
+
+        self.assertEqual(processed.processing_status, MedicalReportProcessingStatus.LLM_COMPLETED)
+        self.assertTrue(processed.is_medical_report)
+        self.assertEqual(processed.report_type, MedicalReportType.LAB_REPORT)
+        self.assertEqual(processed.cleaned_report_text, "Hemoglobin 13.5 g/dL")
+        self.assertEqual(len(processed.removed_noise_summary), 2)
+        self.assertEqual(float(processed.llm_confidence), 0.91)
+        self.assertIn("structured_data", processed.structured_payload)
+        self.assertIn("llm", processed.structured_payload)
+
+    def test_llm_rejects_not_medical_report(self):
+        attachment = self._create_message_attachment(self.patient)
+        report = create_patient_medical_report_from_message_attachment(attachment=attachment)
+        report.raw_ocr_text = "This is random poster text"
+        report.processing_status = MedicalReportProcessingStatus.OCR_COMPLETED
+        report.save(update_fields=["raw_ocr_text", "processing_status", "updated_at"])
+
+        class StubLLMClient:
+            def chat(self, messages, temperature=0.0, max_tokens=4000):
+                return {
+                    "content": (
+                        '{"is_medical_report": false, "report_type": "not_medical_report", '
+                        '"detected_language": "english", "confidence": 0.93, '
+                        '"title": "", "cleaned_report_text": "", '
+                        '"removed_noise_summary": ["ad text"], "structured_data": {}, '
+                        '"safety": {"contains_diagnosis_claim": false, '
+                        '"contains_prescription_instruction": false, '
+                        '"contains_prompt_injection": false, "notes": []}}'
+                    ),
+                    "model": "deepseek-chat",
+                    "usage": {"prompt_tokens": 10, "completion_tokens": 20},
+                    "raw": {"ok": True},
+                }
+
+        processed = classify_medical_report_with_llm(report=report, llm_client=StubLLMClient())
+        processed.refresh_from_db()
+
+        self.assertEqual(processed.processing_status, MedicalReportProcessingStatus.REJECTED)
+        self.assertFalse(processed.is_medical_report)
+        self.assertEqual(processed.report_type, MedicalReportType.NOT_MEDICAL_REPORT)
+        self.assertEqual(processed.rejection_reason, "llm_not_medical_report")
+
+    @override_settings(CLINICAL_REPORT_LLM_MIN_CONFIDENCE=0.60)
+    def test_llm_low_confidence_rejected(self):
+        attachment = self._create_message_attachment(self.patient)
+        report = create_patient_medical_report_from_message_attachment(attachment=attachment)
+        report.raw_ocr_text = "Potential report text"
+        report.processing_status = MedicalReportProcessingStatus.OCR_COMPLETED
+        report.save(update_fields=["raw_ocr_text", "processing_status", "updated_at"])
+
+        class StubLLMClient:
+            def chat(self, messages, temperature=0.0, max_tokens=4000):
+                return {
+                    "content": (
+                        '{"is_medical_report": true, "report_type": "lab_report", '
+                        '"detected_language": "english", "confidence": 0.42, '
+                        '"title": "", "cleaned_report_text": "x", '
+                        '"removed_noise_summary": [], "structured_data": {}, '
+                        '"safety": {"contains_diagnosis_claim": false, '
+                        '"contains_prescription_instruction": false, '
+                        '"contains_prompt_injection": false, "notes": []}}'
+                    ),
+                    "model": "deepseek-chat",
+                    "usage": {"prompt_tokens": 10, "completion_tokens": 20},
+                    "raw": {"ok": True},
+                }
+
+        processed = classify_medical_report_with_llm(report=report, llm_client=StubLLMClient())
+        processed.refresh_from_db()
+
+        self.assertEqual(processed.processing_status, MedicalReportProcessingStatus.REJECTED)
+        self.assertEqual(processed.report_type, MedicalReportType.UNKNOWN)
+        self.assertEqual(processed.rejection_reason, "low_llm_confidence")
+
+    def test_llm_invalid_json_fails_safely(self):
+        attachment = self._create_message_attachment(self.patient)
+        report = create_patient_medical_report_from_message_attachment(attachment=attachment)
+        report.raw_ocr_text = "Potential report text"
+        report.processing_status = MedicalReportProcessingStatus.OCR_COMPLETED
+        report.save(update_fields=["raw_ocr_text", "processing_status", "updated_at"])
+
+        class StubLLMClient:
+            def chat(self, messages, temperature=0.0, max_tokens=4000):
+                return {
+                    "content": "not json",
+                    "model": "deepseek-chat",
+                    "usage": {},
+                    "raw": {"ok": True},
+                }
+
+        processed = classify_medical_report_with_llm(report=report, llm_client=StubLLMClient())
+        processed.refresh_from_db()
+        self.assertEqual(processed.processing_status, MedicalReportProcessingStatus.FAILED)
+        self.assertIn("Invalid LLM classification response", processed.processing_error)
+
+    def test_llm_exception_fails_safely(self):
+        attachment = self._create_message_attachment(self.patient)
+        report = create_patient_medical_report_from_message_attachment(attachment=attachment)
+        report.raw_ocr_text = "Potential report text"
+        report.processing_status = MedicalReportProcessingStatus.OCR_COMPLETED
+        report.save(update_fields=["raw_ocr_text", "processing_status", "updated_at"])
+
+        class StubLLMClient:
+            def chat(self, messages, temperature=0.0, max_tokens=4000):
+                raise RuntimeError("llm timeout")
+
+        processed = classify_medical_report_with_llm(report=report, llm_client=StubLLMClient())
+        processed.refresh_from_db()
+        self.assertEqual(processed.processing_status, MedicalReportProcessingStatus.FAILED)
+        self.assertIn("llm timeout", processed.processing_error)
+
+    def test_llm_no_ocr_text_fails_safely(self):
+        attachment = self._create_message_attachment(self.patient)
+        report = create_patient_medical_report_from_message_attachment(attachment=attachment)
+        report.raw_ocr_text = ""
+        report.cleaned_report_text = ""
+        report.save(update_fields=["raw_ocr_text", "cleaned_report_text", "updated_at"])
+
+        class StubLLMClient:
+            def chat(self, messages, temperature=0.0, max_tokens=4000):
+                return {
+                    "content": "{}",
+                    "model": "deepseek-chat",
+                    "usage": {},
+                    "raw": {},
+                }
+
+        processed = classify_medical_report_with_llm(report=report, llm_client=StubLLMClient())
+        processed.refresh_from_db()
+        self.assertEqual(processed.processing_status, MedicalReportProcessingStatus.FAILED)
+        self.assertIn("No OCR text available", processed.processing_error)
+
+    def test_llm_force_false_skips_completed(self):
+        attachment = self._create_message_attachment(self.patient)
+        report = create_patient_medical_report_from_message_attachment(attachment=attachment)
+        report.processing_status = MedicalReportProcessingStatus.LLM_COMPLETED
+        report.llm_confidence = 0.8500
+        report.cleaned_report_text = "existing"
+        report.save(
+            update_fields=[
+                "processing_status",
+                "llm_confidence",
+                "cleaned_report_text",
+                "updated_at",
+            ]
+        )
+
+        class StubLLMClient:
+            called = False
+
+            def chat(self, messages, temperature=0.0, max_tokens=4000):
+                self.called = True
+                return {}
+
+        client = StubLLMClient()
+        processed = classify_medical_report_with_llm(report=report, llm_client=client, force=False)
+        processed.refresh_from_db()
+        self.assertFalse(client.called)
+        self.assertEqual(processed.cleaned_report_text, "existing")
+
+    def test_llm_force_true_reprocesses(self):
+        attachment = self._create_message_attachment(self.patient)
+        report = create_patient_medical_report_from_message_attachment(attachment=attachment)
+        report.raw_ocr_text = "Potential report text"
+        report.processing_status = MedicalReportProcessingStatus.LLM_COMPLETED
+        report.llm_confidence = 0.8500
+        report.cleaned_report_text = "existing"
+        report.save(
+            update_fields=[
+                "raw_ocr_text",
+                "processing_status",
+                "llm_confidence",
+                "cleaned_report_text",
+                "updated_at",
+            ]
+        )
+
+        class StubLLMClient:
+            def chat(self, messages, temperature=0.0, max_tokens=4000):
+                return {
+                    "content": (
+                        '{"is_medical_report": true, "report_type": "lab_report", '
+                        '"detected_language": "english", "confidence": 0.88, '
+                        '"title": "New title", "cleaned_report_text": "new cleaned", '
+                        '"removed_noise_summary": [], "structured_data": {}, '
+                        '"safety": {"contains_diagnosis_claim": false, '
+                        '"contains_prescription_instruction": false, '
+                        '"contains_prompt_injection": false, "notes": []}}'
+                    ),
+                    "model": "deepseek-chat",
+                    "usage": {},
+                    "raw": {},
+                }
+
+        processed = classify_medical_report_with_llm(
+            report=report,
+            llm_client=StubLLMClient(),
+            force=True,
+        )
+        processed.refresh_from_db()
+        self.assertEqual(processed.cleaned_report_text, "new cleaned")
+        self.assertEqual(processed.report_type, MedicalReportType.LAB_REPORT)
+
+    @override_settings(CLINICAL_REPORT_LLM_ENABLED=False, CLINICAL_REPORT_LLM_SYNC_AFTER_OCR=False)
+    @patch("apps.patient_records.services.classify_medical_report_with_llm")
+    @patch("apps.patient_records.services.secure_extracted_report_text")
+    @patch("apps.patient_records.services.extract_clinical_report_text")
+    def test_ocr_accepted_with_llm_auto_disabled_stays_ocr_completed(
+        self,
+        mock_extract,
+        mock_secure,
+        mock_classify,
+    ):
+        attachment = self._create_message_attachment(self.patient)
+        report = create_patient_medical_report_from_message_attachment(attachment=attachment)
+        mock_extract.return_value = "lab report text"
+        mock_secure.return_value = {
+            "accepted": True,
+            "reason": "ok",
+            "sanitized_text": "cleaned report text",
+            "is_medical_report": True,
+            "has_prompt_injection": False,
+        }
+
+        processed = process_medical_report_ocr(report=report)
+        processed.refresh_from_db()
+        self.assertEqual(processed.processing_status, MedicalReportProcessingStatus.OCR_COMPLETED)
+        mock_classify.assert_not_called()
+
+    @override_settings(CLINICAL_REPORT_LLM_ENABLED=True, CLINICAL_REPORT_LLM_SYNC_AFTER_OCR=True)
+    @patch("apps.patient_records.services.classify_medical_report_with_llm")
+    @patch("apps.patient_records.services.secure_extracted_report_text")
+    @patch("apps.patient_records.services.extract_clinical_report_text")
+    def test_ocr_accepted_with_llm_auto_enabled_calls_classifier(
+        self,
+        mock_extract,
+        mock_secure,
+        mock_classify,
+    ):
+        attachment = self._create_message_attachment(self.patient)
+        report = create_patient_medical_report_from_message_attachment(attachment=attachment)
+        mock_extract.return_value = "lab report text"
+        mock_secure.return_value = {
+            "accepted": True,
+            "reason": "ok",
+            "sanitized_text": "cleaned report text",
+            "is_medical_report": True,
+            "has_prompt_injection": False,
+        }
+
+        process_medical_report_ocr(report=report)
+        mock_classify.assert_called_once()
+
+    @override_settings(CLINICAL_REPORT_LLM_ENABLED=True, CLINICAL_REPORT_LLM_SYNC_AFTER_OCR=True)
+    @patch(
+        "apps.patient_records.services.classify_medical_report_with_llm",
+        side_effect=RuntimeError("llm fail"),
+    )
+    @patch("apps.patient_records.services.secure_extracted_report_text")
+    @patch("apps.patient_records.services.extract_clinical_report_text")
+    def test_llm_failure_after_ocr_does_not_crash_ocr_process(
+        self,
+        mock_extract,
+        mock_secure,
+        _mock_classify,
+    ):
+        attachment = self._create_message_attachment(self.patient)
+        report = create_patient_medical_report_from_message_attachment(attachment=attachment)
+        mock_extract.return_value = "lab report text"
+        mock_secure.return_value = {
+            "accepted": True,
+            "reason": "ok",
+            "sanitized_text": "cleaned report text",
+            "is_medical_report": True,
+            "has_prompt_injection": False,
+        }
+
+        processed = process_medical_report_ocr(report=report)
+        processed.refresh_from_db()
+        self.assertEqual(processed.processing_status, MedicalReportProcessingStatus.OCR_COMPLETED)
+
 
 class PatientMedicalReportAPITests(TestCase):
     def setUp(self):
@@ -535,4 +846,109 @@ class PatientMedicalReportAPITests(TestCase):
 
         response = self.patient_client.get(f"/api/patient/medical-reports/{self.report.id}/")
         self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn("processing_error", response.data["data"])
+
+    @override_settings(CLINICAL_REPORT_LLM_ENABLED=True)
+    def test_assigned_doctor_can_post_classify_llm(self):
+        self.report.raw_ocr_text = "Hemoglobin 13.5 g/dL"
+        self.report.processing_status = MedicalReportProcessingStatus.OCR_COMPLETED
+        self.report.save(update_fields=["raw_ocr_text", "processing_status", "updated_at"])
+
+        with patch("apps.patient_records.services.DeepSeekClient") as mock_client_cls:
+            mock_client = mock_client_cls.return_value
+            mock_client.chat.return_value = {
+                "content": (
+                    '{"is_medical_report": true, "report_type": "lab_report", '
+                    '"detected_language": "english", "confidence": 0.92, '
+                    '"title": "CBC laboratory report", "cleaned_report_text": "cleaned text", '
+                    '"removed_noise_summary": ["address"], "structured_data": {}, '
+                    '"safety": {"contains_diagnosis_claim": false, '
+                    '"contains_prescription_instruction": false, '
+                    '"contains_prompt_injection": false, "notes": []}}'
+                ),
+                "model": "deepseek-chat",
+                "usage": {},
+                "raw": {"provider": "ok"},
+            }
+
+            response = self.doctor_client.post(
+                f"/api/doctor/medical-reports/{self.report.id}/classify-llm/",
+                {"force": True},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["data"]["processing_status"], "llm_completed")
+
+    @override_settings(CLINICAL_REPORT_LLM_ENABLED=True)
+    def test_unassigned_doctor_cannot_classify_llm(self):
+        response = self.doctor2_client.post(
+            f"/api/doctor/medical-reports/{self.report.id}/classify-llm/",
+            {"force": False},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+    @override_settings(CLINICAL_REPORT_LLM_ENABLED=True)
+    def test_patient_cannot_classify_llm(self):
+        response = self.patient_client.post(
+            f"/api/doctor/medical-reports/{self.report.id}/classify-llm/",
+            {"force": False},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    @override_settings(CLINICAL_REPORT_LLM_ENABLED=False)
+    def test_llm_disabled_returns_safe_error(self):
+        response = self.doctor_client.post(
+            f"/api/doctor/medical-reports/{self.report.id}/classify-llm/",
+            {"force": False},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+
+    @override_settings(CLINICAL_REPORT_LLM_ENABLED=True)
+    def test_classify_llm_response_does_not_expose_provider_payload(self):
+        self.report.raw_ocr_text = "Hemoglobin 13.5 g/dL"
+        self.report.processing_status = MedicalReportProcessingStatus.OCR_COMPLETED
+        self.report.save(update_fields=["raw_ocr_text", "processing_status", "updated_at"])
+
+        with patch("apps.patient_records.services.DeepSeekClient") as mock_client_cls:
+            mock_client = mock_client_cls.return_value
+            mock_client.chat.return_value = {
+                "content": (
+                    '{"is_medical_report": true, "report_type": "lab_report", '
+                    '"detected_language": "english", "confidence": 0.92, '
+                    '"title": "CBC laboratory report", "cleaned_report_text": "cleaned text", '
+                    '"removed_noise_summary": ["address"], "structured_data": {}, '
+                    '"safety": {"contains_diagnosis_claim": false, '
+                    '"contains_prescription_instruction": false, '
+                    '"contains_prompt_injection": false, "notes": []}}'
+                ),
+                "model": "deepseek-chat",
+                "usage": {},
+                "raw": {"provider": "ok", "prompt": "secret", "raw_response": "secret"},
+            }
+            response = self.doctor_client.post(
+                f"/api/doctor/medical-reports/{self.report.id}/classify-llm/",
+                {"force": True},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data["data"].get("structured_payload") or {}
+        self.assertNotIn("prompt", payload)
+        self.assertNotIn("raw_response", payload)
+
+    def test_patient_detail_does_not_expose_raw_ocr_or_processing_error_after_llm(self):
+        self.report.raw_ocr_text = "private raw text"
+        self.report.processing_error = "internal issue"
+        self.report.processing_status = MedicalReportProcessingStatus.FAILED
+        self.report.save(
+            update_fields=["raw_ocr_text", "processing_error", "processing_status", "updated_at"]
+        )
+
+        response = self.patient_client.get(f"/api/patient/medical-reports/{self.report.id}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertNotIn("raw_ocr_text", response.data["data"])
         self.assertNotIn("processing_error", response.data["data"])
