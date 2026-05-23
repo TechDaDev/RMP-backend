@@ -372,6 +372,7 @@ class RAGServiceContext(models.TextChoices):
     GENERAL_DOCTOR_QUERY = "general_doctor_query", "General Doctor Query"
     CONSULTATION = "consultation", "Consultation"
     LAB_RESULT = "lab_result", "Lab Result"
+    REPORT_CASE_UPDATE = "report_case_update", "Report Case Update"
     MEDICAL_RECORD = "medical_record", "Medical Record"
     PRESCRIPTION = "prescription", "Prescription"
     LAB_ORDER = "lab_order", "Lab Order"

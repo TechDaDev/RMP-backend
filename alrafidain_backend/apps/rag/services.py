@@ -29,6 +29,13 @@ SAFE_FALLBACK_MESSAGE = (
     "Please review the patient context and approved knowledge sources manually."
 )
 
+DEFAULT_REPORT_CASE_UPDATE_QUESTION = (
+    "Based on the newly processed patient-uploaded medical report and consultation context, "
+    "provide a doctor-facing case update summary, clinically relevant findings to verify, "
+    "red flags to check, suggested follow-up questions, and source-grounded considerations. "
+    "Do not diagnose or prescribe."
+)
+
 
 def _is_source_enforced_by_text(response_text: str) -> bool:
     normalized = (response_text or "").lower()
@@ -103,6 +110,165 @@ def _build_safety_metadata(
 def doctor_can_use_rag(user) -> bool:
     """Return True if the user is allowed to use the RAG endpoints."""
     return is_approved_doctor(user)
+
+
+def _truncate_case_text(text: str, max_chars: int) -> str:
+    value = (text or "").strip()
+    if len(value) <= max_chars:
+        return value
+    return f"{value[:max_chars].rstrip()}..."
+
+
+def _safe_report_structured_observations(report) -> str:
+    payload = report.structured_payload if isinstance(report.structured_payload, dict) else {}
+    structured_data = payload.get("structured_data")
+    if not isinstance(structured_data, dict) or not structured_data:
+        return ""
+
+    observations = []
+    for key in ["lab_values", "findings", "impression", "observations", "sections"]:
+        value = structured_data.get(key)
+        if value is None:
+            continue
+        observations.append(f"{key}: {_truncate_case_text(str(value), 350)}")
+
+    if not observations:
+        return _truncate_case_text(str(structured_data), 500)
+    return _truncate_case_text("; ".join(observations), 1200)
+
+
+def build_medical_report_case_summary_for_rag(report) -> str:
+    max_chars = int(getattr(settings, "RAG_REPORT_CASE_CONTEXT_MAX_CHARS", 6000))
+
+    consultation = getattr(report, "consultation", None)
+    lines = [f"Medical report ID: {report.pk}"]
+    lines.append(f"Report type: {report.report_type}")
+    lines.append(f"Processing status: {report.processing_status}")
+    lines.append(f"Is medical report: {bool(report.is_medical_report)}")
+
+    if report.detected_language:
+        lines.append(f"Detected language: {report.detected_language}")
+    if report.llm_confidence is not None:
+        lines.append(f"LLM confidence: {float(report.llm_confidence):.4f}")
+
+    if consultation is not None:
+        lines.append(f"Consultation ID: {consultation.pk}")
+        lines.append(f"Consultation status: {consultation.status}")
+        specialty = consultation.selected_specialty or consultation.recommended_specialty or "N/A"
+        lines.append(f"Consultation specialty: {specialty}")
+
+        symptom_flags = []
+        if getattr(consultation, "has_fever", False):
+            symptom_flags.append("fever")
+        if getattr(consultation, "has_pain", False):
+            symptom_flags.append("pain")
+        if getattr(consultation, "has_breathing_difficulty", False):
+            symptom_flags.append("breathing_difficulty")
+        if getattr(consultation, "has_emergency_warning", False):
+            symptom_flags.append("emergency_warning")
+        if symptom_flags:
+            lines.append(f"Consultation symptom flags: {', '.join(symptom_flags)}")
+
+        if getattr(consultation, "current_medications_related", ""):
+            lines.append(
+                "Current medications related: "
+                + _truncate_case_text(consultation.current_medications_related, 600)
+            )
+        if getattr(consultation, "additional_notes", ""):
+            lines.append(
+                "Consultation additional notes: "
+                + _truncate_case_text(consultation.additional_notes, 700)
+            )
+
+    if report.cleaned_report_text:
+        lines.append(
+            "Cleaned report text: " + _truncate_case_text(report.cleaned_report_text, 3000)
+        )
+
+    structured_obs = _safe_report_structured_observations(report)
+    if structured_obs:
+        lines.append(f"Structured observations: {structured_obs}")
+
+    linked_entry = getattr(report, "linked_medical_record_entry", None)
+    if linked_entry is not None:
+        lines.append(
+            "Linked medical record entry: "
+            f"id={linked_entry.pk}, category={linked_entry.category}, "
+            f"title={_truncate_case_text(linked_entry.title, 160)}, "
+            f"verification_status={linked_entry.verification_status}"
+        )
+
+    if report.doctor_notes:
+        lines.append("Doctor notes: " + _truncate_case_text(report.doctor_notes, 600))
+
+    lines.append(
+        "Safety note: This report was patient-uploaded and AI-extracted; "
+        "clinical validation is required."
+    )
+
+    return _truncate_case_text("\n".join(lines), max_chars)
+
+
+def doctor_can_access_medical_report_rag(doctor, report) -> bool:
+    if not doctor_can_use_rag(doctor):
+        return False
+
+    from apps.patient_records.permissions import can_view_medical_report
+
+    return can_view_medical_report(doctor, report)
+
+
+def run_medical_report_case_update_rag(
+    *,
+    doctor,
+    report,
+    question=None,
+    top_k=None,
+    filters=None,
+    request=None,
+    llm_client=None,
+):
+    if not doctor_can_access_medical_report_rag(doctor, report):
+        raise PermissionError("You do not have permission to run RAG case update for this report.")
+
+    allowed_statuses = {
+        "llm_completed",
+        "doctor_reviewed",
+        "accepted",
+    }
+    if not report.is_medical_report or report.processing_status not in allowed_statuses:
+        raise ValueError("Report must be an accepted medical report before running case update.")
+
+    payload = report.structured_payload if isinstance(report.structured_payload, dict) else {}
+    structured_data = payload.get("structured_data") if isinstance(payload, dict) else None
+    has_structured_data = isinstance(structured_data, dict) and bool(structured_data)
+    has_cleaned_text = bool((report.cleaned_report_text or "").strip())
+    has_linked_entry = bool(report.linked_medical_record_entry_id)
+
+    if not (has_cleaned_text or has_structured_data or has_linked_entry):
+        raise ValueError("Report does not have enough structured context for case update.")
+
+    summary = build_medical_report_case_summary_for_rag(report)
+    query_text = (question or "").strip() or DEFAULT_REPORT_CASE_UPDATE_QUESTION
+
+    safe_filters = {}
+    filters = filters or {}
+    for key in ["document_type", "specialty", "language", "audience"]:
+        value = filters.get(key)
+        if value:
+            safe_filters[key] = value
+
+    return run_doctor_rag_query(
+        doctor=doctor,
+        query_text=query_text,
+        service_context=RAGServiceContext.REPORT_CASE_UPDATE,
+        object_id=report.pk,
+        filters=safe_filters,
+        top_k=top_k,
+        object_summary=summary,
+        request=request,
+        llm_client=llm_client,
+    )
 
 
 def run_doctor_rag_query(

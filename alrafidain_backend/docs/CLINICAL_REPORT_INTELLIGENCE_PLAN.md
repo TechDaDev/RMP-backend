@@ -101,11 +101,27 @@ Delivered:
 - Source attribution is persisted on entry (`source_user`, `source_role`) with consultation/message/attachment IDs in entry notes.
 - No prompt/provider raw payload/local paths are persisted into canonical entry fields.
 
-## Deferred Beyond 10D
+## Phase 10E (Completed)
+
+Delivered:
+- Doctor-facing report case-update RAG service: `run_medical_report_case_update_rag(...)`
+- Safe report case-summary builder for RAG (`build_medical_report_case_summary_for_rag`)
+- Access rule enforcement for approved assigned doctors only
+- Doctor endpoint: `POST /api/rag/medical-reports/{id}/case-update/`
+- Optional filter passthrough (`document_type`, `specialty`, `language`, `audience`) with sanitized routing into existing RAG query flow
+- Report context routing via `service_context=report_case_update` and `object_id=report_id`
+
+### Phase 10E Behavior Highlights
+
+- Reuses existing approved knowledge retrieval safeguards and RAG response safety invariants.
+- Uses cleaned report text and bounded structured summary; prompt/provider raw internals are not exposed in response payloads.
+- Includes linked medical record entry context when available.
+- Does not auto-save generated RAG output into patient records.
+
+## Deferred Beyond 10E
 
 - Structured lab value extraction
-- RAG context auto-update from report OCR
-- Doctor AI assistant response generation from extracted report context
+- Doctor AI assistant response generation from extracted report context (Phase 10F)
 
 ## Configuration Flags (Phase 10B)
 

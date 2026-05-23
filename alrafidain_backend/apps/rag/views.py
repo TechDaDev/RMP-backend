@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from apps.audit.services import create_audit_log, record_security_event
 from apps.common.choices import RAGServiceContext
 from apps.common.permissions import CanExportRagDataset
+from apps.patient_records.models import PatientMedicalReport
 
 from .models import RAGResponse, RAGResponseFeedback
 from .permissions import can_access_consultation_rag, can_access_lab_result_rag
@@ -14,12 +15,13 @@ from .serializers import (
     ConsultationRAGSupportSerializer,
     DoctorRAGQuerySerializer,
     LabResultRAGSupportSerializer,
+    MedicalReportRAGSupportSerializer,
     RAGAnalyticsSummarySerializer,
     RAGDatasetExportSerializer,
     RAGFeedbackReviewSerializer,
     RAGResponseFeedbackCreateSerializer,
-    RAGResponseSaveToRecordSerializer,
     RAGResponseFeedbackSerializer,
+    RAGResponseSaveToRecordSerializer,
     RAGResponseSerializer,
 )
 from .services import (
@@ -28,6 +30,7 @@ from .services import (
     doctor_can_use_rag,
     review_rag_feedback,
     run_doctor_rag_query,
+    run_medical_report_case_update_rag,
     save_rag_response_to_patient_record,
     submit_rag_response_feedback,
 )
@@ -160,6 +163,63 @@ class LabResultRAGSupportView(APIView):
         return Response(RAGResponseSerializer(rag_response).data, status=200)
 
 
+class MedicalReportCaseUpdateRAGView(APIView):
+    """POST /api/rag/medical-reports/<uuid:report_id>/case-update/.
+
+    Run doctor-facing RAG update using a saved medical report context.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, report_id):
+        if not doctor_can_use_rag(request.user):
+            return Response(
+                {"detail": "Only approved doctors can use RAG case updates."},
+                status=403,
+            )
+
+        report = get_object_or_404(
+            PatientMedicalReport.objects.select_related(
+                "patient",
+                "consultation",
+                "linked_medical_record_entry",
+            ),
+            pk=report_id,
+        )
+
+        serializer = MedicalReportRAGSupportSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        top_k = data.get("top_k") or getattr(settings, "RAG_DEFAULT_TOP_K", 6)
+        filters = {
+            key: value
+            for key, value in {
+                "document_type": data.get("document_type") or None,
+                "specialty": data.get("specialty") or None,
+                "language": data.get("language") or None,
+                "audience": data.get("audience") or None,
+            }.items()
+            if value
+        }
+
+        try:
+            _, rag_response = run_medical_report_case_update_rag(
+                doctor=request.user,
+                report=report,
+                question=data.get("question"),
+                top_k=top_k,
+                filters=filters,
+                request=request,
+            )
+        except PermissionError as exc:
+            return Response({"detail": str(exc)}, status=403)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=400)
+
+        return Response(RAGResponseSerializer(rag_response).data, status=200)
+
+
 # ---------------------------------------------------------------------------
 # Phase 12D — Feedback views
 # ---------------------------------------------------------------------------
@@ -210,7 +270,10 @@ class RAGResponseFeedbackCreateView(APIView):
 
 
 class RAGResponseSaveToPatientRecordView(APIView):
-    """POST /api/rag/responses/<uuid:rag_response_id>/save-to-record/ — persist doctor RAG output."""
+    """POST /api/rag/responses/<uuid:rag_response_id>/save-to-record/.
+
+    Persist doctor-approved RAG response into the canonical patient record.
+    """
 
     permission_classes = [IsAuthenticated]
 

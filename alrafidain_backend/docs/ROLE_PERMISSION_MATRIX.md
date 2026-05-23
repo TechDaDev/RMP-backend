@@ -219,6 +219,7 @@ Notes:
 | General RAG query | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
 | Consultation RAG support | ❌ | ❌ | ✅ (assigned) | ❌ | ❌ | ❌ |
 | Lab result RAG support | ❌ | ❌ | ✅ (assigned) | ❌ | ❌ | ❌ |
+| Medical report case-update RAG support | ❌ | ❌ | ✅ (assigned) | ❌ | ❌ | ❌ |
 
 > **Privacy rule**: Patients cannot use any RAG endpoint. RAG is exclusively for approved doctors.
 

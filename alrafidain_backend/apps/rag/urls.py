@@ -8,6 +8,7 @@ from .views import (
     ConsultationRAGSupportView,
     DoctorGeneralRAGQueryView,
     LabResultRAGSupportView,
+    MedicalReportCaseUpdateRAGView,
     MyRAGFeedbackListView,
     RAGResponseFeedbackCreateView,
     RAGResponseSaveToPatientRecordView,
@@ -25,6 +26,11 @@ urlpatterns = [
         "lab-results/<uuid:lab_result_id>/support/",
         LabResultRAGSupportView.as_view(),
         name="rag-lab-result-support",
+    ),
+    path(
+        "medical-reports/<uuid:report_id>/case-update/",
+        MedicalReportCaseUpdateRAGView.as_view(),
+        name="rag-medical-report-case-update",
     ),
     # Phase 12D — Feedback
     path(

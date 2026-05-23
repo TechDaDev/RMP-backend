@@ -2243,6 +2243,27 @@ paths:
       responses:
         '200':
           description: No response body
+  /api/rag/medical-reports/{report_id}/case-update/:
+    post:
+      operationId: rag_medical_reports_case_update_create
+      description: |-
+        POST /api/rag/medical-reports/<uuid:report_id>/case-update/.
+
+        Run doctor-facing RAG update using a saved medical report context.
+      parameters:
+      - in: path
+        name: report_id
+        schema:
+          type: string
+          format: uuid
+        required: true
+      tags:
+      - rag
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          description: No response body
   /api/rag/responses/{rag_response_id}/feedback/:
     post:
       operationId: rag_responses_feedback_create
@@ -2265,8 +2286,10 @@ paths:
   /api/rag/responses/{rag_response_id}/save-to-record/:
     post:
       operationId: rag_responses_save_to_record_create
-      description: POST /api/rag/responses/<uuid:rag_response_id>/save-to-record/
-        — persist doctor RAG output.
+      description: |-
+        POST /api/rag/responses/<uuid:rag_response_id>/save-to-record/.
+
+        Persist doctor-approved RAG response into the canonical patient record.
       parameters:
       - in: path
         name: rag_response_id

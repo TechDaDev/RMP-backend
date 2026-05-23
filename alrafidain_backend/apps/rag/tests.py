@@ -14,6 +14,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.audit.models import AuditLog
 from apps.common.choices import (
+    ConsultationDuration,
+    ConsultationStatus,
     KnowledgeApprovalStatus,
     KnowledgeAudience,
     KnowledgeDocumentType,
@@ -21,6 +23,9 @@ from apps.common.choices import (
     KnowledgeProcessingStatus,
     KnowledgeSecurityStatus,
     LabTestCategory,
+    MedicalReportProcessingStatus,
+    MedicalReportSource,
+    MedicalReportType,
     MedicalSpecialty,
     RAGResponseStatus,
     RAGSafetyLevel,
@@ -29,7 +34,11 @@ from apps.common.choices import (
     VerificationStatus,
 )
 from apps.knowledge_base.models import KnowledgeChunk, KnowledgeDocument
-from apps.patient_records.models import MedicalRecordEntry
+from apps.patient_records.models import (
+    MedicalRecordEntry,
+    PatientMedicalRecord,
+    PatientMedicalReport,
+)
 from apps.profiles.models import DoctorProfile, PatientProfile, UserProfile
 
 from .models import RAGQuery, RAGRetrievedChunk
@@ -41,8 +50,10 @@ from .permissions import (
 from .services import (
     build_consultation_summary_for_rag,
     build_lab_result_summary_for_rag,
+    build_medical_report_case_summary_for_rag,
     doctor_can_use_rag,
     run_doctor_rag_query,
+    run_medical_report_case_update_rag,
 )
 
 User = get_user_model()
@@ -100,6 +111,49 @@ def create_doctor(email="doctor@example.com", approved=True):
         verification_status=VerificationStatus.APPROVED if approved else VerificationStatus.PENDING,
     )
     return user
+
+
+def create_medical_report_for_rag(*, patient, doctor, report_type=MedicalReportType.LAB_REPORT):
+    from apps.consultations.models import Consultation
+
+    consultation = Consultation.objects.create(
+        patient=patient,
+        assigned_doctor=doctor,
+        status=ConsultationStatus.ACCEPTED,
+        selected_specialty=MedicalSpecialty.GENERAL_MEDICINE,
+        duration=ConsultationDuration.ONE_TO_THREE_DAYS,
+        severity="mild",
+        has_fever=True,
+        additional_notes="Follow up on uploaded report",
+        current_medications_related="Vitamin D",
+    )
+    report = PatientMedicalReport.objects.create(
+        patient=patient,
+        consultation=consultation,
+        source=MedicalReportSource.CHAT_ATTACHMENT,
+        report_type=report_type,
+        processing_status=MedicalReportProcessingStatus.LLM_COMPLETED,
+        title="Uploaded report",
+        original_filename="lab-report.pdf",
+        is_medical_report=True,
+        cleaned_report_text="Hemoglobin 12.8 g/dL. Glucose 98 mg/dL.",
+        structured_payload={
+            "llm": {"provider": "deepseek", "model": "deepseek-chat"},
+            "structured_data": {
+                "lab_values": [
+                    {"name": "Hemoglobin", "value": "12.8", "unit": "g/dL"},
+                    {"name": "Glucose", "value": "98", "unit": "mg/dL"},
+                ]
+            },
+            "safety": {"contains_prompt_injection": False},
+            "raw_response": {"secret": "must-not-leak"},
+            "prompt_text": "must-not-leak",
+        },
+        detected_language="english",
+        llm_confidence=0.91,
+        doctor_notes="Recheck fasting status",
+    )
+    return consultation, report
 
 
 def _mock_chunk():
@@ -621,6 +675,217 @@ class BuildLabResultSummaryTest(TestCase):
         summary = build_lab_result_summary_for_rag(lab_result)
         self.assertIn("Hemoglobin 11.8", summary)
         self.assertNotIn("Ignore previous instructions", summary)
+
+
+class BuildMedicalReportCaseSummaryForRagTest(TestCase):
+    def setUp(self):
+        self.doctor = create_doctor(email="summary_doc@example.com")
+        self.patient = create_patient(email="summary_patient@example.com")
+        _, self.report = create_medical_report_for_rag(patient=self.patient, doctor=self.doctor)
+
+    def test_includes_required_report_case_context(self):
+        record, _ = PatientMedicalRecord.objects.get_or_create(patient=self.patient)
+        entry = MedicalRecordEntry.objects.create(
+            medical_record=record,
+            category="lab_report",
+            title="Linked CBC Entry",
+            value="Value",
+            verification_status="self_reported",
+            source_user=self.patient,
+            source_role="patient",
+        )
+        self.report.linked_medical_record_entry = entry
+        self.report.save(update_fields=["linked_medical_record_entry", "updated_at"])
+
+        summary = build_medical_report_case_summary_for_rag(self.report)
+
+        self.assertIn("Consultation status", summary)
+        self.assertIn("Report type", summary)
+        self.assertIn("Hemoglobin 12.8", summary)
+        self.assertIn("Structured observations", summary)
+        self.assertIn("Linked medical record entry", summary)
+        self.assertIn("clinical validation is required", summary.lower())
+
+    def test_does_not_include_prompt_or_raw_provider_payload(self):
+        summary = build_medical_report_case_summary_for_rag(self.report)
+        self.assertNotIn("prompt_text", summary)
+        self.assertNotIn("raw_response", summary)
+        self.assertNotIn("must-not-leak", summary)
+
+
+class RunMedicalReportCaseUpdateRagServiceTest(TestCase):
+    def setUp(self):
+        self.doctor = create_doctor(email="report_case_doc@example.com")
+        self.other_doctor = create_doctor(email="report_case_other@example.com")
+        self.unapproved_doctor = create_doctor(
+            email="report_case_pending@example.com",
+            approved=False,
+        )
+        self.patient = create_patient(email="report_case_patient@example.com")
+        _, self.report = create_medical_report_for_rag(patient=self.patient, doctor=self.doctor)
+
+    @patch("apps.rag.services.run_doctor_rag_query")
+    def test_assigned_doctor_can_run_case_update(self, mock_run):
+        mock_run.return_value = (MagicMock(), MagicMock())
+
+        run_medical_report_case_update_rag(doctor=self.doctor, report=self.report)
+
+        mock_run.assert_called_once()
+        kwargs = mock_run.call_args.kwargs
+        self.assertEqual(kwargs["service_context"], RAGServiceContext.REPORT_CASE_UPDATE)
+        self.assertEqual(kwargs["object_id"], self.report.pk)
+        self.assertTrue(kwargs["object_summary"])
+
+    @patch("apps.rag.services.run_doctor_rag_query")
+    def test_unapproved_doctor_cannot_run(self, mock_run):
+        with self.assertRaises(PermissionError):
+            run_medical_report_case_update_rag(
+                doctor=self.unapproved_doctor,
+                report=self.report,
+            )
+        mock_run.assert_not_called()
+
+    @patch("apps.rag.services.run_doctor_rag_query")
+    def test_unassigned_doctor_cannot_run(self, mock_run):
+        with self.assertRaises(PermissionError):
+            run_medical_report_case_update_rag(doctor=self.other_doctor, report=self.report)
+        mock_run.assert_not_called()
+
+    @patch("apps.rag.services.run_doctor_rag_query")
+    def test_not_medical_report_cannot_run(self, mock_run):
+        self.report.is_medical_report = False
+        self.report.report_type = MedicalReportType.NOT_MEDICAL_REPORT
+        self.report.save(update_fields=["is_medical_report", "report_type", "updated_at"])
+
+        with self.assertRaises(ValueError):
+            run_medical_report_case_update_rag(doctor=self.doctor, report=self.report)
+        mock_run.assert_not_called()
+
+    @patch("apps.rag.services.run_doctor_rag_query")
+    def test_report_without_useful_content_cannot_run(self, mock_run):
+        self.report.cleaned_report_text = ""
+        self.report.structured_payload = {}
+        self.report.linked_medical_record_entry = None
+        self.report.save(
+            update_fields=[
+                "cleaned_report_text",
+                "structured_payload",
+                "linked_medical_record_entry",
+                "updated_at",
+            ]
+        )
+
+        with self.assertRaises(ValueError):
+            run_medical_report_case_update_rag(doctor=self.doctor, report=self.report)
+        mock_run.assert_not_called()
+
+    @patch("apps.rag.services.run_doctor_rag_query")
+    def test_no_automatic_patient_record_save_happens(self, mock_run):
+        mock_run.return_value = (MagicMock(), MagicMock())
+        before = MedicalRecordEntry.objects.count()
+
+        run_medical_report_case_update_rag(doctor=self.doctor, report=self.report)
+
+        self.assertEqual(MedicalRecordEntry.objects.count(), before)
+
+
+class MedicalReportCaseUpdateRAGViewTest(TestCase):
+    def setUp(self):
+        self.doctor = create_doctor(email="case_view_doc@example.com")
+        self.other_doctor = create_doctor(email="case_view_other@example.com")
+        self.patient = create_patient(email="case_view_patient@example.com")
+        _, self.report = create_medical_report_for_rag(patient=self.patient, doctor=self.doctor)
+
+        with patch("apps.knowledge_base.services.semantic_search_approved_chunks", return_value=[]):
+            _, self.rag_response = run_doctor_rag_query(
+                doctor=self.doctor,
+                query_text="report case update",
+                service_context=RAGServiceContext.REPORT_CASE_UPDATE,
+                object_id=self.report.pk,
+            )
+
+    def url(self):
+        return f"/api/rag/medical-reports/{self.report.pk}/case-update/"
+
+    @patch("apps.rag.views.run_medical_report_case_update_rag")
+    def test_assigned_doctor_can_post_case_update(self, mock_service):
+        mock_service.return_value = (MagicMock(), self.rag_response)
+
+        client = auth_client(self.doctor)
+        resp = client.post(self.url(), {}, format="json")
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("query_id", resp.data)
+        self.assertIn("status", resp.data)
+
+    @patch("apps.rag.views.run_medical_report_case_update_rag")
+    def test_patient_cannot_call_endpoint(self, mock_service):
+        client = auth_client(self.patient)
+        resp = client.post(self.url(), {}, format="json")
+        self.assertEqual(resp.status_code, 403)
+        mock_service.assert_not_called()
+
+    @patch("apps.rag.views.run_medical_report_case_update_rag")
+    def test_unassigned_doctor_cannot_call_endpoint(self, mock_service):
+        mock_service.side_effect = PermissionError("forbidden")
+        client = auth_client(self.other_doctor)
+        resp = client.post(self.url(), {}, format="json")
+        self.assertEqual(resp.status_code, 403)
+
+    @patch("apps.rag.views.run_medical_report_case_update_rag")
+    def test_default_question_flows_when_not_provided(self, mock_service):
+        mock_service.return_value = (MagicMock(), self.rag_response)
+        client = auth_client(self.doctor)
+        client.post(self.url(), {}, format="json")
+
+        kwargs = mock_service.call_args.kwargs
+        self.assertEqual(kwargs["question"], "")
+
+    @patch("apps.rag.views.run_medical_report_case_update_rag")
+    def test_custom_question_passes_through(self, mock_service):
+        mock_service.return_value = (MagicMock(), self.rag_response)
+        client = auth_client(self.doctor)
+        client.post(
+            self.url(),
+            {"question": "Focus on red flags."},
+            format="json",
+        )
+        kwargs = mock_service.call_args.kwargs
+        self.assertEqual(kwargs["question"], "Focus on red flags.")
+
+    @patch("apps.rag.views.run_medical_report_case_update_rag")
+    def test_filters_pass_safely(self, mock_service):
+        mock_service.return_value = (MagicMock(), self.rag_response)
+        client = auth_client(self.doctor)
+        client.post(
+            self.url(),
+            {
+                "document_type": "clinical_guideline",
+                "specialty": "cardiology",
+                "language": "english",
+                "audience": "doctor",
+            },
+            format="json",
+        )
+        kwargs = mock_service.call_args.kwargs
+        self.assertEqual(
+            kwargs["filters"],
+            {
+                "document_type": "clinical_guideline",
+                "specialty": "cardiology",
+                "language": "english",
+                "audience": "doctor",
+            },
+        )
+
+    @patch("apps.rag.views.run_medical_report_case_update_rag")
+    def test_response_does_not_expose_prompt_or_raw_payload(self, mock_service):
+        mock_service.return_value = (MagicMock(), self.rag_response)
+        client = auth_client(self.doctor)
+        resp = client.post(self.url(), {}, format="json")
+        self.assertEqual(resp.status_code, 200)
+        self.assertNotIn("prompt_text", resp.data)
+        self.assertNotIn("raw_response", resp.data)
 
 
 # ---------------------------------------------------------------------------

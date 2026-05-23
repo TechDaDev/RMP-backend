@@ -222,6 +222,7 @@ Legend:
 | POST | `/api/rag/doctor/query/` | `DoctorGeneralRAGQueryView` | Yes | doctor (approved) | `RAGQueryRequestSerializer` | stable |
 | POST | `/api/rag/consultations/<id>/support/` | `ConsultationRAGSupportView` | Yes | doctor (approved, assigned) | `RAGQueryRequestSerializer` | stable |
 | POST | `/api/rag/lab-results/<id>/support/` | `LabResultRAGSupportView` | Yes | doctor (approved, assigned) | `RAGQueryRequestSerializer` | stable |
+| POST | `/api/rag/medical-reports/<id>/case-update/` | `MedicalReportCaseUpdateRAGView` | Yes | doctor (approved, assigned) | `MedicalReportRAGSupportSerializer` | stable |
 
 > Response shape: raw `RAGResponseSerializer` data (not wrapped in `{"success": true, "data": ...}`). See [API Response Contract](API_RESPONSE_CONTRACT.md).
 

@@ -2178,7 +2178,7 @@ Privacy notes:
 - Prompt text and raw provider payload are not exposed via this API.
 - Local file paths, secrets, and raw provider internals are not exposed.
 
-> Phase 10D note: OCR + LLM classification + canonical save-to-record are implemented. RAG auto-trigger and doctor AI assistant generation remain deferred.
+> Phase 10E note: OCR + LLM classification + canonical save-to-record are implemented, and doctor report case-update RAG is available. Assistant message generation remains deferred to 10F.
 
 ---
 
@@ -2871,13 +2871,39 @@ Backend context enrichment:
 
 ---
 
+### POST `/api/rag/medical-reports/<report_id>/case-update/`
+
+RAG case update scoped to a saved medical report candidate.
+The requesting user must be an **approved doctor** and the **assigned doctor** for the report consultation.
+
+Backend context enrichment:
+- Uses safe report context from cleaned report text and bounded structured payload summary.
+- Includes linked medical record entry summary when present.
+- Applies the same approved-knowledge retrieval and RAG safety guards as other doctor RAG endpoints.
+- Does not auto-save generated RAG output into patient records.
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `question` | string | no | Custom question (defaults to report case update prompt) |
+| `document_type` | string | no | Filter by document type |
+| `specialty` | string | no | Filter by medical specialty |
+| `language` | string | no | Filter by language |
+| `audience` | string | no | Filter by audience |
+| `top_k` | int | no | Number of chunks to retrieve |
+
+**Response:** `RAGResponse` object.
+
+---
+
 ### RAGResponse Schema
 
 ```json
 {
   "id": "uuid",
   "query_id": "uuid",
-  "service_context": "general_doctor_query | consultation | lab_result | ...",
+  "service_context": "general_doctor_query | consultation | lab_result | report_case_update | ...",
   "object_id": "uuid | null",
   "response_text": "AI-generated answer citing approved sources",
   "status": "success | failed | no_context | blocked",

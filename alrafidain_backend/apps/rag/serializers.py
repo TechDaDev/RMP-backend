@@ -178,6 +178,40 @@ class LabResultRAGSupportSerializer(serializers.Serializer):
         return fields
 
 
+class MedicalReportRAGSupportSerializer(serializers.Serializer):
+    """Input serializer for the medical report case-update RAG endpoint."""
+
+    question = serializers.CharField(max_length=2000, required=False, allow_blank=True, default="")
+    document_type = serializers.CharField(
+        max_length=50, required=False, allow_blank=True, default=""
+    )
+    specialty = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
+    language = serializers.CharField(max_length=20, required=False, allow_blank=True, default="")
+    audience = serializers.CharField(max_length=50, required=False, allow_blank=True, default="")
+    top_k = serializers.IntegerField(required=False, min_value=1)
+
+    def validate_top_k(self, value):
+        max_k = getattr(settings, "RAG_MAX_TOP_K", 12)
+        if value > max_k:
+            raise serializers.ValidationError(f"top_k may not exceed {max_k}.")
+        return value
+
+    def validate_question(self, value):
+        if not value:
+            return value
+        max_query_len = getattr(settings, "RAG_MAX_QUERY_LENGTH", 2000)
+        if len(value) > max_query_len:
+            raise serializers.ValidationError(
+                f"question may not exceed {max_query_len} characters."
+            )
+        return value
+
+    def get_fields(self):
+        fields = super().get_fields()
+        fields["top_k"].default = getattr(settings, "RAG_DEFAULT_TOP_K", 6)
+        return fields
+
+
 class RAGResponseSaveToRecordSerializer(serializers.Serializer):
     """Input serializer for saving a doctor RAG response into the patient record."""
 

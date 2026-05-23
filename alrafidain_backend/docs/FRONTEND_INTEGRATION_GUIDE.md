@@ -612,7 +612,7 @@ Notes:
 - Approve accepts optional `note`.
 - Self-approval is denied by backend policy.
 
-### 10.6 Medical Report Candidates (Phase 10D)
+### 10.6 Medical Report Candidates (Phase 10E)
 
 When a patient uploads a consultation chat attachment, the backend now creates a `PatientMedicalReport` candidate record.
 
@@ -625,12 +625,15 @@ Available endpoints:
 - `POST /api/doctor/medical-reports/{report_id}/process-ocr/`
 - `POST /api/doctor/medical-reports/{report_id}/classify-llm/`
 - `POST /api/doctor/medical-reports/{report_id}/save-to-record/`
+- `POST /api/rag/medical-reports/{report_id}/case-update/`
 
-Phase 10D behavior contract:
+Phase 10E behavior contract:
 - Candidate creation is non-blocking and does not break chat send flow.
 - OCR processing can be triggered by assigned doctors using `process-ocr`.
 - LLM cleanup/classification can be triggered by assigned doctors using `classify-llm`.
 - Assigned doctors can persist accepted/classified reports into canonical medical records using `save-to-record`.
+- Assigned approved doctors can request doctor-facing report case updates via `case-update` using existing RAG safety and retrieval rules.
+- `case-update` does not auto-write to canonical patient records; explicit save actions remain separate.
 - If OCR-on-upload settings are enabled server-side, processing may run inline or queued.
 - If LLM-sync-after-OCR is enabled server-side, accepted OCR results may automatically continue into LLM classification.
 - Duplicate record entries are prevented by default using linked-entry idempotency.
@@ -645,10 +648,9 @@ Frontend implementation notes:
 - `structured_payload` is safe-filtered; frontend should only rely on `ocr`, `llm`, `structured_data`, and `safety` keys.
 - Report detail includes a safe `linked_medical_record_entry` summary when saved.
 
-Deferred after Phase 10D:
+Deferred after Phase 10E:
 - Structured lab value extraction
-- Automatic RAG updates from OCR output
-- Doctor AI assistant messages based on extracted report context
+- Doctor AI assistant messages based on extracted report context (Phase 10F)
 
 ---
 
