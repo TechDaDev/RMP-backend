@@ -145,7 +145,78 @@ Authorization: Bearer <access_token>
 
 ---
 
-### 3. chat.message.created
+### 3. doctor_ai.message.created
+
+**Endpoint:** User socket (`/ws/user/`)
+
+**When:** A `DoctorAIAssistantMessage` is created for the owning doctor.
+
+**Payload:**
+```json
+{
+  "type": "doctor_ai.message.created",
+  "message": {
+    "id": "550e8400-e29b-41d4-a716-446655440010",
+    "consultation": "550e8400-e29b-41d4-a716-446655440011",
+    "trigger_type": "medical_report_case_update",
+    "status": "unread",
+    "safety_level": "doctor_only",
+    "title": "AI case update from uploaded medical report",
+    "body": "Doctor-facing support response...",
+    "summary": {
+      "rag_response_id": "550e8400-e29b-41d4-a716-446655440012",
+      "rag_query_id": "550e8400-e29b-41d4-a716-446655440013",
+      "service_context": "report_case_update",
+      "source_count": 3,
+      "document_titles": ["Guideline A"],
+      "confidence": null,
+      "fallback_reason": null,
+      "source_report_id": "550e8400-e29b-41d4-a716-446655440014",
+      "linked_medical_record_entry_id": "550e8400-e29b-41d4-a716-446655440015"
+    },
+    "source_report": "550e8400-e29b-41d4-a716-446655440014",
+    "source_rag_response": "550e8400-e29b-41d4-a716-446655440012",
+    "source_medical_record_entry": "550e8400-e29b-41d4-a716-446655440015",
+    "read_at": null,
+    "archived_at": null,
+    "created_at": "2026-05-23T00:00:00Z",
+    "updated_at": "2026-05-23T00:00:00Z"
+  }
+}
+```
+
+Guarantees:
+- Broadcast target is only `user_<doctor_id>`.
+- Assistant events are never sent to patient user groups.
+- Assistant events are never sent to consultation chat groups.
+- Payload excludes prompt text, raw provider payload, credentials, and local file paths.
+
+---
+
+### 4. doctor_ai.message.updated
+
+**Endpoint:** User socket (`/ws/user/`)
+
+**When:** Doctor marks assistant message read/unread.
+
+**Payload:**
+```json
+{
+  "type": "doctor_ai.message.updated",
+  "message": {
+    "id": "550e8400-e29b-41d4-a716-446655440010",
+    "status": "read",
+    "read_at": "2026-05-23T00:05:00Z",
+    "updated_at": "2026-05-23T00:05:00Z"
+  }
+}
+```
+
+Note: The backend sends the full safe assistant message object, and frontend may merge by `id`.
+
+---
+
+### 5. chat.message.created
 
 **Endpoint:** Consultation socket
 
@@ -185,7 +256,7 @@ Authorization: Bearer <access_token>
 
 ---
 
-### 4. chat.messages.read
+### 6. chat.messages.read
 
 **Endpoint:** Consultation socket
 
@@ -207,7 +278,7 @@ Authorization: Bearer <access_token>
 
 ---
 
-### 5. consultation.updated
+### 7. consultation.updated
 
 **Endpoint:** User socket AND Consultation socket
 
@@ -236,7 +307,7 @@ Authorization: Bearer <access_token>
 
 ---
 
-### 6. prescription.updated
+### 8. prescription.updated
 
 **Endpoint:** User socket (patient only)
 
@@ -264,7 +335,7 @@ Authorization: Bearer <access_token>
 
 ---
 
-### 7. lab_order.updated
+### 9. lab_order.updated
 
 **Endpoint:** User socket (patient only)
 
@@ -294,7 +365,7 @@ Authorization: Bearer <access_token>
 
 ---
 
-### 8. lab_result.released
+### 10. lab_result.released
 
 **Endpoint:** User socket (patient only)
 
@@ -333,6 +404,7 @@ Authorization: Bearer <access_token>
 - Events for their own user ID
 - Notifications
 - Unread counts
+- Doctor AI assistant events for their own account only
 - Consultation updates (for consultations they're involved in)
 - Prescription updates (for their own prescriptions)
 - Lab order updates (for their own lab orders)
@@ -353,6 +425,10 @@ Authorization: Bearer <access_token>
 - Pharmacists
 - Laboratorians
 - Anonymous users
+
+**AI assistant isolation:**
+- Consultation socket never carries `doctor_ai.*` events.
+- AI assistant stream is delivered only via user socket to owning doctor.
 
 **Consultation status requirements:**
 - Can connect to: `accepted`, `doctor_responded`, `closed`

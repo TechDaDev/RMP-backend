@@ -1092,6 +1092,43 @@ class DoctorAIAssistantMessageServiceTest(TestCase):
         self.assertEqual(unmarked.status, DoctorAIAssistantMessageStatus.UNREAD)
         self.assertIsNone(unmarked.read_at)
 
+    @patch("apps.rag.assistant_services.transaction.on_commit")
+    @patch("apps.rag.assistant_services._broadcast_doctor_ai_message_created")
+    def test_create_message_broadcasts_created_event(self, mock_broadcast, mock_on_commit):
+        mock_on_commit.side_effect = lambda fn, robust=True: fn()
+
+        message = create_doctor_ai_assistant_message(
+            consultation=self.consultation,
+            doctor=self.doctor,
+            patient=self.patient,
+            title="AI update",
+            body="Doctor-only body",
+            trigger_type=DoctorAIAssistantTriggerType.MEDICAL_REPORT_CASE_UPDATE,
+            safety_level=DoctorAIAssistantSafetyLevel.DOCTOR_ONLY,
+            source_report=self.report,
+            source_rag_response=self.rag_response,
+        )
+
+        mock_broadcast.assert_called_once_with(message)
+
+    @patch("apps.realtime.services.broadcast_doctor_ai_message_created")
+    def test_broadcast_failure_does_not_fail_message_creation(self, mock_realtime_broadcast):
+        mock_realtime_broadcast.side_effect = RuntimeError("boom")
+
+        message = create_doctor_ai_assistant_message(
+            consultation=self.consultation,
+            doctor=self.doctor,
+            patient=self.patient,
+            title="AI update",
+            body="Doctor-only body",
+            trigger_type=DoctorAIAssistantTriggerType.MEDICAL_REPORT_CASE_UPDATE,
+            safety_level=DoctorAIAssistantSafetyLevel.DOCTOR_ONLY,
+            source_report=self.report,
+            source_rag_response=self.rag_response,
+        )
+
+        self.assertTrue(DoctorAIAssistantMessage.objects.filter(pk=message.pk).exists())
+
 
 class DoctorAIAssistantMessageEndpointsTest(TestCase):
     def setUp(self):

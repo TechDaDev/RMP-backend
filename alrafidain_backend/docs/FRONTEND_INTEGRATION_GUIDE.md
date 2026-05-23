@@ -788,6 +788,15 @@ userWs.addEventListener('close', () => {
 - ❌ Do NOT create messages/data over WebSocket in MVP
 - ❌ Do NOT rely only on WebSocket (use REST as source of truth)
 
+Doctor AI assistant stream (Phase 10G.2A backend contract):
+- Subscribe on user socket (`/ws/user/?token=<access_token>`), not consultation socket.
+- Listen for `doctor_ai.message.created` and `doctor_ai.message.updated`.
+- Events include a safe `message` object matching backend assistant serializer shape.
+- Do not render assistant events in normal patient-doctor chat timeline.
+- Keep assistant events in a doctor-only AI panel state slice.
+- On event receipt, merge by `message.id` or trigger a panel refresh for consistency.
+- Patients must never receive or render assistant events.
+
 ### Token Handling
 
 Tokens are passed in the WebSocket URL:

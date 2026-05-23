@@ -2997,6 +2997,13 @@ Privacy and safety invariants for assistant stream:
 - Assistant APIs do not expose RAG `prompt_text`, provider raw payload, API secrets, or local file paths.
 - Assistant output is advisory only and does not auto-diagnose, auto-prescribe, auto-change consultation state, or auto-write to patient medical record.
 
+Realtime contract:
+- New assistant events are emitted on `/ws/user/` only:
+  - `doctor_ai.message.created`
+  - `doctor_ai.message.updated`
+- Assistant events are never emitted on consultation chat websocket groups.
+- See [docs/WEBSOCKET_CONTRACT.md](WEBSOCKET_CONTRACT.md) for exact payload shape.
+
 ---
 
 ### RAGResponse Schema

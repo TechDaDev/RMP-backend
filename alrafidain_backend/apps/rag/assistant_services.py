@@ -124,6 +124,18 @@ def _broadcast_doctor_ai_message_created(message):
         )
 
 
+def _broadcast_doctor_ai_message_updated(message):
+    try:
+        from apps.realtime.services import broadcast_doctor_ai_message_updated
+
+        broadcast_doctor_ai_message_updated(message)
+    except Exception:
+        logger.exception(
+            "Failed to broadcast doctor_ai.message.updated",
+            extra={"message_id": str(message.id), "doctor_id": str(message.doctor_id)},
+        )
+
+
 def create_doctor_ai_assistant_message(
     *,
     consultation,
@@ -289,5 +301,7 @@ def mark_doctor_ai_message_read(message, doctor, read=True, request=None):
         },
         request=request,
     )
+
+    transaction.on_commit(lambda: _broadcast_doctor_ai_message_updated(message), robust=True)
 
     return message

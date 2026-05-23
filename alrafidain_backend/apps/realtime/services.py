@@ -5,12 +5,18 @@ Provides sync-safe helpers for sending events to WebSocket groups.
 All functions use async_to_sync() to be callable from sync contexts like views.
 """
 
+import json
 import logging
 
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 logger = logging.getLogger(__name__)
+
+
+def _json_safe(value):
+    """Normalize payload to JSON-safe primitives (e.g., UUID -> str)."""
+    return json.loads(json.dumps(value, default=str))
 
 
 def get_channel_layer_safe():
@@ -171,22 +177,52 @@ def broadcast_doctor_ai_message_created(message):
         message: DoctorAIAssistantMessage instance
     """
     try:
+        from apps.rag.serializers import DoctorAIAssistantMessageSerializer
+
+        payload = DoctorAIAssistantMessageSerializer(message).data
+        payload.pop("source_metadata", None)
+        payload = _json_safe(payload)
+
         event_data = {
             "type": "doctor_ai.message.created",
-            "consultation_id": str(message.consultation_id),
-            "message_id": str(message.id),
-            "doctor_id": str(message.doctor_id),
-            "trigger_type": message.trigger_type,
-            "status": message.status,
-            "safety_level": message.safety_level,
-            "title": message.title,
-            "created_at": message.created_at.isoformat() if message.created_at else None,
+            "message": payload,
         }
 
         send_to_group_safe(user_group_name(message.doctor_id), event_data)
     except Exception:
         logger.exception(
             "Failed to broadcast doctor_ai.message.created",
+            extra={
+                "consultation_id": str(message.consultation_id),
+                "message_id": str(message.id),
+                "doctor_id": str(message.doctor_id),
+            },
+        )
+
+
+def broadcast_doctor_ai_message_updated(message):
+    """
+    Broadcast doctor_ai.message.updated event to the owning doctor's user socket.
+
+    Args:
+        message: DoctorAIAssistantMessage instance
+    """
+    try:
+        from apps.rag.serializers import DoctorAIAssistantMessageSerializer
+
+        payload = DoctorAIAssistantMessageSerializer(message).data
+        payload.pop("source_metadata", None)
+        payload = _json_safe(payload)
+
+        event_data = {
+            "type": "doctor_ai.message.updated",
+            "message": payload,
+        }
+
+        send_to_group_safe(user_group_name(message.doctor_id), event_data)
+    except Exception:
+        logger.exception(
+            "Failed to broadcast doctor_ai.message.updated",
             extra={
                 "consultation_id": str(message.consultation_id),
                 "message_id": str(message.id),

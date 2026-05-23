@@ -29,6 +29,7 @@ class UserRealtimeConsumer(AsyncJsonWebsocketConsumer):
     - notification.created
     - notification.unread_count
     - doctor_ai.message.created
+    - doctor_ai.message.updated
     - consultation.updated
     - prescription.updated
     - lab_order.updated
@@ -107,6 +108,17 @@ class UserRealtimeConsumer(AsyncJsonWebsocketConsumer):
         logger.info(
             "Delivering doctor_ai.message.created to user socket",
             extra={"user_id": str(self.user_id), "message_id": str(event.get("message_id"))},
+        )
+        await self.send_json(event)
+
+    async def doctor_ai_message_updated(self, event):
+        """Handle doctor_ai.message.updated event."""
+        logger.info(
+            "Delivering doctor_ai.message.updated to user socket",
+            extra={
+                "user_id": str(self.user_id),
+                "message_id": str(event.get("message", {}).get("id")),
+            },
         )
         await self.send_json(event)
 

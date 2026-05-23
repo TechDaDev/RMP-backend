@@ -15,6 +15,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from apps.common.choices import (
     ConsultationDuration,
     ConsultationStatus,
+    DoctorAIAssistantMessageStatus,
+    DoctorAIAssistantSafetyLevel,
+    DoctorAIAssistantTriggerType,
     MedicalSpecialty,
     MessageSenderRole,
     MessageType,
@@ -27,11 +30,14 @@ from apps.consultations.models import Consultation
 from apps.messaging.models import ConsultationMessage
 from apps.notifications.models import Notification
 from apps.profiles.models import DoctorProfile, PatientProfile, UserProfile
+from apps.rag.models import DoctorAIAssistantMessage
 from config.asgi import application
 
 from .permissions import can_connect_consultation_messages, can_connect_user_socket
 from .services import (
     broadcast_consultation_updated,
+    broadcast_doctor_ai_message_created,
+    broadcast_doctor_ai_message_updated,
     broadcast_lab_order_updated,
     broadcast_lab_result_released,
     broadcast_message_created,
@@ -243,6 +249,125 @@ class BroadcastServiceTests(TransactionTestCase):
             lab_order=SimpleNamespace(patient_id=uuid4()),
         )
         broadcast_lab_result_released(lab_result)
+
+    @patch("apps.realtime.services.send_to_group_safe")
+    def test_broadcast_doctor_ai_message_created_contract(self, send_to_group_safe):
+        patient = create_patient("ai-contract-patient@example.com")
+        doctor = create_doctor("ai-contract-doctor@example.com")
+        consultation = create_consultation(patient, doctor, ConsultationStatus.ACCEPTED)
+        ai_message = DoctorAIAssistantMessage.objects.create(
+            consultation=consultation,
+            doctor=doctor,
+            patient=patient,
+            trigger_type=DoctorAIAssistantTriggerType.MEDICAL_REPORT_CASE_UPDATE,
+            status=DoctorAIAssistantMessageStatus.UNREAD,
+            safety_level=DoctorAIAssistantSafetyLevel.DOCTOR_ONLY,
+            title="AI case update",
+            body="Doctor-only AI response.",
+            summary={
+                "rag_response_id": str(uuid4()),
+                "rag_query_id": str(uuid4()),
+                "service_context": "report_case_update",
+                "source_count": 1,
+                "document_titles": ["Guideline A"],
+                "confidence": None,
+                "fallback_reason": None,
+                "source_report_id": str(uuid4()),
+                "linked_medical_record_entry_id": str(uuid4()),
+            },
+            source_metadata={"prompt_text": "must-not-leak", "raw_response": {"k": "v"}},
+        )
+
+        broadcast_doctor_ai_message_created(ai_message)
+
+        send_to_group_safe.assert_called_once()
+        group_name, event_data = send_to_group_safe.call_args.args
+        self.assertEqual(group_name, f"user_{doctor.id}")
+        self.assertNotEqual(group_name, f"user_{patient.id}")
+        self.assertNotEqual(group_name, f"consultation_{consultation.id}")
+        self.assertEqual(event_data["type"], "doctor_ai.message.created")
+        self.assertIn("message", event_data)
+        self.assertEqual(event_data["message"]["id"], str(ai_message.id))
+        self.assertEqual(event_data["message"]["consultation"], str(consultation.id))
+        self.assertNotIn("prompt_text", event_data["message"])
+        self.assertNotIn("raw_response", event_data["message"])
+        self.assertNotIn("source_metadata", event_data["message"])
+
+    @patch("apps.realtime.services.send_to_group_safe")
+    def test_broadcast_doctor_ai_message_updated_contract(self, send_to_group_safe):
+        patient = create_patient("ai-update-patient@example.com")
+        doctor = create_doctor("ai-update-doctor@example.com")
+        consultation = create_consultation(patient, doctor, ConsultationStatus.ACCEPTED)
+        ai_message = DoctorAIAssistantMessage.objects.create(
+            consultation=consultation,
+            doctor=doctor,
+            patient=patient,
+            trigger_type=DoctorAIAssistantTriggerType.MEDICAL_REPORT_CASE_UPDATE,
+            status=DoctorAIAssistantMessageStatus.READ,
+            safety_level=DoctorAIAssistantSafetyLevel.DOCTOR_ONLY,
+            title="AI case update",
+            body="Doctor-only AI response.",
+        )
+
+        broadcast_doctor_ai_message_updated(ai_message)
+
+        send_to_group_safe.assert_called_once()
+        group_name, event_data = send_to_group_safe.call_args.args
+        self.assertEqual(group_name, f"user_{doctor.id}")
+        self.assertEqual(event_data["type"], "doctor_ai.message.updated")
+        self.assertEqual(event_data["message"]["id"], str(ai_message.id))
+
+
+class DoctorAiUserSocketDeliveryTests(TransactionTestCase):
+    def test_doctor_ai_event_reaches_doctor_user_socket_not_patient_user_socket(self):
+        patient = create_patient("socket-ai-patient@example.com")
+        doctor = create_doctor("socket-ai-doctor@example.com")
+        consultation = create_consultation(patient, doctor, ConsultationStatus.ACCEPTED)
+        ai_message = DoctorAIAssistantMessage.objects.create(
+            consultation=consultation,
+            doctor=doctor,
+            patient=patient,
+            trigger_type=DoctorAIAssistantTriggerType.MEDICAL_REPORT_CASE_UPDATE,
+            status=DoctorAIAssistantMessageStatus.UNREAD,
+            safety_level=DoctorAIAssistantSafetyLevel.DOCTOR_ONLY,
+            title="AI case update",
+            body="Doctor-only AI response.",
+            summary={"service_context": "report_case_update"},
+        )
+
+        patient_token = str(RefreshToken.for_user(patient).access_token)
+        doctor_token = str(RefreshToken.for_user(doctor).access_token)
+
+        async def scenario():
+            patient_socket = WebsocketCommunicator(
+                application,
+                f"/ws/user/?token={patient_token}",
+            )
+            doctor_socket = WebsocketCommunicator(
+                application,
+                f"/ws/user/?token={doctor_token}",
+            )
+
+            patient_connected, _ = await patient_socket.connect()
+            doctor_connected, _ = await doctor_socket.connect()
+
+            self.assertTrue(patient_connected)
+            self.assertTrue(doctor_connected)
+
+            try:
+                await database_sync_to_async(broadcast_doctor_ai_message_created)(ai_message)
+
+                doctor_event = await doctor_socket.receive_json_from(timeout=1)
+                self.assertEqual(doctor_event["type"], "doctor_ai.message.created")
+                self.assertEqual(doctor_event["message"]["id"], str(ai_message.id))
+
+                nothing_received = await patient_socket.receive_nothing(timeout=0.3)
+                self.assertTrue(nothing_received)
+            finally:
+                await patient_socket.disconnect()
+                await doctor_socket.disconnect()
+
+        async_to_sync(scenario)()
 
 
 class ConsultationSocketDeliveryTests(TransactionTestCase):

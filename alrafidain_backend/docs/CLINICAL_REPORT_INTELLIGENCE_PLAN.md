@@ -140,6 +140,21 @@ Delivered:
 - Assistant APIs do not expose prompts, provider raw payloads, API credentials, or local file paths.
 - Assistant output is advisory and does not auto-diagnose, auto-prescribe, auto-change consultation status, or auto-save to patient record.
 
+## Phase 10G.2A (Completed)
+
+Delivered:
+- Explicit backend realtime contract for doctor AI assistant stream
+- `doctor_ai.message.created` event contract on user websocket (`/ws/user/`)
+- `doctor_ai.message.updated` event contract for read/unread state changes
+- Safe payload alignment with assistant serializer fields
+- Guaranteed doctor-only routing via `user_<doctor_id>` group
+
+Safety guarantees:
+- Assistant events are never sent to patient user groups.
+- Assistant events are never sent on consultation chat groups.
+- Normal chat websocket events remain unchanged.
+- Payload excludes prompt/provider raw internals and secrets.
+
 ## Deferred Beyond 10F
 
 - Structured lab value extraction
