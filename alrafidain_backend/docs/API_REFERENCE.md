@@ -43,6 +43,7 @@ All responses follow the standard envelope:
   - [Doctor Responses and Close](#consultations)
 - [Messaging](#messaging)
 - [Drug Catalog and Prescription Drug Selection](#drug-catalog-and-prescription-drug-selection)
+- [Lab Test Offerings and Pricing](#lab-test-offerings-and-pricing)
 - [Prescriptions](#prescriptions)
 - [Notifications](#notifications)
 - [Patient Records](#patient-records)
@@ -1776,6 +1777,80 @@ Create payload example (custom drug):
   "is_available": true
 }
 ```
+
+## Lab Test Offerings and Pricing
+
+This API exposes lab-side offerings for test price and availability management.
+It does not process payments. It prepares the future lab request/quote/payment workflow.
+
+`LabTest` is the canonical identity. `LabTestOffering` is the lab-specific pricing and availability layer.
+
+### `GET /api/lab/inventory/?search=cbc`
+
+List active lab offerings with optional search and filters.
+
+- **Auth required**: Yes
+- **Search fields**: `lab_test.name`, `lab_test.short_name`, `lab_test.loinc_code`, `lab_test.aliases.alias`, `custom_test_name`, `local_name`, `sample_type_override`
+- **Additional query params**:
+  - `available=true|false`
+  - `lab_test=<lab_test_uuid>`
+  - `lab=<laboratorian_profile_uuid>` (admin/staff)
+  - `category=<category>`
+  - `sample_type=<sample_type>`
+
+### `POST /api/lab/inventory/`
+
+Create a new lab offering.
+
+- **Auth required**: Yes
+- **Allowed write roles**: Admin/Staff, Laboratorian (own lab only)
+
+Create payload example (catalog lab test):
+```json
+{
+  "lab_test": "<lab_test_uuid>",
+  "local_name": "CBC",
+  "sample_type_override": "Blood",
+  "preparation_notes": "No special preparation required.",
+  "estimated_turnaround_time": "Same day",
+  "price": "10000.00",
+  "currency": "IQD",
+  "is_available": true
+}
+```
+
+Create payload example (custom test):
+```json
+{
+  "custom_test_name": "Special local test not in catalog",
+  "sample_type_override": "Blood",
+  "estimated_turnaround_time": "24 hours",
+  "price": "25000.00",
+  "currency": "IQD",
+  "is_available": true
+}
+```
+
+Validation rules:
+- At least one of `lab_test` or `custom_test_name` is required.
+- Inactive `lab_test` cannot be selected.
+- `price` must be non-negative.
+- Duplicate active offerings for the same `lab + lab_test` are rejected.
+
+### `PATCH /api/lab/inventory/{id}/`
+
+Partially update a lab offering.
+
+- **Auth required**: Yes
+- **Allowed write roles**: Admin/Staff, owning Laboratorian
+
+### `DELETE /api/lab/inventory/{id}/`
+
+Soft-delete a lab offering.
+
+- **Auth required**: Yes
+- **Allowed write roles**: Admin/Staff, owning Laboratorian
+- **Behavior**: sets `is_active=false`
 
 ## Lab Test Catalog
 
