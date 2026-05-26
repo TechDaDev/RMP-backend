@@ -1730,6 +1730,167 @@ List dispensing records for the authenticated pharmacist only.
 
 ---
 
+## Pharmacy Drug Inventory
+
+This API exposes pharmacy-side inventory listings with availability and pricing.
+It is designed to support future prescription fulfillment and payment workflows.
+
+### `GET /api/pharmacy/inventory/?search=amoxi`
+
+List active inventory records with optional search and filters.
+
+- **Auth required**: Yes
+- **Search fields**: catalog drug name/generic/brand/rxcui/alias, `custom_drug_name`, `brand_name`, `strength`, `form`
+- **Additional query params**:
+  - `available=true|false`
+  - `stock_status=in_stock|low_stock|out_of_stock|unavailable`
+  - `drug=<drug_uuid>`
+  - `pharmacy=<pharmacy_uuid>` (admin/staff)
+
+Create payload example (catalog drug):
+```json
+{
+  "drug": "<drug_uuid>",
+  "brand_name": "Augmentin",
+  "form": "Tablet",
+  "strength": "625 mg",
+  "price": "7500.00",
+  "currency": "IQD",
+  "stock_status": "in_stock",
+  "quantity": 20,
+  "is_available": true
+}
+```
+
+Create payload example (custom drug):
+```json
+{
+  "custom_drug_name": "Local syrup not in catalog",
+  "brand_name": "Local Brand",
+  "form": "Syrup",
+  "strength": "100 ml",
+  "price": "5000.00",
+  "currency": "IQD",
+  "stock_status": "in_stock",
+  "quantity": 12,
+  "is_available": true
+}
+```
+
+## Pharmacy Prescription Requests and Quotes
+
+This workflow links prescriptions to pharmacy inventory for quote-based pre-payment review.
+No payment is processed in these endpoints.
+
+### `POST /api/pharmacy/requests/`
+
+Create a pharmacy prescription request.
+
+- **Auth required**: Yes
+- **Allowed roles**: Patient (own prescription), Doctor (related prescription), Admin/Staff
+
+Example payload:
+```json
+{
+  "prescription": "prescription_uuid",
+  "pharmacy": "pharmacist_profile_uuid",
+  "patient_notes": "Please check availability"
+}
+```
+
+Behavior:
+- Creates request with `status=pending`.
+- Automatically snapshots prescription items into request items.
+- Initializes quote amounts to zero until pharmacy submits quote.
+
+### `POST /api/pharmacy/requests/{id}/quote/`
+
+Pharmacy creates or updates quote lines.
+
+- **Auth required**: Yes
+- **Allowed roles**: Owning pharmacy user, Admin/Staff
+
+Example payload:
+```json
+{
+  "pharmacy_notes": "All available except one substitution.",
+  "items": [
+    {
+      "prescription_item": "prescription_item_uuid",
+      "inventory_item": "inventory_uuid",
+      "availability_status": "available",
+      "quoted_name": "Amoxicillin 500 mg Capsule",
+      "quantity": 1,
+      "unit_price": "7500.00",
+      "pharmacy_note": "Available"
+    },
+    {
+      "prescription_item": "prescription_item_uuid",
+      "inventory_item": "replacement_inventory_uuid",
+      "availability_status": "substituted",
+      "quoted_name": "Equivalent local brand",
+      "quantity": 1,
+      "unit_price": "5000.00",
+      "substitution_note": "Same generic, different brand"
+    }
+  ]
+}
+```
+
+Quote rules:
+- Request must be `pending` or `quoted`.
+- Inventory item must belong to same pharmacy request target.
+- Unavailable lines are quoted at zero.
+- Request `total_price` is recalculated from request items.
+- No stock deduction yet.
+
+### `POST /api/pharmacy/requests/{id}/accept/`
+
+Patient accepts quoted request.
+
+- **Auth required**: Yes
+- **Allowed roles**: Patient owner, Admin/Staff
+- **Status required**: `quoted`
+
+### `POST /api/pharmacy/requests/{id}/reject/`
+
+Patient rejects quoted request.
+
+- **Auth required**: Yes
+- **Allowed roles**: Patient owner, Admin/Staff
+- **Status required**: `quoted`
+
+Example payload:
+```json
+{
+  "rejection_reason": "Too expensive"
+}
+```
+
+### `POST /api/pharmacy/requests/{id}/cancel/`
+
+Cancel a pending or quoted request.
+
+- **Auth required**: Yes
+- **Allowed roles**: Patient owner, Doctor owner, Owning pharmacy user, Admin/Staff
+
+### `POST /api/pharmacy/requests/{id}/complete/`
+
+Mark accepted request as completed (fulfillment checkpoint before future payment workflow).
+
+- **Auth required**: Yes
+- **Allowed roles**: Owning pharmacy user, Admin/Staff
+- **Status required**: `accepted`
+
+Status lifecycle:
+- `pending` -> `quoted` -> `accepted` -> `completed`
+- `quoted` -> `rejected`
+- `pending|quoted` -> `cancelled`
+
+Note:
+- Accepted quotes prepare future payment workflow only.
+- No wallet/payment transaction is executed here.
+
 ## Notifications
 
 ### `GET /api/notifications/`

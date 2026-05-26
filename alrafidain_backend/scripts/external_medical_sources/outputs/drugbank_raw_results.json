@@ -1,0 +1,16 @@
+[
+  {
+    "tested": false,
+    "reason": "Missing DRUGBANK_API_KEY",
+    "input_terms": [
+      "paracetamol",
+      "acetaminophen",
+      "amoxicillin",
+      "metformin",
+      "ibuprofen",
+      "ceftriaxone",
+      "insulin"
+    ],
+    "base_url": "https://api.drugbank.com/v1"
+  }
+]

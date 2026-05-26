@@ -1,0 +1,79 @@
+[
+  {
+    "input_term": "CBC",
+    "loinc_code": null,
+    "display": null,
+    "system": null,
+    "version": null,
+    "designation_synonyms": [],
+    "properties": {},
+    "source_endpoint_used": "ValueSet/$expand",
+    "note": "Skipped: missing credentials"
+  },
+  {
+    "input_term": "Complete Blood Count",
+    "loinc_code": null,
+    "display": null,
+    "system": null,
+    "version": null,
+    "designation_synonyms": [],
+    "properties": {},
+    "source_endpoint_used": "ValueSet/$expand",
+    "note": "Skipped: missing credentials"
+  },
+  {
+    "input_term": "HbA1c",
+    "loinc_code": null,
+    "display": null,
+    "system": null,
+    "version": null,
+    "designation_synonyms": [],
+    "properties": {},
+    "source_endpoint_used": "ValueSet/$expand",
+    "note": "Skipped: missing credentials"
+  },
+  {
+    "input_term": "Creatinine",
+    "loinc_code": null,
+    "display": null,
+    "system": null,
+    "version": null,
+    "designation_synonyms": [],
+    "properties": {},
+    "source_endpoint_used": "ValueSet/$expand",
+    "note": "Skipped: missing credentials"
+  },
+  {
+    "input_term": "Liver Function Test",
+    "loinc_code": null,
+    "display": null,
+    "system": null,
+    "version": null,
+    "designation_synonyms": [],
+    "properties": {},
+    "source_endpoint_used": "ValueSet/$expand",
+    "note": "Skipped: missing credentials"
+  },
+  {
+    "input_term": "Urinalysis",
+    "loinc_code": null,
+    "display": null,
+    "system": null,
+    "version": null,
+    "designation_synonyms": [],
+    "properties": {},
+    "source_endpoint_used": "ValueSet/$expand",
+    "note": "Skipped: missing credentials"
+  },
+  {
+    "input_term": "Glucose",
+    "loinc_code": null,
+    "display": null,
+    "system": null,
+    "version": null,
+    "designation_synonyms": [],
+    "properties": {},
+    "source_endpoint_used": "ValueSet/$expand",
+    "note": "Skipped: missing credentials"
+  }
+]

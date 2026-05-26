@@ -3,6 +3,7 @@ from datetime import date
 from rest_framework import serializers
 
 from apps.common.choices import DispensingAttemptStatus, MedicationRoute
+from apps.medical_catalog.models import Drug
 
 from .models import DispensingRecord, Prescription, PrescriptionItem
 
@@ -16,13 +17,43 @@ class _SafeUserSerializer(serializers.Serializer):
         return f"{obj.first_name} {obj.last_name}".strip() or obj.email
 
 
+class _DrugLightSerializer(serializers.ModelSerializer):
+    display_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Drug
+        fields = [
+            "id",
+            "display_name",
+            "name",
+            "generic_name",
+            "brand_name",
+            "form",
+            "strength",
+            "route",
+            "rxnorm_rxcui",
+        ]
+
+    def get_display_name(self, obj):
+        parts = [obj.name]
+        if obj.strength:
+            parts.append(obj.strength)
+        if obj.form:
+            parts.append(obj.form)
+        return " ".join(parts)
+
+
 # ──────────────────────────────────────────────
 # Doctor: create prescription
 # ──────────────────────────────────────────────
 
 
 class PrescriptionItemCreateSerializer(serializers.Serializer):
-    medication_name = serializers.CharField(max_length=200)
+    drug = serializers.PrimaryKeyRelatedField(queryset=Drug.objects.all(), required=False, allow_null=True)
+    custom_drug_name = serializers.CharField(max_length=255, required=False, allow_blank=True, allow_null=True)
+    medication_name = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    # Backward-compatible alias for legacy payloads that may send drug_name.
+    drug_name = serializers.CharField(max_length=200, required=False, allow_blank=True, write_only=True)
     strength = serializers.CharField(max_length=100, required=False, default="")
     dosage = serializers.CharField(max_length=200)
     frequency = serializers.CharField(max_length=200)
@@ -30,6 +61,29 @@ class PrescriptionItemCreateSerializer(serializers.Serializer):
     route = serializers.ChoiceField(choices=MedicationRoute.choices)
     quantity = serializers.CharField(max_length=100, required=False, default="")
     instructions = serializers.CharField(required=False, default="")
+
+    def validate(self, attrs):
+        drug = attrs.get("drug")
+        custom_drug_name = (attrs.get("custom_drug_name") or "").strip()
+        legacy_drug_name = (attrs.get("drug_name") or "").strip()
+        medication_name = (attrs.get("medication_name") or "").strip()
+
+        if drug and not drug.is_active:
+            raise serializers.ValidationError({"drug": "Selected drug is inactive."})
+
+        resolved_name = medication_name or legacy_drug_name or custom_drug_name
+        if not resolved_name and drug:
+            resolved_name = drug.name
+        if not (drug or resolved_name):
+            raise serializers.ValidationError(
+                {"medication_name": "A catalog drug or custom drug name is required."}
+            )
+
+        if not medication_name and resolved_name:
+            attrs["medication_name"] = resolved_name
+        attrs["custom_drug_name"] = custom_drug_name or None
+        attrs.pop("drug_name", None)
+        return attrs
 
 
 class PrescriptionCreateSerializer(serializers.Serializer):
@@ -75,10 +129,19 @@ class PrescriptionPatientDetailSerializer(PrescriptionPatientListSerializer):
 
 
 class PrescriptionItemSerializer(serializers.ModelSerializer):
+    drug_detail = _DrugLightSerializer(source="drug", read_only=True)
+    display_drug_name = serializers.CharField(read_only=True)
+    drug_name = serializers.CharField(source="medication_name", read_only=True)
+
     class Meta:
         model = PrescriptionItem
         fields = [
             "id",
+            "drug",
+            "drug_detail",
+            "custom_drug_name",
+            "display_drug_name",
+            "drug_name",
             "medication_name",
             "strength",
             "dosage",
@@ -143,10 +206,19 @@ class PrescriptionDoctorDetailSerializer(serializers.ModelSerializer):
 
 
 class PrescriptionRemainingItemSerializer(serializers.ModelSerializer):
+    drug_detail = _DrugLightSerializer(source="drug", read_only=True)
+    display_drug_name = serializers.CharField(read_only=True)
+    drug_name = serializers.CharField(source="medication_name", read_only=True)
+
     class Meta:
         model = PrescriptionItem
         fields = [
             "id",
+            "drug",
+            "drug_detail",
+            "custom_drug_name",
+            "display_drug_name",
+            "drug_name",
             "medication_name",
             "strength",
             "dosage",

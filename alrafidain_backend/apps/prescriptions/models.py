@@ -149,6 +149,14 @@ class PrescriptionItem(BaseModel):
         on_delete=models.CASCADE,
         related_name="items",
     )
+    drug = models.ForeignKey(
+        "medical_catalog.Drug",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="prescription_items",
+    )
+    custom_drug_name = models.CharField(max_length=255, blank=True, null=True)
     medication_name = models.CharField(max_length=200)
     strength = models.CharField(max_length=100, blank=True)
     dosage = models.CharField(max_length=200)
@@ -173,6 +181,17 @@ class PrescriptionItem(BaseModel):
 
     def __str__(self):
         return f"{self.medication_name} [{self.status}]"
+
+    @property
+    def display_drug_name(self):
+        if self.drug:
+            parts = [self.drug.name]
+            if self.drug.strength:
+                parts.append(self.drug.strength)
+            if self.drug.form:
+                parts.append(self.drug.form)
+            return " ".join(parts)
+        return self.custom_drug_name or self.medication_name
 
 
 class DispensingRecord(BaseModel):

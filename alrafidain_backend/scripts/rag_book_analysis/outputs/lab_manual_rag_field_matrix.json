@@ -1,0 +1,106 @@
+{
+  "generated_at": "2026-05-26T10:08:18.586288+00:00",
+  "field_support": {
+    "purpose_summary": true,
+    "patient_preparation": true,
+    "specimen_type": true,
+    "sample_collection_notes": true,
+    "clinical_significance": true,
+    "interpretation_summary": true,
+    "interfering_factors": true,
+    "safety_notes": false,
+    "patient_explanation": true,
+    "provider_notes": true
+  },
+  "matrix": [
+    {
+      "field": "purpose_summary",
+      "supported_by_retrieved_content": true,
+      "store_directly": false,
+      "store_as_reviewed_summary": true,
+      "ignore": false,
+      "notes": "Use clinician-reviewed rewritten summary with source traceability."
+    },
+    {
+      "field": "patient_preparation",
+      "supported_by_retrieved_content": true,
+      "store_directly": false,
+      "store_as_reviewed_summary": true,
+      "ignore": false,
+      "notes": "Use clinician-reviewed rewritten summary with source traceability."
+    },
+    {
+      "field": "specimen_type",
+      "supported_by_retrieved_content": true,
+      "store_directly": false,
+      "store_as_reviewed_summary": true,
+      "ignore": false,
+      "notes": "Use clinician-reviewed rewritten summary with source traceability."
+    },
+    {
+      "field": "sample_collection_notes",
+      "supported_by_retrieved_content": true,
+      "store_directly": false,
+      "store_as_reviewed_summary": true,
+      "ignore": false,
+      "notes": "Use clinician-reviewed rewritten summary with source traceability."
+    },
+    {
+      "field": "clinical_significance",
+      "supported_by_retrieved_content": true,
+      "store_directly": false,
+      "store_as_reviewed_summary": true,
+      "ignore": false,
+      "notes": "Use clinician-reviewed rewritten summary with source traceability."
+    },
+    {
+      "field": "interpretation_summary",
+      "supported_by_retrieved_content": true,
+      "store_directly": false,
+      "store_as_reviewed_summary": true,
+      "ignore": false,
+      "notes": "Use clinician-reviewed rewritten summary with source traceability."
+    },
+    {
+      "field": "interfering_factors",
+      "supported_by_retrieved_content": true,
+      "store_directly": false,
+      "store_as_reviewed_summary": true,
+      "ignore": false,
+      "notes": "Use clinician-reviewed rewritten summary with source traceability."
+    },
+    {
+      "field": "safety_notes",
+      "supported_by_retrieved_content": false,
+      "store_directly": false,
+      "store_as_reviewed_summary": false,
+      "ignore": true,
+      "notes": "Insufficient signal in retrieved excerpts for this run."
+    },
+    {
+      "field": "patient_explanation",
+      "supported_by_retrieved_content": true,
+      "store_directly": false,
+      "store_as_reviewed_summary": true,
+      "ignore": false,
+      "notes": "Use clinician-reviewed rewritten summary with source traceability."
+    },
+    {
+      "field": "provider_notes",
+      "supported_by_retrieved_content": true,
+      "store_directly": false,
+      "store_as_reviewed_summary": true,
+      "ignore": false,
+      "notes": "Use clinician-reviewed rewritten summary with source traceability."
+    }
+  ],
+  "should_not_store": [
+    "full paragraphs",
+    "copyrighted wording",
+    "long monographs",
+    "full reference ranges as final truth",
+    "outdated clinical recommendations without review",
+    "content without source traceability"
+  ],
+  "usage_decision": "Useful for reviewed summaries"
+}

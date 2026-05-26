@@ -1,0 +1,938 @@
+[
+  {
+    "input_term": "paracetamol",
+    "generic_names": [],
+    "brand_names": [],
+    "manufacturer_name": [],
+    "route": [],
+    "warnings": [],
+    "indications_and_usage": [],
+    "contraindications": [],
+    "adverse_reactions": [],
+    "dosage_and_administration": [],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label",
+    "note": "No results or request failed"
+  },
+  {
+    "input_term": "acetaminophen",
+    "generic_names": [
+      "ACETAMINOPHEN"
+    ],
+    "brand_names": [
+      "basic care acetaminophen"
+    ],
+    "manufacturer_name": [
+      "Amazon.com Services LLC"
+    ],
+    "route": [
+      "ORAL"
+    ],
+    "warnings": [
+      "Warnings Liver warning: This product contains acetaminophen. Severe liver damage may occur if you take \u2022 more than 4,000 mg of acetaminophen in 24 hours \u2022 with other drugs containing acetaminophen \u2022 3 or more alcoholic drinks every day while using this product Allergy alert: Acetaminophen may cause severe skin reactions. Symptoms may include: \u2022 skin reddening \u2022 blisters \u2022 rash If a skin reaction occurs, stop use and seek medical help right away. Do not use \u2022 with any other drug containing acetam"
+    ],
+    "indications_and_usage": [
+      "Uses \u2022 temporarily relieves minor aches and pains due to: \u2022 headache \u2022 muscular aches \u2022 backache \u2022 minor pain of arthritis \u2022 the common cold \u2022 toothache \u2022 premenstrual and menstrual cramps \u2022 temporarily reduces fever"
+    ],
+    "contraindications": [],
+    "adverse_reactions": [],
+    "dosage_and_administration": [
+      "Directions \u2022 do not take more than directed (see overdose warning) adults and children 12 years and over \u2022 take 2 caplets every 6 hours while symptoms last \u2022 do not take more than 6 caplets in 24 hours, unless directed by a doctor \u2022 do not use for more than 10 days unless directed by a doctor children under 12 years ask a doctor"
+    ],
+    "active_ingredient": [
+      "Active ingredient (in each caplet) Acetaminophen 500 mg"
+    ],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "acetaminophen",
+    "generic_names": [
+      "ACETAMINOPHEN"
+    ],
+    "brand_names": [
+      "Acetaminophen"
+    ],
+    "manufacturer_name": [
+      "WALMART INC."
+    ],
+    "route": [
+      "ORAL"
+    ],
+    "warnings": [
+      "Warnings Liver warning: This product contains acetaminophen. Severe liver damage may occur if you take more than 6 tablets in 24 hours, which is the maximum daily amount with other drugs containing acetaminophen 3 or more alcoholic drinks every day while using this product Allergy alert: acetaminophen may cause severe skin reactions. Symptoms may include: skin reddening blisters rash If a skin reaction occurs, stop use and seek medical help right away."
+    ],
+    "indications_and_usage": [
+      "Uses temporarily relieves minor aches and pains due to: minor pain of arthritis muscular aches backache premenstrual and menstrual cramp toothache the common cold headache toothache temporarily reduces fever"
+    ],
+    "contraindications": [],
+    "adverse_reactions": [],
+    "dosage_and_administration": [
+      "Directions do not take more than directed (see overdose warning). Adults: take 2 tablets every 8 hours with water swallow whole; do not crush, chew, split or dissolve do not take more than 6 tablets in 24 hours do not use for more than 10 days unless directed by a doctor. Under 18 years of age: ask a doctor"
+    ],
+    "active_ingredient": [
+      "Drug Facts Active ingredient (in each extended-release tablet) Acetaminophen USP 650 mg"
+    ],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "acetaminophen",
+    "generic_names": [
+      "ACETAMINOPHEN"
+    ],
+    "brand_names": [
+      "Acetaminophen"
+    ],
+    "manufacturer_name": [
+      "NuCare Pharmaceuticals,Inc."
+    ],
+    "route": [
+      "ORAL"
+    ],
+    "warnings": [
+      "Warnings Liver warning: This product contains acetaminophen. The maximum daily dose of this product is 10 tablets (3,250 mg) in 24 hours for adults or 5 tablets (1,625 mg) in 24 hours for children. Severe liver damage may occur if adult takes more than 4,000 mg of acetaminophen in 24 hours child takes more than 5 doses in 24 hours, which is the maximum daily amount taken with other drugs containing acetaminophen adult has 3 or more alcoholic drinks every day while using this product Allergy aler"
+    ],
+    "indications_and_usage": [
+      "Uses temporarily relieves minor aches and pains due to: headache muscular aches backache minor pain of arthritis the common cold toothache premenstrual and menstrual cramps temporarily reduces fever"
+    ],
+    "contraindications": [],
+    "adverse_reactions": [],
+    "dosage_and_administration": [
+      "Directions do not take more than directed (see overdose warning) adults and children 12 years and over take 2 tablets, every 4 to 6 hours while symptoms last do not take more than 10 tablets in 24 hours, unless directe by a doctor do not use for more than 10 days unless directed by a doctor children 6 to under 12 years take 1 tablet every 4 to 6 hours while symptoms last do not take more than 5 tablets in 24 hours do not use for more than 5 days unless directed by a doctor children under 6 years"
+    ],
+    "active_ingredient": [
+      "Active ingredient (in each tablet) Acetaminophen 325mg"
+    ],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "acetaminophen",
+    "generic_names": [
+      "ACETAMINOPHEN"
+    ],
+    "brand_names": [
+      "ACETAMINOPHEN"
+    ],
+    "manufacturer_name": [
+      "Granules India Limited"
+    ],
+    "route": [
+      "ORAL"
+    ],
+    "warnings": [
+      "WARNINGS Liver warning: This product contains acetaminophen. Severe Liver damage may occur if you take \u2022 more than 6 caplets in 24 hours, which is the maximum daily amount \u2022 with other drugs containing acetaminophen \u2022 3 or more alcoholic drinks everyday while using this product Allergy alert: acetaminophen may cause severe skin reactions Symptoms may include: \u2022 skin reddening \u2022 blisters \u2022 rash If a skin reaction occurs, stop use and seek medical help right away"
+    ],
+    "indications_and_usage": [
+      "USES For Arthritis Pain label \u2022 temporarily relieves minor aches and pains due to: \u2022 minor pain of arthritis \u2022 muscular aches \u2022 backache \u2022 premenstrual and menstrual cramps \u2022 the common cold \u2022 headache \u2022 toothache \u2022 temporarily reduces fever For Muscle Aches & Pain label \u2022 temporarily relieves minor aches and pains due to: \u2022 muscular aches \u2022 backache \u2022 minor pain of arthritis \u2022 toothache \u2022 premenstrual and menstrual cramps \u2022 headache \u2022 the common cold \u2022 temporarily reduces fever"
+    ],
+    "contraindications": [],
+    "adverse_reactions": [],
+    "dosage_and_administration": [
+      "DIRECTIONS For Arthritis Pain Label \u2022 do not take more than directed (see overdose warning) adults \u2022 take 2 caplets every 8 hours with water \u2022 swallow whole; do not crush, chew, split or dissolve \u2022 do not take more than 6 caplets in 24 hours \u2022 do not use for more than 10 days unless directed by a doctor under 18 years of age \u2022 ask a doctor For Muscle Ache and Pain label \u2022 do not take more than directed (see overdose warning) adults and children 12 years of age and over \u2022 take 2 caplets every 8 h"
+    ],
+    "active_ingredient": [
+      "ACTIVE INGREDIENT (IN EACH CAPLET) Acetaminophen USP, 650 mg"
+    ],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "acetaminophen",
+    "generic_names": [
+      "ACETAMINOPHEN 500MG/ DIPHENHYDRAMINE HCL 25MG"
+    ],
+    "brand_names": [
+      "Extra strength Acetaminophen PM"
+    ],
+    "manufacturer_name": [
+      "TIME CAP LABS INC"
+    ],
+    "route": [
+      "ORAL"
+    ],
+    "warnings": [
+      "Warnings Liver warning: This product contains acetaminophen. Severe liver damage may occur if you take more than 4,000 mg of acetaminophen in 24 hours with other drugs containing acetaminophen 3 or more alcoholic drinks every day while using this product Allergy alert: acetaminophen may cause severe skin reactions. Symptoms may include: skin reddening blisters rash If a skin reaction occurs, stop use and seek medical help right away."
+    ],
+    "indications_and_usage": [
+      "Uses temporary relief of occasional headaches and minor aches and pains with accompanying sleeplessness"
+    ],
+    "contraindications": [],
+    "adverse_reactions": [],
+    "dosage_and_administration": [
+      "Directions Do not take more than directed. See overdose warning adults and children 12 years and over take 2 caplets at bedtime do not take more than 2 caplets of this product in 24 hours children under 12 years do not use"
+    ],
+    "active_ingredient": [
+      "Active ingredients (in each caplet) Acetaminophen 500 mg Diphenhydramine HCl 25 mg"
+    ],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "amoxicillin",
+    "generic_names": [
+      "AMOXICILLIN AND CLAVULANATE POTASSIUM"
+    ],
+    "brand_names": [
+      "AMOXICILLIN AND CLAVULANATE POTASSIUM"
+    ],
+    "manufacturer_name": [
+      "A-S Medication Solutions"
+    ],
+    "route": [
+      "ORAL"
+    ],
+    "warnings": [],
+    "indications_and_usage": [
+      "1 INDICATIONS AND USAGE Amoxicillin and Clavulanate Potassium is indicated for the treatment of infections in adults and pediatric patients, due to susceptible isolates of the designated bacteria in the conditions listed below: Lower Respiratory Tract Infections - caused by beta\u2011lactamase\u2013producing isolates of Haemophilus influenzae and Moraxella catarrhalis . Acute Bacterial Otitis Media - caused by beta\u2011lactamase\u2013producing isolates of H. influenzae and M. catarrhalis . Sinusitis - caused by be"
+    ],
+    "contraindications": [
+      "4 CONTRAINDICATIONS History of a serious hypersensitivity reaction (e.g., anaphylaxis or Stevens-Johnson syndrome) to Amoxicillin and Clavulanate Potassium or to other beta\u2011lactams (e.g., penicillins or cephalosporins). ( 4.1 ) History of cholestatic jaundice/hepatic dysfunction associated with Amoxicillin and Clavulanate Potassium. ( 4.2 ) 4.1 Serious Hypersensitivity Reactions Amoxicillin and Clavulanate Potassium is contraindicated in patients with a history of serious hypersensitivity reacti"
+    ],
+    "adverse_reactions": [
+      "6 ADVERSE REACTIONS The following are discussed in more detail in other sections of the labeling: Anaphylactic reactions [see Warnings and Precautions (5.1) ] Severe Cutaneous Adverse Reactions [see Warnings and Precautions ( 5.2 )] Hepatic Dysfunction [see Warnings and Precautions (5.3) ] Clostridioides difficile Associated Diarrhea (CDAD) [see Warnings and Precautions (5.4) ] The most frequently reported adverse effects were diarrhea/loose stools (9%), nausea (3%), skin rashes and urticaria (3"
+    ],
+    "dosage_and_administration": [
+      "2 DOSAGE AND ADMINISTRATION Adults and Pediatric Patients greater than 40 kg: 500 or 875 mg every 12 hours or 250 or 500 mg every 8 hours, based on the amoxicillin component. ( 2.2 , 2.3 ) Pediatric patients aged 12 weeks (3 months) and older: 25 to 45 mg/kg/day every 12 hours or 20 to 40 mg/kg/day every 8 hours, up to the adult dose. ( 2.3 ) Neonates and infants less than 12 weeks of age: 30 mg/kg/day divided every 12 hours, based on the amoxicillin component. Use of the 125 mg/5 mL oral suspen"
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "amoxicillin",
+    "generic_names": [
+      "AMOXICILLIN"
+    ],
+    "brand_names": [
+      "Amoxicillin"
+    ],
+    "manufacturer_name": [
+      "A-S Medication Solutions"
+    ],
+    "route": [
+      "ORAL"
+    ],
+    "warnings": [],
+    "indications_and_usage": [
+      "1 INDICATIONS AND USAGE Adults and Pediatric Patients Upper Respiratory Tract Infections of the Ear, Nose, and Throat: Amoxicillin tablets are indicated in the treatment of infections due to susceptible (ONLY \u03b2-lactamase-negative) isolates of Streptococcus species. (\u03b1- and \u03b2-hemolytic isolates only), Streptococcus pneumoniae , Staphylococcus spp., or Haemophilus influenzae . Infections of the Genitourinary Tract: Amoxicillin tablets are indicated in the treatment of infections due to susceptible"
+    ],
+    "contraindications": [
+      "4 CONTRAINDICATIONS Amoxicillin tablets are contraindicated in patients who have experienced a serious hypersensitivity reaction (e.g., anaphylaxis or Stevens-Johnson syndrome) to amoxicillin tablets or to other \u03b2-lactam antibacterial drugs (e.g., penicillins and cephalosporins). History of a serious hypersensitivity reaction (e.g., anaphylaxis or Stevens-Johnson syndrome) to amoxicillin tablets or to other beta-lactams (e.g., penicillins or cephalosporins). (4)"
+    ],
+    "adverse_reactions": [
+      "6 ADVERSE REACTIONS The following are discussed in more detail in other sections of the labeling: Anaphylactic reactions [see Warnings and Precautions (5.1) ] Severe Cutaneous Adverse Reactions [see Warnings and Precautions (5.2) ] Clostridioides difficile- Associated Diarrhea (CDAD) [see Warnings and Precautions (5.3) ] The most common adverse reactions (greater than 1%) observed in clinical trials of amoxicillin tablets or for oral suspension were diarrhea, rash, vomiting, and nausea. (6.1) To"
+    ],
+    "dosage_and_administration": [
+      "2 DOSAGE AND ADMINISTRATION In Adults, 750 to 1750 mg/day in divided doses every 8 to 12 hours. In Pediatric Patients over 3 Months of Age, 20 to 45 mg/kg/day in divided doses every 8 to 12 hours. Refer to full prescribing information for specific dosing regimens. ( 2.2 , 2.3 ) The upper dose for neonates and infants aged 3 months or younger is 30 mg/kg/day divided every 12 hours. ( 2.3 ) Dosing for H. pylori Infection (in Adults): Triple therapy: 1 gram amoxicillin, 500 mg clarithromycin, and 3"
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "amoxicillin",
+    "generic_names": [
+      "AMOXICILLIN"
+    ],
+    "brand_names": [
+      "AMOXICILLIN"
+    ],
+    "manufacturer_name": [
+      "DIRECT RX"
+    ],
+    "route": [
+      "ORAL"
+    ],
+    "warnings": [],
+    "indications_and_usage": [
+      "INDICATIONS & USAGE SECTION To reduce the development of drug-resistant bacteria and maintain the effectiveness of amoxicillin for oral suspension, USP and other antibacterial drugs, amoxicillin for oral suspension, USP should be used only to treat infections that are proven or strongly suspected to be caused by bacteria. When culture and susceptibility information are available, they should be considered in selecting or modifying antibacterial therapy. In the absence of such data, local epidemi"
+    ],
+    "contraindications": [
+      "CONTRAINDICATIONS SECTION Amoxicillinfor oral suspension is contraindicated in patients who have experienced a serious hypersensitivity reaction (e.g., anaphylaxis or Stevens-Johnson syndrome) to amoxicillin for oral suspension or to other \u03b2-lactam antibiotics (e.g., penicillins and cephalosporins)."
+    ],
+    "adverse_reactions": [
+      "ADVERSE REACTIONS SECTION The following are discussed in more detail in other sections of the labeling: Anaphylactic reactions [see Warnings and Precautions (5.1) ] CDAD [see Warnings and Precautions (5.2) ] 6.1 Clinical Trials Experience Because clinical trials are conducted under widely varying conditions, adverse reaction rates observed in the clinical trials of a drug cannot be directly compared to rates in the clinical trials of another drug and may not reflect the rates observed in practic"
+    ],
+    "dosage_and_administration": [
+      "DOSAGE & ADMINISTRATION SECTION 2.1 Dosing for Adult and Pediatric Patients > 3 Months of Age Except for gonorrhea, treatment should be continued for a minimum of 48 to 72 hours beyond the time that the patient becomes asymptomatic or evidence of bacterial eradication has been obtained. It is recommended that there be at least 10 days\u2019 treatment for any infection caused by Streptococcus pyogenes to prevent the occurrence of acute rheumatic fever. In some infections, therapy may be required for s"
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "amoxicillin",
+    "generic_names": [
+      "AMOXICILLIN AND CLAVULANATE POTASSIUM"
+    ],
+    "brand_names": [
+      "Amoxicillin and Clavulanate Potassium"
+    ],
+    "manufacturer_name": [
+      "Proficient Rx LP"
+    ],
+    "route": [
+      "ORAL"
+    ],
+    "warnings": [],
+    "indications_and_usage": [
+      "1 INDICATIONS AND USAGE To reduce the development of drug-resistant bacteria and maintain the effectiveness of amoxicillin and clavulanate potassium and other antibacterial drugs, amoxicillin and clavulanate potassium should be used only to treat infections that are proven or strongly suspected to be caused by susceptible bacteria. When culture and susceptibility information are available, they should be considered in selecting or modifying antibacterial therapy. In the absence of such data, loc"
+    ],
+    "contraindications": [
+      "4 CONTRAINDICATIONS \u2022 History of a serious hypersensitivity reaction (e.g., anaphylaxis or Stevens-Johnson syndrome) to amoxicillin and clavulanate potassium or to other beta-lactams (e.g., penicillins or cephalosporins) ( 4 ) \u2022 History of cholestatic jaundice/hepatic dysfunction associated with amoxicillin and clavulanate potassium. ( 4 ) 4.1 Serious Hypersensitivity Reactions Amoxicillin and clavulanate potassium is contraindicated in patients with a history of serious hypersensitivity reactio"
+    ],
+    "adverse_reactions": [
+      "6 ADVERSE REACTIONS The following are discussed in more detail in other sections of the labeling: \u2022 Anaphylactic reactions [see Warnings and Precautions ( 5.1 )] \u2022 Hepatic Dysfunction [see Warnings and Precautions ( 5.2 )] \u2022 CDAD [see Warnings and Precautions ( 5.3 )] The most frequently reported adverse effects were diarrhea/loose stools (9%), nausea (3%), skin rashes and urticaria (3%), vomiting (1%) and vaginitis (1%) ( 6.1 ) To report SUSPECTED ADVERSE REACTIONS, contact Sandoz Inc. at 1-800"
+    ],
+    "dosage_and_administration": [
+      "2 DOSAGE AND ADMINISTRATION Amoxicillin and clavulanate potassium may be taken without regard to meals; however, absorption of clavulanate potassium is enhanced when amoxicillin and clavulanate potassium is administered at the start of a meal. To minimize the potential for gastrointestinal intolerance, amoxicillin and clavulanate potassium should be taken at the start of a meal. \u2022 Adults and Pediatric Patients > 40 kg: 500 or 875 mg every 12 hours or 250 or 500 mg every 8 hours. ( 2.1 , 2.2 ) \u2022 "
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "amoxicillin",
+    "generic_names": [
+      "AMOXICILLIN AND CLAVULANATE POTASSIUM"
+    ],
+    "brand_names": [
+      "Amoxicillin and Clavulanate Potassium"
+    ],
+    "manufacturer_name": [
+      "A-S Medication Solutions"
+    ],
+    "route": [
+      "ORAL"
+    ],
+    "warnings": [],
+    "indications_and_usage": [
+      "1 INDICATIONS AND USAGE Amoxicillin and clavulanate potassium is indicated for the treatment of infections in adults and pediatric patients, due to susceptible isolates of the designated bacteria in the conditions listed below: \u2022 Lower Respiratory Tract Infections - caused by beta\u2011lactamase\u2011producing isolates of Haemophilus influenzae and Moraxella catarrhalis . \u2022 Acute Bacterial Otitis Media - caused by beta\u2011lactamase\u2011producing isolates of H. influenzae and M. catarrhalis . \u2022 Sinusitis - caused"
+    ],
+    "contraindications": [
+      "4 CONTRAINDICATIONS \u2022 History of a serious hypersensitivity reaction (e.g., anaphylaxis or Stevens-Johnson syndrome) to amoxicillin and clavulanate potassium or to other beta\u2011lactams (e.g., penicillins or cephalosporins). (4.1) \u2022 History of cholestatic jaundice/hepatic dysfunction associated with amoxicillin and clavulanate potassium. (4.2) 4.1 Serious Hypersensitivity Reactions Amoxicillin and clavulanate potassium is contraindicated in patients with a history of serious hypersensitivity reacti"
+    ],
+    "adverse_reactions": [
+      "6 ADVERSE REACTIONS The following are discussed in more detail in other sections of the labeling: \u2022 Anaphylactic reactions [see Warnings and Precautions ( 5.1 )] \u2022 Severe Cutaneous Adverse Reactions [see Warnings and Precautions (5.2) ] \u2022 Hepatic Dysfunction [see Warnings and Precautions (5.3) ] \u2022 Clostridioides difficile Associated Diarrhea (CDAD) [see Warnings and Precautions (5.4) ] The most frequently reported adverse reactions were diarrhea/loose stools (9%), nausea (3%), skin rashes and ur"
+    ],
+    "dosage_and_administration": [
+      "2 DOSAGE AND ADMINISTRATION \u2022 Adults and Pediatric Patients greater than 40 kg: 500 or 875 mg every 12 hours or 250 or 500 mg every 8 hours, based on amoxicillin component. ( 2.2 , 2.3 ) \u2022 Pediatric patients aged 12 weeks (3 months) and older: 25 to 45 mg/kg/day every 12 hours or 20 to 40 mg/kg/day every 8 hours, up to the adult dose. (2.3) \u2022 Neonates and infants less than 12 weeks of age: 30 mg/kg/day divided every 12 hours, based on the amoxicillin component. Use of the 125 mg/5 mL oral suspen"
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "metformin",
+    "generic_names": [
+      "METFORMIN HYDROCHLORIDE"
+    ],
+    "brand_names": [
+      "Metformin Hydrochloride"
+    ],
+    "manufacturer_name": [
+      "A-S Medication Solutions"
+    ],
+    "route": [
+      "ORAL"
+    ],
+    "warnings": [],
+    "indications_and_usage": [
+      "1 INDICATIONS & USAGE Metformin hydrochloride tablets are indicated as an adjunct to diet and exercise to improve glycemic control in adults and pediatric patients 10 years of age and older with type 2 diabetes mellitus. Metformin hydrochloride tablets are biguanide indicated as an adjunct to diet and exercise to improve glycemic control in adults and pediatric patients 10 years of age and older with type 2 diabetes mellitus. ( 1 )"
+    ],
+    "contraindications": [
+      "4 CONTRAINDICATIONS Metformin hydrochloride tablets are contraindicated in patients with: Severe renal impairment (eGFR below 30 mL/min/1.73 m 2 ) [ see Warnings and Precautions (5.1) ]. Hypersensitivity to metformin. Acute or chronic metabolic acidosis, including diabetic ketoacidosis, with or without coma. Severe renal impairment (eGFR below 30 mL/min/1.73 m 2 ) ( 4 , 5.1 ) Hypersensitivity to metformin ( 4 ) Acute or chronic metabolic acidosis, including diabetic ketoacidosis, with or without"
+    ],
+    "adverse_reactions": [
+      "6 ADVERSE REACTIONS The following adverse reactions are also discussed elsewhere in the labeling: Lactic Acidosis [ see Boxed Warning and Warnings and Precautions (5.1) ]. Vitamin B12 Deficiency [ see Warnings and Precautions (5.2) ]. Hypoglycemia [ see Warnings and Precautions (5.3) For metformin hydrochloride tablets, the most common adverse reactions (>5.0%) are diarrhea, nausea/vomiting, flatulence, asthenia, indigestion, abdominal discomfort, and headache. ( 6.1 ) To report SUSPECTED ADVERS"
+    ],
+    "dosage_and_administration": [
+      "2 DOSAGE & ADMINISTRATION Adult Dosage for metformin hydrochloride tablets: Starting dose: 500 mg orally twice a day or 850 mg once a day, with meals ( 2.1 ) Increase the dose in increments of 500 mg weekly or 850 mg every 2 weeks, up to a maximum dose of 2550 mg per day, given in divided doses ( 2.1 ) Doses above 2000 mg may be better tolerated given 3 times a day with meals ( 2.1 ) Pediatric Dosage for metformin hydrochloride tablets: Starting dose: 500 mg orally twice a day, with meals ( 2.2 "
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "metformin",
+    "generic_names": [
+      "METFORMIN HYDROCHLORIDE"
+    ],
+    "brand_names": [
+      "Metformin hydrochloride"
+    ],
+    "manufacturer_name": [
+      "REMEDYREPACK INC."
+    ],
+    "route": [
+      "ORAL"
+    ],
+    "warnings": [],
+    "indications_and_usage": [
+      "1 INDICATIONS AND USAGE Metformin hydrochloride extended-release tablets, USP are indicated as an adjunct to diet and exercise to improve glycemic control in adults with type 2 diabetes mellitus. Metformin hydrochloride extended-release tablets, USP are a biguanide indicated as an adjunct to diet and exercise to improve glycemic control in adults with type 2 diabetes mellitus. ( 1 )"
+    ],
+    "contraindications": [
+      "4 CONTRAINDICATIONS Metformin hydrochloride extended-release tablets are contraindicated in patients with: Severe renal impairment (eGFR below 30 mL/min/1.73 m 2 ) [ see Warnings and Precautions ( 5.1 ) ]. Hypersensitivity to metformin. Acute or chronic metabolic acidosis, including diabetic ketoacidosis, with or without coma. Severe renal impairment (eGFR below 30 mL/min/1.73 m 2 ) ( 4 , 5.1 ) Hypersensitivity to metformin ( 4 ) Acute or chronic metabolic acidosis, including diabetic ketoacidos"
+    ],
+    "adverse_reactions": [
+      "6 ADVERSE REACTIONS The following adverse reactions are also discussed elsewhere in the labeling: Lactic Acidosis [ see Boxed Warning and Warnings and Precautions ( 5.1 ) ] Vitamin B 12 Deficiency [ see Warnings and Precautions ( 5.2 ) ] Hypoglycemia [ see Warnings and Precautions ( 5.3 ) ] Common adverse reactions are diarrhea, nausea/vomiting, abdominal pain, constipation, abdomen distention, dyspepsia/heartburn, flatulence, dizziness, headache, upper respiratory infection, taste disturbance. "
+    ],
+    "dosage_and_administration": [
+      "2 DOSAGE AND ADMINISTRATION Swallow metformin hydrochloride extended-release tablets whole and never crush, cut or chew ( 2.1 ) Starting dose: 500 mg orally once daily with the evening meal ( 2.1 ) Increase the dose in increments of 500 mg weekly, up to a maximum of 2,000 mg once daily with the evening meal ( 2.1 ) Patients receiving metformin hydrochloride (HCl) tablets may be switched to metformin hydrochloride extended-release tablets once daily at the same total daily dose, up to 2,000 mg on"
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "metformin",
+    "generic_names": [
+      "METFORMIN HYDROCHLORIDE"
+    ],
+    "brand_names": [
+      "Metformin Hydrochloride"
+    ],
+    "manufacturer_name": [
+      "Northwind Health Company, LLC"
+    ],
+    "route": [
+      "ORAL"
+    ],
+    "warnings": [],
+    "indications_and_usage": [
+      "1 INDICATIONS AND USAGE Metformin hydrochloride tablets, USP are indicated as an adjunct to diet and exercise to improve glycemic control in adults and pediatric patients 10 years of age and older with type 2 diabetes mellitus. Metformin hydrochloride tablets, USP are a biguanide indicated as an adjunct to diet and exercise to improve glycemic control in adults and pediatric patients 10 years of age and older with type 2 diabetes mellitus. ( 1 )"
+    ],
+    "contraindications": [
+      "4 CONTRAINDICATIONS Metformin hydrochloride tablets are contraindicated in patients with: Severe renal impairment (eGFR below 30 mL/min/1.73 m 2 ) [see Warnings and Precautions (5.1) ]. Hypersensitivity to metformin. Acute or chronic metabolic acidosis, including diabetic ketoacidosis, with or without coma. Severe renal impairment (eGFR below 30 mL/min/1.73 m 2 ) ( 4 , 5.1 ) Hypersensitivity to metformin ( 4 ) Acute or chronic metabolic acidosis, including diabetic ketoacidosis, with or without "
+    ],
+    "adverse_reactions": [
+      "6 ADVERSE REACTIONS The following adverse reactions are also discussed elsewhere in the labeling: Lactic Acidosis [see Boxed Warning and Warnings and Precautions (5.1) ] Vitamin B 12 Deficiency [see Warnings and Precautions (5.2) ] Hypoglycemia [see Warnings and Precautions (5.3) ] For metformin hydrochloride, the most common adverse reactions (>5.0%) are diarrhea, nausea/vomiting, flatulence, asthenia, indigestion, abdominal discomfort, and headache. ( 6.1 ) To report SUSPECTED ADVERSE REACTION"
+    ],
+    "dosage_and_administration": [
+      "2 DOSAGE AND ADMINISTRATION Adult Dosage for Metformin Hydrochloride Tablets: Starting dose: 500 mg orally twice a day or 850 mg once a day, with meals ( 2.1 ) Increase the dose in increments of 500 mg weekly or 850 mg every 2 weeks, up to a maximum dose of 2,550 mg per day, given in divided doses ( 2.1 ) Doses above 2,000 mg may be better tolerated given 3 times a day with meals ( 2.1 ) Pediatric Dosage for Metformin Hydrochloride Tablets : Starting dose: 500 mg orally twice a day, with meals ("
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "metformin",
+    "generic_names": [
+      "METFORMIN HYDROCHLORIDE"
+    ],
+    "brand_names": [
+      "Metformin Hydrochloride"
+    ],
+    "manufacturer_name": [
+      "PD-Rx Pharmaceuticals, Inc."
+    ],
+    "route": [
+      "ORAL"
+    ],
+    "warnings": [],
+    "indications_and_usage": [
+      "1 INDICATIONS AND USAGE Metformin hydrochloride tablets are indicated as an adjunct to diet and exercise to improve glycemic control in adults and pediatric patients 10 years of age and older with type 2 diabetes mellitus. Metformin hydrochloride tablets is a biguanide indicated as an adjunct to diet and exercise to improve glycemic control in adults and pediatric patients 10 years of age and older with type 2 diabetes mellitus. ( 1 )"
+    ],
+    "contraindications": [
+      "4 CONTRAINDICATIONS Metformin hydrochloride tablets are contraindicated in patients with: Severe renal impairment (eGFR below 30 mL/min/1.73 m 2 ) [see Warnings and Precautions (5.1) ] . Hypersensitivity to metformin. Acute or chronic metabolic acidosis, including diabetic ketoacidosis, with or without coma. Severe renal impairment (eGFR below 30 mL/min/1.73 m 2 ). ( 4 , 5.1 ) Hypersensitivity to metformin. ( 4 ) Acute or chronic metabolic acidosis, including diabetic ketoacidosis, with or witho"
+    ],
+    "adverse_reactions": [
+      "6 ADVERSE REACTIONS The following adverse reactions are also discussed elsewhere in the labeling: Lactic Acidosis [see Boxed Warning and Warnings and Precautions (5.1) ] Vitamin B 12 Deficiency [see Warnings and Precautions (5.2) ] Hypoglycemia [see Warnings and Precautions (5.3) ] For metformin hydrochloride tablets, the most common adverse reactions (> 5.0%) are diarrhea, nausea/vomiting, flatulence, asthenia, indigestion, abdominal discomfort, and headache. ( 6.1 ) To report SUSPECTED ADVERSE"
+    ],
+    "dosage_and_administration": [
+      "2 DOSAGE AND ADMINISTRATION Adult Dosage for Metformin Hydrochloride Tablets : Starting dose: 500 mg orally twice a day or 850 mg once a day, with meals. ( 2.1 ) Increase the dose in increments of 500 mg weekly or 850 mg every 2 weeks, up to a maximum dose of 2,550 mg per day, given in divided doses. ( 2.1 ) Doses above 2,000 mg may be better tolerated given 3 times a day with meals. ( 2.1 ) Pediatric Dosage for Metformin Hydrochloride Tablets : Starting dose: 500 mg orally twice a day, with mea"
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "metformin",
+    "generic_names": [
+      "GLIPIZIDE AND METFORMIN HYDROCHLORIDE"
+    ],
+    "brand_names": [
+      "Glipizide and Metformin Hydrochloride"
+    ],
+    "manufacturer_name": [
+      "Teva Pharmaceuticals USA, Inc."
+    ],
+    "route": [
+      "ORAL"
+    ],
+    "warnings": [
+      "WARNINGS WARNING: LACTIC ACIDOSIS Postmarketing cases of metformin-associated lactic acidosis have resulted in death, hypothermia, hypotension, and resistant bradyarrhythmias. The onset of metformin-associated lactic acidosis is often subtle, accompanied only by nonspecific symptoms such as malaise, myalgias, respiratory distress, somnolence, and abdominal pain. Metformin-associated lactic acidosis was characterized by elevated blood lactate levels (> 5 mmol/Liter), anion gap acidosis (without e"
+    ],
+    "indications_and_usage": [
+      "INDICATIONS AND USAGE Glipizide and metformin hydrochloride tablets USP are indicated as an adjunct to diet and exercise to improve glycemic control in adults with type 2 diabetes mellitus."
+    ],
+    "contraindications": [
+      "CONTRAINDICATIONS Glipizide and metformin hydrochloride tablets are contraindicated in patients with: Severe renal impairment (eGFR below 30 mL/min/1.73 m 2 ) (see WARNINGS and PRECAUTIONS ). Known hypersensitivity to glipizide or metformin hydrochloride. Acute or chronic metabolic acidosis, including diabetic ketoacidosis, with or without coma. Diabetic ketoacidosis should be treated with insulin."
+    ],
+    "adverse_reactions": [
+      "ADVERSE REACTIONS Glipizide and Metformin Hydrochloride Tablets In a double-blind 24-week clinical trial involving glipizide and metformin hydrochloride tablets as initial therapy, a total of 172 patients received glipizide and metformin hydrochloride tablets, 2.5 mg/250 mg, 173 received glipizide and metformin hydrochloride tablets, 2.5 mg/500 mg, 170 received glipizide, and 177 received metformin. The most common clinical adverse events in these treatment groups are listed in Table 4 . Table 4"
+    ],
+    "dosage_and_administration": [
+      "DOSAGE AND ADMINISTRATION General Considerations Dosage of glipizide and metformin hydrochloride tablets must be individualized on the basis of both effectiveness and tolerance while not exceeding the maximum recommended daily dose of 20 mg glipizide/2000 mg metformin. Glipizide and metformin hydrochloride tablets should be given with meals and should be initiated at a low dose, with gradual dose escalation as described below, in order to avoid hypoglycemia (largely due to glipizide), reduce GI "
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "ibuprofen",
+    "generic_names": [
+      "IBUPROFEN"
+    ],
+    "brand_names": [
+      "Ibuprofen Dye Free"
+    ],
+    "manufacturer_name": [
+      "CVS Pharmacy"
+    ],
+    "route": [
+      "ORAL"
+    ],
+    "warnings": [
+      "Warnings Allergy alert: Ibuprofen may cause a severe allergic reaction, especially in people allergic to aspirin. Symptoms may include: rash facial swelling asthma (wheezing) hives skin reddening shock blisters If an allergic reaction occurs, stop use and seek medical help right away. Stomach bleeding warning: This product contains an NSAID, which may cause severe stomach bleeding. The chance is higher if you: take more or for a longer time than directed take a blood thinning (anticoagulant) or "
+    ],
+    "indications_and_usage": [
+      "Uses temporarily relieves minor aches and pains due to: headache toothache backache menstrual cramps the common cold muscular aches minor pain of arthritis temporarily reduces fever"
+    ],
+    "contraindications": [],
+    "adverse_reactions": [],
+    "dosage_and_administration": [
+      "Directions do not take more than directed the smallest effective dose should be used adults and children 12 years and over: take 1 tablet every 4 to 6 hours while symptoms persist if pain or fever does not respond to 1 tablet, 2 tablets may be used do not exceed 6 tablets in 24 hours, unless directed by a doctor children under 12 years: ask a doctor"
+    ],
+    "active_ingredient": [
+      "Active ingredient (in each white tablet) Ibuprofen USP, 200 mg (NSAID)* *nonsteroidal anti-inflammatory drug"
+    ],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "ibuprofen",
+    "generic_names": [
+      "IBUPROFEN"
+    ],
+    "brand_names": [
+      "care one ibuprofen"
+    ],
+    "manufacturer_name": [
+      "American Sales Company"
+    ],
+    "route": [
+      "ORAL"
+    ],
+    "warnings": [
+      "Warnings Allergy alert: Ibuprofen may cause a severe allergic reaction, especially in people allergic to aspirin. Symptoms may include: \u2022 hives \u2022 facial swelling \u2022 asthma (wheezing) \u2022 shock \u2022 skin reddening \u2022 rash \u2022 blisters If an allergic reaction occurs, stop use and seek medical help right away. Stomach bleeding warning: This product contains an NSAID, which may cause severe stomach bleeding. The chance is higher if you \u2022 are age 60 or older \u2022 have had stomach ulcers or bleeding problems \u2022 ta"
+    ],
+    "indications_and_usage": [
+      "Uses \u2022 temporarily relieves minor aches and pains due to: \u2022 headache \u2022 muscular aches \u2022 minor pain of arthritis \u2022 toothache \u2022 backache \u2022 the common cold \u2022 menstrual cramps \u2022 temporarily reduces fever"
+    ],
+    "contraindications": [],
+    "adverse_reactions": [],
+    "dosage_and_administration": [
+      "Directions \u2022 do not take more than directed \u2022 the smallest effective dose should be used adults and children 12 years and older \u2022 take 1 tablet every 4 to 6 hours while symptoms persist \u2022 if pain or fever does not respond to 1 tablet, 2 tablets may be used \u2022 do not exceed 6 tablets in 24 hours, unless directed by a doctor children under 12 years \u2022 ask a doctor"
+    ],
+    "active_ingredient": [
+      "Active ingredient (in each tablet) Ibuprofen 200 mg (NSAID)* *nonsteroidal anti-inflammatory drug"
+    ],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "ibuprofen",
+    "generic_names": [
+      "IBUPROFEN"
+    ],
+    "brand_names": [
+      "Ibuprofen"
+    ],
+    "manufacturer_name": [
+      "Aurobindo Pharma Limited"
+    ],
+    "route": [
+      "ORAL"
+    ],
+    "warnings": [
+      "WARNINGS Cardiovascular Effects Cardiovascular Thrombotic Events Clinical trials of several COX-2 selective and nonselective NSAIDs of up to three years duration have shown an increased risk of serious cardiovascular (CV) thrombotic events, including myocardial infarction (MI) and stroke, which can be fatal. Based on available data, it is unclear that the risk for CV thrombotic events is similar for all NSAIDs. The relative increase in serious CV thrombotic events over baseline conferred by NSAI"
+    ],
+    "indications_and_usage": [
+      "INDICATIONS AND USAGE Carefully consider the potential benefits and risks of ibuprofen tablets and other treatment options before deciding to use ibuprofen. Use the lowest effective dose for the shortest duration consistent with individual patient treatment goals (see WARNINGS ). Ibuprofen tablets are indicated for relief of the signs and symptoms of rheumatoid arthritis and osteoarthritis. Ibuprofen tablets are indicated for relief of mild to moderate pain. Ibuprofen tablets are also indicated "
+    ],
+    "contraindications": [
+      "CONTRAINDICATIONS Ibuprofen tablets are contraindicated in patients with known hypersensitivity to Ibuprofen. Ibuprofen tablets should not be given to patients who have experienced asthma, urticaria, or allergic-type reactions after taking aspirin or other NSAIDs. Severe, rarely fatal, anaphylactic-like reactions to NSAIDs have been reported in such patients (see WARNINGS , Anaphylactoid Reactions , and PRECAUTIONS , Preexisting Asthma ). In the setting of coronary artery bypass graft (CABG) sur"
+    ],
+    "adverse_reactions": [
+      "ADVERSE REACTIONS The most frequent type of adverse reaction occurring with ibuprofen tablets is gastrointestinal. In controlled clinical trials the percentage of patients reporting one or more gastrointestinal complaints ranged from 4% to 16%. In controlled studies when ibuprofen tablets were compared to aspirin and indomethacin in equally effective doses, the overall incidence of gastrointestinal complaints was about half that seen in either the aspirin- or indomethacin-treated patients. Adver"
+    ],
+    "dosage_and_administration": [
+      "DOSAGE AND ADMINISTRATION Carefully consider the potential benefits and risks of ibuprofen tablets and other treatment options before deciding to use ibuprofen tablets. Use the lowest effective dose for the shortest duration consistent with individual patient treatment goals (see WARNINGS ). After observing the response to initial therapy with ibuprofen tablets, the dose and frequency should be adjusted to suit an individual patient's needs. Do not exceed 3200 mg total daily dose. If gastrointes"
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "ibuprofen",
+    "generic_names": [
+      "IBUPROFEN"
+    ],
+    "brand_names": [
+      "leader Ibuprofen"
+    ],
+    "manufacturer_name": [
+      "Cardinal Health 110, LLC. dba Leader"
+    ],
+    "route": [
+      "ORAL"
+    ],
+    "warnings": [
+      "Warnings Allergy alert: Ibuprofen may cause a severe allergic reaction, especially in people allergic to aspirin. Symptoms may include: \u2022 hives \u2022 facial swelling \u2022 asthma (wheezing) \u2022 shock \u2022 skin reddening \u2022 rash \u2022 blisters If an allergic reaction occurs, stop use and seek medical help right away. Stomach bleeding warning: This product contains an NSAID, which may cause severe stomach bleeding. The chance is higher if your child: \u2022 has had stomach ulcers or bleeding problems \u2022 takes a blood thi"
+    ],
+    "indications_and_usage": [
+      "Uses temporarily: \u2022 relieves minor aches and pains due to the common cold, flu, sore throat, headache and toothache \u2022 reduces fever"
+    ],
+    "contraindications": [],
+    "adverse_reactions": [],
+    "dosage_and_administration": [
+      "Directions \u2022 this product does not contain directions or complete warnings for adult use \u2022 do not give more than directed \u2022 shake well before using \u2022 mL = milliliter \u2022 find right dose on chart. If possible, use weight to dose; otherwise use age. \u2022 use only enclosed dosing cup. Do not use any other dosing device. \u2022 if needed, repeat dose every 6-8 hours \u2022 do not use more than 4 times a day \u2022 replace original bottle cap to maintain child resistance \u2022 wash dosage cup after each use Dosing Chart Wei"
+    ],
+    "active_ingredient": [
+      "Active ingredient (in each 5 mL) Ibuprofen 100 mg (NSAID)* *nonsteroidal anti-inflammatory drug"
+    ],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "ibuprofen",
+    "generic_names": [
+      "IBUPROFEN"
+    ],
+    "brand_names": [
+      "Concentrated ibuprofen infants"
+    ],
+    "manufacturer_name": [
+      "Wal-Mart Stores, Inc."
+    ],
+    "route": [
+      "ORAL"
+    ],
+    "warnings": [
+      "WARNINGS Allergy alert: Ibuprofen may cause a severe allergic reaction, especially in people allergic to aspirin. Symptoms may include: hives facial swelling asthma (wheezing) shock skin reddening rash blisters If an allergic reaction occurs, stop use and seek medical help right away. Stomach bleeding warning: This product contains an NSAID, which may cause severe stomach bleeding. The chance is higher if you child: has had stomach ulcers or bleeding problems takes a blood thinning (anticoagulan"
+    ],
+    "indications_and_usage": [
+      "USE(S) temporarily: reduces fever relieves minor aches and pains due to the common cold, flu, sore throat, headaches and toothaches"
+    ],
+    "contraindications": [],
+    "adverse_reactions": [],
+    "dosage_and_administration": [
+      "DIRECTIONS this product does not contain directions or complete warnings for adult use do not give more than directed shake well before using find right dose on chart below. If possible, use weight to dose; otherwise use age. mL=milliliter measure with dosing device provided. Do not use any other dosing device. dispense liquid slowly into the child's mouth, toward the inner cheek if needed, repeat dose every 6-8 hours do not use more than 4 times a day Dosing Chart WEIGHT (lb) AGE (mos) DOSE (mL"
+    ],
+    "active_ingredient": [
+      "ACTIVE INGREDIENT (in each 1.25 mL) Ibuprofen 50 mg (NSAID)* *nonsteroidal anti-inflammatory drug"
+    ],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "ceftriaxone",
+    "generic_names": [
+      "CEFTRIAXONE SODIUM"
+    ],
+    "brand_names": [
+      "Ceftriaxone Sodium"
+    ],
+    "manufacturer_name": [
+      "Hospira, Inc"
+    ],
+    "route": [
+      "INTRAMUSCULAR",
+      "INTRAVENOUS"
+    ],
+    "warnings": [
+      "WARNINGS Hypersensitivity Reactions Before therapy with ceftriaxone for injection is instituted, careful inquiry should be made to determine whether the patient has had previous hypersensitivity reactions to cephalosporins, penicillins and other beta-lactam agents or other drugs. This product should be given cautiously to penicillin and other beta-lactam agent-sensitive patients. Antibacterial drugs should be administered with caution to any patient who has demonstrated some form of allergy, par"
+    ],
+    "indications_and_usage": [
+      "INDICATIONS AND USAGE Before instituting treatment with ceftriaxone, appropriate specimens should be obtained for isolation of the causative organism and for determination of its susceptibility to the drug. Therapy may be instituted prior to obtaining results of susceptibility testing. To reduce the development of drug-resistant bacteria and maintain the effectiveness of ceftriaxone for injection, USP and other antibacterial drugs, ceftriaxone for injection, USP should be used only to treat or p"
+    ],
+    "contraindications": [
+      "CONTRAINDICATIONS Hypersensitivity Ceftriaxone for injection is contraindicated in patients with known hypersensitivity to ceftriaxone, any of its excipients or to any other cephalosporin. Patients with previous hypersensitivity reactions to penicillin and other beta lactam antibacterial agents may be at greater risk of hypersensitivity to ceftriaxone (see Warnings \u2013 Hypersensitivity Reactions ). Neonates Premature neonates : Ceftriaxone for injection is contraindicated in premature neonates up "
+    ],
+    "adverse_reactions": [
+      "ADVERSE REACTIONS Ceftriaxone is generally well tolerated. In clinical trials, the following adverse reactions, which were considered to be related to ceftriaxone therapy or of uncertain etiology, were observed: Local Reactions Pain, induration and tenderness was 1% overall. Phlebitis was reported in <1% after IV administration. The incidence of warmth, tightness or induration was 17% (3/17) after IM administration of 350 mg/mL and 5% (1/20) after IM administration of 250 mg/mL. General Disorder"
+    ],
+    "dosage_and_administration": [
+      "DOSAGE AND ADMINISTRATION Ceftriaxone may be administered intravenously or intramuscularly. Do not use diluents containing calcium, such as Ringer\u2019s solution or Hartmann\u2019s solution, to reconstitute ceftriaxone vials or to further dilute a reconstituted vial for IV administration because a precipitate can form. Precipitation of ceftriaxone-calcium can also occur when ceftriaxone is mixed with calcium-containing solutions in the same IV administration line. Ceftriaxone must not be administered sim"
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "ceftriaxone",
+    "generic_names": [
+      "CEFTRIAXONE SODIUM"
+    ],
+    "brand_names": [
+      "Ceftriaxone Sodium"
+    ],
+    "manufacturer_name": [
+      "Hospira, Inc"
+    ],
+    "route": [
+      "INTRAVENOUS"
+    ],
+    "warnings": [
+      "WARNINGS Hypersensitivity Reactions Before therapy with ceftriaxone for injection is instituted, careful inquiry should be made to determine whether the patient has had previous hypersensitivity reactions to cephalosporins, penicillins and other beta-lactam agents or other drugs. This product should be given cautiously to penicillin and other beta-lactam agent-sensitive patients. Antibacterial drugs should be administered with caution to any patient who has demonstrated some form of allergy, par"
+    ],
+    "indications_and_usage": [
+      "INDICATIONS AND USAGE Before instituting treatment with ceftriaxone for injection, USP, appropriate specimens should be obtained for isolation of the causative organism and for determination of its susceptibility to the drug. Therapy may be instituted prior to obtaining results of susceptibility testing. To reduce the development of drug-resistant bacteria and maintain the effectiveness of ceftriaxone for injection, USP and other antibacterial drugs, ceftriaxone for injection, USP should be used"
+    ],
+    "contraindications": [
+      "CONTRAINDICATIONS Hypersensitivity Ceftriaxone for injection is contraindicated in patients with known hypersensitivity to ceftriaxone, any of its excipients or to any other cephalosporin. Patients with previous hypersensitivity reactions to penicillin and other beta lactam antibacterial agents may be at greater risk of hypersensitivity to ceftriaxone (see WARNINGS \u2013 Hypersensitivity Reactions ). Neonates Premature neonates Ceftriaxone for injection is contraindicated in premature neonates up to"
+    ],
+    "adverse_reactions": [
+      "ADVERSE REACTIONS Ceftriaxone is generally well tolerated. In clinical trials, the following adverse reactions, which were considered to be related to ceftriaxone therapy or of uncertain etiology, were observed: Local Reactions Pain, induration and tenderness was 1% overall. Phlebitis was reported in <1% after IV administration. The incidence of warmth, tightness or induration was 17% (3/17) after IM administration of 350 mg/mL and 5% (1/20) after IM administration of 250 mg/mL. General Disorder"
+    ],
+    "dosage_and_administration": [
+      "DOSAGE AND ADMINISTRATION Ceftriaxone in the ADD-Vantage \u00ae Vial is intended for intravenous infusion only, after dilution with appropriate volume of ADD-Vantage \u00ae diluent solution. Do not use diluents containing calcium, such as Ringer\u2019s solution or Hartmann\u2019s solution, to reconstitute ceftriaxone vials or to further dilute a reconstituted vial for IV administration because a precipitate can form. Precipitation of ceftriaxone-calcium can also occur when ceftriaxone is mixed with calcium-containi"
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "ceftriaxone",
+    "generic_names": [
+      "CEFTRIAXONE SODIUM"
+    ],
+    "brand_names": [
+      "Ceftriaxone Sodium"
+    ],
+    "manufacturer_name": [
+      "Hospira, Inc"
+    ],
+    "route": [
+      "INTRAMUSCULAR",
+      "INTRAVENOUS"
+    ],
+    "warnings": [
+      "WARNINGS Hypersensitivity Reactions Before therapy with ceftriaxone for injection is instituted, careful inquiry should be made to determine whether the patient has had previous hypersensitivity reactions to cephalosporins, penicillins and other beta-lactam agents or other drugs. This product should be given cautiously to penicillin and other beta-lactam agent-sensitive patients. Antibacterial drugs should be administered with caution to any patient who has demonstrated some form of allergy, par"
+    ],
+    "indications_and_usage": [
+      "INDICATIONS AND USAGE Before instituting treatment with ceftriaxone, appropriate specimens should be obtained for isolation of the causative organism and for determination of its susceptibility to the drug. Therapy may be instituted prior to obtaining results of susceptibility testing. To reduce the development of drug-resistant bacteria and maintain the effectiveness of ceftriaxone for injection, USP and other antibacterial drugs, ceftriaxone for injection, USP should be used only to treat or p"
+    ],
+    "contraindications": [
+      "CONTRAINDICATIONS Hypersensitivity Ceftriaxone for injection is contraindicated in patients with known hypersensitivity to ceftriaxone, any of its excipients or to any other cephalosporin. Patients with previous hypersensitivity reactions to penicillin and other beta lactam antibacterial agents may be at greater risk of hypersensitivity to ceftriaxone (see Warnings \u2013 Hypersensitivity Reactions ). Neonates Premature neonates: Ceftriaxone for injection is contraindicated in premature neonates up t"
+    ],
+    "adverse_reactions": [
+      "ADVERSE REACTIONS Ceftriaxone is generally well tolerated. In clinical trials, the following adverse reactions, which were considered to be related to ceftriaxone therapy or of uncertain etiology, were observed: Local Reactions Pain, induration and tenderness was 1% overall. Phlebitis was reported in <1% after IV administration. The incidence of warmth, tightness or induration was 17% (3/17) after IM administration of 350 mg/mL and 5% (1/20) after IM administration of 250 mg/mL. General Disorder"
+    ],
+    "dosage_and_administration": [
+      "DOSAGE AND ADMINISTRATION Ceftriaxone may be administered intravenously or intramuscularly. Do not use diluents containing calcium, such as Ringer\u2019s solution or Hartmann\u2019s solution, to reconstitute ceftriaxone vials or to further dilute a reconstituted vial for IV administration because a precipitate can form. Precipitation of ceftriaxone-calcium can also occur when ceftriaxone is mixed with calcium-containing solutions in the same IV administration line. Ceftriaxone must not be administered sim"
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "ceftriaxone",
+    "generic_names": [
+      "CEFTRIAXONE SODIUM"
+    ],
+    "brand_names": [
+      "Ceftriaxone Sodium"
+    ],
+    "manufacturer_name": [
+      "A-S Medication Solutions"
+    ],
+    "route": [
+      "INTRAMUSCULAR",
+      "INTRAVENOUS"
+    ],
+    "warnings": [
+      "WARNINGS Hypersensitivity Reactions Before therapy with ceftriaxone for injection is instituted, careful inquiry should be made to determine whether the patient has had previous hypersensitivity reactions to cephalosporins, penicillins and other beta-lactam agents or other drugs. This product should be given cautiously to penicillin and other beta-lactam agent-sensitive patients. Antibacterial drugs should be administered with caution to any patient who has demonstrated some form of allergy, par"
+    ],
+    "indications_and_usage": [
+      "INDICATIONS AND USAGE Before instituting treatment with ceftriaxone, appropriate specimens should be obtained for isolation of the causative organism and for determination of its susceptibility to the drug. Therapy may be instituted prior to obtaining results of susceptibility testing. To reduce the development of drug-resistant bacteria and maintain the effectiveness of ceftriaxone for injection, USP and other antibacterial drugs, ceftriaxone for injection, USP should be used only to treat or p"
+    ],
+    "contraindications": [
+      "CONTRAINDICATIONS Hypersensitivity Ceftriaxone for injection is contraindicated in patients with known hypersensitivity to ceftriaxone, any of its excipients or to any other cephalosporin. Patients with previous hypersensitivity reactions to penicillin and other beta lactam antibacterial agents may be at greater risk of hypersensitivity to ceftriaxone (see Warnings \u2013 Hypersensitivity Reactions ). Neonates Premature neonates : Ceftriaxone for injection is contraindicated in premature neonates up "
+    ],
+    "adverse_reactions": [
+      "ADVERSE REACTIONS Ceftriaxone is generally well tolerated. In clinical trials, the following adverse reactions, which were considered to be related to ceftriaxone therapy or of uncertain etiology, were observed: Local Reactions Pain, induration and tenderness was 1% overall. Phlebitis was reported in <1% after IV administration. The incidence of warmth, tightness or induration was 17% (3/17) after IM administration of 350 mg/mL and 5% (1/20) after IM administration of 250 mg/mL. General Disorder"
+    ],
+    "dosage_and_administration": [
+      "DOSAGE AND ADMINISTRATION Ceftriaxone may be administered intravenously or intramuscularly. Do not use diluents containing calcium, such as Ringer\u2019s solution or Hartmann\u2019s solution, to reconstitute ceftriaxone vials or to further dilute a reconstituted vial for IV administration because a precipitate can form. Precipitation of ceftriaxone-calcium can also occur when ceftriaxone is mixed with calcium-containing solutions in the same IV administration line. Ceftriaxone must not be administered sim"
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "ceftriaxone",
+    "generic_names": [
+      "CEFTRIAXONE"
+    ],
+    "brand_names": [
+      "Ceftriaxone"
+    ],
+    "manufacturer_name": [
+      "Hikma Pharmaceuticals USA Inc."
+    ],
+    "route": [
+      "INTRAVENOUS"
+    ],
+    "warnings": [
+      "WARNINGS Hypersensitivity Reactions Before therapy with Ceftriaxone is instituted, careful inquiry should be made to determine whether the patient has had previous hypersensitivity reactions to cephalosporins, penicillins and other beta-lactam agents or other drugs. This product should be given cautiously to penicillin and other beta-lactam agent-sensitive patients. Antibacterial drugs should be administered with caution to any patient who has demonstrated some form of allergy, particularly to d"
+    ],
+    "indications_and_usage": [
+      "INDICATIONS AND USAGE Before instituting treatment with Ceftriaxone for Injection, USP, appropriate specimens should be obtained for isolation of the causative organism and for determination of its susceptibility to the drug. Therapy may be instituted prior to obtaining results of susceptibility testing. To reduce the development of drug-resistant bacteria and maintain the effectiveness of Ceftriaxone for Injection, USP and other antibacterial drugs, Ceftriaxone for Injection, USP should be used"
+    ],
+    "contraindications": [
+      "CONTRAINDICATIONS Hypersensitivity Ceftriaxone is contraindicated in patients with known hypersensitivity to ceftriaxone, any of its excipients or to any other cephalosporin. Patients with previous hypersensitivity reactions to penicillin and other beta lactam antibacterial agents may be at greater risk of hypersensitivity to ceftriaxone (see WARNINGS \u2013 Hypersensitivity ). Neonates Premature neonates : Ceftriaxone is contraindicated in premature neonates up to a postmenstrual age of 41 weeks (ge"
+    ],
+    "adverse_reactions": [
+      "ADVERSE REACTIONS Ceftriaxone is generally well tolerated. In clinical trials, the following adverse reactions, which were considered to be related to Ceftriaxone therapy or of uncertain etiology, were observed: LOCAL REACTIONS - pain, induration and tenderness was 1% overall. Phlebitis was reported in <1% after IV administration. The incidence of warmth, tightness or induration was 17% (3/17) after IM administration of 350 mg/mL and 5% (1/20) after IM administration of 250 mg/mL. GENERAL DISORD"
+    ],
+    "dosage_and_administration": [
+      "DOSAGE AND ADMINISTRATION Ceftriaxone may be administered intravenously or intramuscularly. However, the intent of this Pharmacy Bulk Package is for the preparation of solutions for intravenous infusion only. Ceftriaxone should be administered intravenously by infusion over a period of 30 minutes. Do not use diluents containing calcium, such as Ringer \u2019 s solution or Hartmann \u2019 s solution, to reconstitute Ceftriaxone vials or to further dilute a reconstituted vial for IV administration because a"
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "insulin",
+    "generic_names": [
+      "INSULIN ASPART"
+    ],
+    "brand_names": [
+      ".Insulin Aspart Protamine and Insulin Aspart"
+    ],
+    "manufacturer_name": [
+      "A-S Medication Solutions"
+    ],
+    "route": [
+      "SUBCUTANEOUS"
+    ],
+    "warnings": [],
+    "indications_and_usage": [
+      "1 INDICATIONS AND USAGE Insulin Aspart Protamine and Insulin Aspart Mix 70/30 is a mixture of insulin aspart protamine and insulin aspart indicated to improve glycemic control in adult patients with diabetes mellitus. Limitations of Use: \u2022 Insulin Aspart Protamine and Insulin Aspart Mix 70/30 is not recommended for the treatment of diabetic ketoacidosis. \u2022 The proportions of rapid-acting and long-acting insulins in Insulin Aspart Protamine and Insulin Aspart Mix 70/30 are fixed and do not allow "
+    ],
+    "contraindications": [
+      "4 CONTRAINDICATIONS Insulin Aspart Protamine and Insulin Aspart Mix 70/30 is contraindicated: \u2022 During episodes of hypoglycemia [see Warnings and Precautions ( 5.3 )] \u2022 In patients with hypersensitivity to Insulin Aspart Protamine and Insulin Aspart Mix 70/30 or one of its excipients [see Warnings and Precautions ( 5.5 )] \u2022 Do not use during episodes of hypoglycemia (4) . \u2022 Do not use in patients with hypersensitivity to Insulin Aspart Protamine and Insulin Aspart Mix 70/30 or one of its excipie"
+    ],
+    "adverse_reactions": [
+      "6 ADVERSE REACTIONS The following adverse reactions are also discussed elsewhere: \u2022 Hypoglycemia [see Warnings and Precautions ( 5.3 )] \u2022 Hypoglycemia Due to Medication Errors [see Warnings and Precautions ( 5.4 )] \u2022 Hypersensitivity reactions [see Warnings and Precautions ( 5.5 )] \u2022 Hypokalemia [see Warnings and Precautions ( 5.6 )] Adverse reactions observed with insulin therapy include hypoglycemia, allergic reactions, local injection site reactions, lipodystrophy, rash and pruritus (6) . To "
+    ],
+    "dosage_and_administration": [
+      "2 DOSAGE AND ADMINISTRATION \u2022 Inspect visually before use. Appearance should be uniformly white and cloudy. Do not use it if it looks clear or if it contains solid particles ( 2.1 ). \u2022 Insulin Aspart Protamine and Insulin Aspart Mix 70/30 must be resuspended immediately before use. Resuspension is easier when the insulin has reached room temperature ( 2.1 ). \u2022 Inject Insulin Aspart Protamine and Insulin Aspart Mix 70/30 subcutaneously in the abdominal region, buttocks, thigh, or upper arm (2.1)."
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "insulin",
+    "generic_names": [
+      "INSULIN GLARGINE-YFGN"
+    ],
+    "brand_names": [
+      "INSULIN GLARGINE"
+    ],
+    "manufacturer_name": [
+      "Civica, Inc."
+    ],
+    "route": [
+      "SUBCUTANEOUS"
+    ],
+    "warnings": [],
+    "indications_and_usage": [
+      "1 INDICATIONS AND USAGE Insulin Glargine-yfgn is indicated to improve glycemic control in adult and pediatric patients with diabetes mellitus. Limitations of Use Insulin Glargine-yfgn is not recommended for the treatment of diabetic ketoacidosis. Insulin Glargine-yfgn is a long-acting human insulin analog indicated to improve glycemic control in adult and pediatric patients with diabetes mellitus. ( 1 ) Limitations of Use Not recommended for the treatment of diabetic ketoacidosis. ( 1 )"
+    ],
+    "contraindications": [
+      "4 CONTRAINDICATIONS Insulin Glargine-yfgn is contraindicated: During episodes of hypoglycemia [see Warnings and Precautions (5.3) ]. In patients with hypersensitivity to insulin glargine products or any of the excipients in Insulin Glargine-yfgn [see Warnings and Precautions (5.5) ]. During episodes of hypoglycemia ( 4 ) Hypersensitivity to insulin glargine products or any excipient in Insulin Glargine-yfgn ( 4 )"
+    ],
+    "adverse_reactions": [
+      "6 ADVERSE REACTIONS The following adverse reactions are discussed elsewhere: Hyperglycemia or Hypoglycemia with Changes in Insulin Regimen [see Warnings and Precautions (5.2) ] Hypoglycemia [see Warnings and Precautions (5.3) ] Hypoglycemia Due to Medication Errors [see Warnings and Precautions (5.4) ] Hypersensitivity Reactions [see Warnings and Precautions (5.5) ] Hypokalemia [see Warnings and Precautions (5.6) ] Adverse reactions commonly associated with insulin glargine products include hypo"
+    ],
+    "dosage_and_administration": [
+      "2 DOSAGE AND ADMINISTRATION Individualize dosage based on metabolic needs, blood glucose monitoring, glycemic control, type of diabetes, and prior insulin use. ( 2.2 ) Administer subcutaneously into the abdominal area, thigh, or deltoid once daily at any time of day, but at the same time every day. ( 2.1 ) Do not dilute or mix with any other insulin or solution. ( 2.1 ) Rotate injection sites to reduce risk of lipodystrophy and localized cutaneous amyloidosis. ( 2.1 ) See Full Prescribing Inform"
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "insulin",
+    "generic_names": [
+      "INSULIN LISPRO"
+    ],
+    "brand_names": [
+      "Insulin Lispro"
+    ],
+    "manufacturer_name": [
+      "A-S Medication Solutions"
+    ],
+    "route": [
+      "INTRAVENOUS",
+      "SUBCUTANEOUS"
+    ],
+    "warnings": [],
+    "indications_and_usage": [
+      "1 INDICATIONS AND USAGE Insulin Lispro is indicated to improve glycemic control in adult and pediatric patients with diabetes mellitus. Insulin Lispro is a rapid acting human insulin analog indicated to improve glycemic control in adult and pediatric patients with diabetes mellitus. ( 1 )"
+    ],
+    "contraindications": [
+      "4 CONTRAINDICATIONS Insulin Lispro is contraindicated: during episodes of hypoglycemia [see Warnings and Precautions ( 5.3 )] . in patients who are hypersensitive to Insulin Lispro or to any of the excipients in Insulin Lispro [see Warnings and Precautions ( 5.5 )] . Do not use during episodes of hypoglycemia. ( 4 ) Do not use in patients with hypersensitivity to Insulin Lispro or any of the excipients in Insulin Lispro. ( 4 )"
+    ],
+    "adverse_reactions": [
+      "6 ADVERSE REACTIONS The following adverse reactions are discussed elsewhere: Hypoglycemia [see Warnings and Precautions ( 5.3 )] . Hypoglycemia Due to Medication Errors [see Warnings and Precautions ( 5.4 )]. Hypersensitivity Reactions [see Warnings and Precautions ( 5.5 )]. Hypokalemia [see Warnings and Precautions ( 5.6 )] . Adverse reactions associated with Insulin Lispro include hypoglycemia, allergic reactions, injection site reactions, lipodystrophy, pruritus, and rash. ( 6.1 ) To report S"
+    ],
+    "dosage_and_administration": [
+      "2 DOSAGE AND ADMINISTRATION See Full Prescribing Information for important administration instructions. ( 2.1 , 2.2 , 2.3 , 2.4 ) Subcutaneous Injection ( 2.2 ): Administer Insulin Lispro by subcutaneous injection into the abdominal wall, thigh, upper arm, or buttocks within 15 minutes before a meal or immediately after a meal. Rotate injection sites to reduce risk of lipodystrophy and localized cutaneous amyloidosis. Continuous subcutaneous infusion (Insulin Pump) ( 2.2 ): Refer to the insulin "
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "insulin",
+    "generic_names": [
+      "INSULIN ASPART",
+      "WATER INJECTION"
+    ],
+    "brand_names": [
+      "NOVOLOG",
+      "Insulin Diluting Medium for NovoLog"
+    ],
+    "manufacturer_name": [
+      "Novo Nordisk"
+    ],
+    "route": [
+      "INTRAVENOUS",
+      "SUBCUTANEOUS"
+    ],
+    "warnings": [],
+    "indications_and_usage": [
+      "1 INDICATIONS AND USAGE NOVOLOG is indicated to improve glycemic control in adults and pediatric patients with diabetes mellitus. NOVOLOG is rapid acting human insulin analog indicated to improve glycemic control in adults and pediatric patients with diabetes mellitus ( 1 )."
+    ],
+    "contraindications": [
+      "4 CONTRAINDICATIONS NOVOLOG is contraindicated: \u2022 During episodes of hypoglycemia [see Warnings and Precautions ( 5.3 )] \u2022 In patients with hypersensitivity to NOVOLOG or one of its excipients, [see Warnings and Precautions ( 5.5 )] \u2022 During episodes of hypoglycemia ( 4 ). \u2022 Hypersensitivity to NOVOLOG or one of its excipients."
+    ],
+    "adverse_reactions": [
+      "6 ADVERSE REACTIONS The following adverse reactions are also discussed elsewhere: \u2022 Hypoglycemia [see Warnings and Precautions ( 5.3 )] \u2022 Hypoglycemia Due to Medication Errors [see Warnings and Precautions (5.4 )] \u2022 Hypersensitivity reactions [see Warnings and Precautions ( 5.5 )] \u2022 Hypokalemia [see Warnings and Precautions ( 5.6 )] Adverse reactions observed with NOVOLOG include: hypoglycemia, allergic reactions, local injection site reactions, lipodystrophy, rash, and pruritus ( 6 ). To report"
+    ],
+    "dosage_and_administration": [
+      "2 DOSAGE AND ADMINISTRATION See Full Prescribing Information for important preparation, administration, and dosage instructions ( 2.1, 2.2, 2.3, 2.4, 2.5 ). \u2022 Subcutaneous injection ( 2.2 ): o Inject subcutaneously within 5-10 minutes before a meal into the abdominal area, thigh, buttocks or upper arm. o Rotate injection sites within the same region from one injection to the next to reduce risk of lipodystrophy and localized cutaneous amyloidosis. o Should generally be used in regimens with an i"
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  },
+  {
+    "input_term": "insulin",
+    "generic_names": [
+      "INSULIN GLARGINE-YFGN"
+    ],
+    "brand_names": [
+      "Insulin Glargine"
+    ],
+    "manufacturer_name": [
+      "Biocon Biologics Inc."
+    ],
+    "route": [
+      "SUBCUTANEOUS"
+    ],
+    "warnings": [],
+    "indications_and_usage": [
+      "1 INDICATIONS AND USAGE Insulin Glargine-yfgn is indicated to improve glycemic control in adult and pediatric patients with diabetes mellitus. Limitations of Use Insulin Glargine-yfgn is not recommended for the treatment of diabetic ketoacidosis. Insulin Glargine-yfgn is a long-acting human insulin analog indicated to improve glycemic control in adult and pediatric patients with diabetes mellitus. ( 1 ) Limitations of Use Not recommended for the treatment of diabetic ketoacidosis. ( 1 )"
+    ],
+    "contraindications": [
+      "4 CONTRAINDICATIONS Insulin Glargine-yfgn is contraindicated: \u2022 During episodes of hypoglycemia [see Warnings and Precautions (5.3) ] \u2022 In patients with hypersensitivity to insulin glargine products or any of the excipients in Insulin Glargine-yfgn [see Warnings and Precautions (5.5) ] \u2022 During episodes of hypoglycemia ( 4 ) \u2022 Hypersensitivity to insulin glargine products or any excipient in Insulin Glargine-yfgn ( 4 )"
+    ],
+    "adverse_reactions": [
+      "6 ADVERSE REACTIONS The following adverse reactions are discussed elsewhere: Hyperglycemia or Hypoglycemia with Changes in Insulin Regimen [see Warnings and Precautions (5.2) ] Hypoglycemia [see Warnings and Precautions (5.3) ] Hypoglycemia Due to Medication Errors [see Warnings and Precautions (5.4) ] Hypersensitivity Reactions [see Warnings and Precautions (5.5) ] Hypokalemia [see Warnings and Precautions (5.6) ] Adverse reactions commonly associated with insulin glargine products include hypo"
+    ],
+    "dosage_and_administration": [
+      "2 DOSAGE AND ADMINISTRATION \u2022 Individualize dosage based on metabolic needs, blood glucose monitoring, glycemic control, type of diabetes, and prior insulin use. ( 2.2 ) \u2022 Administer subcutaneously into the abdominal area, thigh, or deltoid once daily at any time of day, but at the same time every day. ( 2.1 ) \u2022 Do not dilute or mix with any other insulin or solution. ( 2.1 ) \u2022 Rotate injection sites to reduce risk of lipodystrophy and localized cutaneous amyloidosis. ( 2.1 ) \u2022 See Full Prescrib"
+    ],
+    "active_ingredient": [],
+    "source_endpoint_used": "drug/label"
+  }
+]

@@ -1,0 +1,16 @@
+[
+  {
+    "tested": false,
+    "reason": "Missing LOINC_USERNAME or LOINC_PASSWORD",
+    "input_terms": [
+      "CBC",
+      "Complete Blood Count",
+      "HbA1c",
+      "Creatinine",
+      "Liver Function Test",
+      "Urinalysis",
+      "Glucose"
+    ],
+    "source_endpoint": "ValueSet/$expand"
+  }
+]

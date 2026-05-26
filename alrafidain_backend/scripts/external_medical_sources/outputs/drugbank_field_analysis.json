@@ -1,0 +1,26 @@
+{
+  "service": "drugbank",
+  "records_raw": 1,
+  "records_simplified": 7,
+  "raw_key_frequency": {
+    "tested": 1,
+    "reason": 1,
+    "input_terms": 1,
+    "base_url": 1
+  },
+  "simplified_key_frequency": {
+    "input_term": 7,
+    "drugbank_id": 7,
+    "name": 7,
+    "description": 7,
+    "synonyms": 7,
+    "categories": 7,
+    "interactions": 7,
+    "source_endpoint_used": 7,
+    "note": 7
+  },
+  "notes": [
+    "DrugBank access patterns vary by commercial plan and endpoint permissions.",
+    "This script is exploratory and handles auth or schema mismatches gracefully."
+  ]
+}

@@ -7,6 +7,15 @@ class PrescriptionItemInline(admin.TabularInline):
     model = PrescriptionItem
     extra = 0
     readonly_fields = ("id", "created_at", "updated_at", "dispensed_at", "cancelled_at")
+    fields = (
+        "drug",
+        "custom_drug_name",
+        "medication_name",
+        "dosage",
+        "frequency",
+        "duration",
+        "status",
+    )
 
 
 class DispensingRecordInline(admin.TabularInline):
@@ -34,9 +43,28 @@ class PrescriptionAdmin(admin.ModelAdmin):
 
 @admin.register(PrescriptionItem)
 class PrescriptionItemAdmin(admin.ModelAdmin):
-    list_display = ("id", "prescription", "medication_name", "status", "created_at")
+    list_display = (
+        "id",
+        "prescription",
+        "drug",
+        "custom_drug_name",
+        "medication_name",
+        "dosage",
+        "frequency",
+        "duration",
+        "status",
+        "created_at",
+    )
     list_filter = ("status", "route")
-    search_fields = ("medication_name", "prescription__qr_token", "prescription__patient__email")
+    search_fields = (
+        "drug__name",
+        "drug__generic_name",
+        "drug__brand_name",
+        "custom_drug_name",
+        "medication_name",
+        "prescription__qr_token",
+        "prescription__patient__email",
+    )
     readonly_fields = ("id", "created_at", "updated_at")
 
 

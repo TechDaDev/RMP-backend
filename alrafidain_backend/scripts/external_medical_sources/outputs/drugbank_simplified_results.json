@@ -1,0 +1,79 @@
+[
+  {
+    "input_term": "paracetamol",
+    "drugbank_id": null,
+    "name": null,
+    "description": null,
+    "synonyms": [],
+    "categories": [],
+    "interactions": [],
+    "source_endpoint_used": null,
+    "note": "Skipped: missing DRUGBANK_API_KEY"
+  },
+  {
+    "input_term": "acetaminophen",
+    "drugbank_id": null,
+    "name": null,
+    "description": null,
+    "synonyms": [],
+    "categories": [],
+    "interactions": [],
+    "source_endpoint_used": null,
+    "note": "Skipped: missing DRUGBANK_API_KEY"
+  },
+  {
+    "input_term": "amoxicillin",
+    "drugbank_id": null,
+    "name": null,
+    "description": null,
+    "synonyms": [],
+    "categories": [],
+    "interactions": [],
+    "source_endpoint_used": null,
+    "note": "Skipped: missing DRUGBANK_API_KEY"
+  },
+  {
+    "input_term": "metformin",
+    "drugbank_id": null,
+    "name": null,
+    "description": null,
+    "synonyms": [],
+    "categories": [],
+    "interactions": [],
+    "source_endpoint_used": null,
+    "note": "Skipped: missing DRUGBANK_API_KEY"
+  },
+  {
+    "input_term": "ibuprofen",
+    "drugbank_id": null,
+    "name": null,
+    "description": null,
+    "synonyms": [],
+    "categories": [],
+    "interactions": [],
+    "source_endpoint_used": null,
+    "note": "Skipped: missing DRUGBANK_API_KEY"
+  },
+  {
+    "input_term": "ceftriaxone",
+    "drugbank_id": null,
+    "name": null,
+    "description": null,
+    "synonyms": [],
+    "categories": [],
+    "interactions": [],
+    "source_endpoint_used": null,
+    "note": "Skipped: missing DRUGBANK_API_KEY"
+  },
+  {
+    "input_term": "insulin",
+    "drugbank_id": null,
+    "name": null,
+    "description": null,
+    "synonyms": [],
+    "categories": [],
+    "interactions": [],
+    "source_endpoint_used": null,
+    "note": "Skipped: missing DRUGBANK_API_KEY"
+  }
+]

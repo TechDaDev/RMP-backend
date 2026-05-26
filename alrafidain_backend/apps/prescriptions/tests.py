@@ -17,6 +17,7 @@ from apps.common.choices import (
     VerificationStatus,
 )
 from apps.consultations.models import Consultation
+from apps.medical_catalog.models import Drug
 from apps.profiles.models import DoctorProfile, PatientProfile, PharmacistProfile, UserProfile
 
 from .models import DispensingRecord, Prescription, PrescriptionItem
@@ -276,6 +277,153 @@ class PrescriptionCreationTests(TestCase):
         resp = client.post(self._url(), {"items": [ITEM_PAYLOAD]}, format="json")
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         self.assertTrue(AuditLog.objects.filter(action="prescription_created").exists())
+
+    def test_doctor_can_create_prescription_item_with_catalog_drug(self):
+        catalog_drug = Drug.objects.create(
+            name="Amoxicillin",
+            generic_name="Amoxicillin",
+            form="Capsule",
+            strength="500 mg",
+            route="oral",
+            is_active=True,
+        )
+        client = auth_client(self.doctor)
+        payload = {
+            "items": [
+                {
+                    "drug": str(catalog_drug.id),
+                    "dosage": "500 mg",
+                    "frequency": "Every 8 hours",
+                    "duration": "5 days",
+                    "route": "oral",
+                    "instructions": "After food",
+                }
+            ]
+        }
+        resp = client.post(self._url(), payload, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        item = PrescriptionItem.objects.get(prescription_id=resp.data["data"]["id"])
+        self.assertEqual(item.drug_id, catalog_drug.id)
+        self.assertEqual(item.medication_name, "Amoxicillin")
+
+    def test_doctor_can_create_prescription_item_with_custom_drug_name_only(self):
+        client = auth_client(self.doctor)
+        payload = {
+            "items": [
+                {
+                    "custom_drug_name": "Local brand not found",
+                    "dosage": "1 tablet",
+                    "frequency": "Twice daily",
+                    "duration": "3 days",
+                    "route": "oral",
+                    "instructions": "After meals",
+                }
+            ]
+        }
+        resp = client.post(self._url(), payload, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        item = PrescriptionItem.objects.get(prescription_id=resp.data["data"]["id"])
+        self.assertEqual(item.custom_drug_name, "Local brand not found")
+        self.assertEqual(item.medication_name, "Local brand not found")
+
+    def test_existing_drug_name_only_behavior_still_works(self):
+        client = auth_client(self.doctor)
+        payload = {
+            "items": [
+                {
+                    "drug_name": "Legacy Named Drug",
+                    "dosage": "1 tablet",
+                    "frequency": "Once daily",
+                    "duration": "5 days",
+                    "route": "oral",
+                }
+            ]
+        }
+        resp = client.post(self._url(), payload, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        item = PrescriptionItem.objects.get(prescription_id=resp.data["data"]["id"])
+        self.assertEqual(item.medication_name, "Legacy Named Drug")
+
+    def test_create_item_without_drug_or_names_fails(self):
+        client = auth_client(self.doctor)
+        payload = {
+            "items": [
+                {
+                    "dosage": "1 tablet",
+                    "frequency": "Once daily",
+                    "duration": "5 days",
+                    "route": "oral",
+                }
+            ]
+        }
+        resp = client.post(self._url(), payload, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("items", resp.data.get("errors", {}))
+        self.assertIn("medication_name", resp.data["errors"]["items"][0])
+        self.assertEqual(
+            resp.data["errors"]["items"][0]["medication_name"][0],
+            "A catalog drug or custom drug name is required.",
+        )
+
+    def test_inactive_catalog_drug_cannot_be_selected(self):
+        catalog_drug = Drug.objects.create(
+            name="Inactive Drug",
+            is_active=False,
+            source_name="rxnorm",
+        )
+        client = auth_client(self.doctor)
+        payload = {
+            "items": [
+                {
+                    "drug": str(catalog_drug.id),
+                    "dosage": "1 tablet",
+                    "frequency": "Once daily",
+                    "duration": "2 days",
+                    "route": "oral",
+                }
+            ]
+        }
+        resp = client.post(self._url(), payload, format="json")
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("items", resp.data.get("errors", {}))
+        self.assertIn("drug", resp.data["errors"]["items"][0])
+        self.assertEqual(resp.data["errors"]["items"][0]["drug"][0], "Selected drug is inactive.")
+
+    def test_prescription_item_response_includes_drug_detail_and_display_name(self):
+        catalog_drug = Drug.objects.create(
+            name="Paracetamol",
+            generic_name="Acetaminophen",
+            form="Tablet",
+            strength="500 mg",
+            route="oral",
+            rxnorm_rxcui="161",
+            is_active=True,
+        )
+        client = auth_client(self.doctor)
+        payload = {
+            "items": [
+                {
+                    "drug": str(catalog_drug.id),
+                    "custom_drug_name": "Optional note",
+                    "dosage": "500 mg",
+                    "frequency": "Every 8 hours",
+                    "duration": "5 days",
+                    "route": "oral",
+                }
+            ]
+        }
+        create_resp = client.post(self._url(), payload, format="json")
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED)
+        prescription_id = create_resp.data["data"]["id"]
+
+        detail_resp = client.get(f"/api/prescriptions/doctor/{prescription_id}/")
+        self.assertEqual(detail_resp.status_code, status.HTTP_200_OK)
+        item = detail_resp.data["data"]["items"][0]
+        self.assertEqual(str(item["drug"]), str(catalog_drug.id))
+        self.assertEqual(item["drug_detail"]["id"], str(catalog_drug.id))
+        self.assertEqual(item["drug_detail"]["rxnorm_rxcui"], "161")
+        self.assertEqual(item["display_drug_name"], "Paracetamol 500 mg Tablet")
+        self.assertEqual(item["drug_name"], item["medication_name"])
 
 
 # ──────────────────────────────────────────────
