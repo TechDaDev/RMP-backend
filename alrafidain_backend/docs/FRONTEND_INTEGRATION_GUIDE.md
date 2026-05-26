@@ -362,6 +362,21 @@ GET /api/patient-records/patients/{patient_id}/
 
 ### 7.5 Create Prescription
 
+Drug selection supports both catalog and manual entry:
+
+1. Doctor types in drug input.
+2. Frontend calls catalog search with debounce (~300ms):
+
+```http
+GET /api/catalog/drugs/?search=para
+```
+
+3. Frontend displays returned `display_name` suggestions.
+4. If selected, submit `drug` UUID in prescription item.
+5. If no suitable match, submit `custom_drug_name` manually.
+
+Catalog search matches by `name`, `generic_name`, `brand_name`, `rxnorm_rxcui`, and alias values.
+
 ```http
 POST /api/consultations/{consultation_id}/prescriptions/
 {
@@ -380,13 +395,71 @@ POST /api/consultations/{consultation_id}/prescriptions/
 }
 ```
 
+Catalog drug payload example:
+
+```json
+{
+  "items": [
+    {
+      "drug": "drug_uuid_here",
+      "dosage": "500 mg",
+      "frequency": "Every 8 hours",
+      "duration": "5 days",
+      "route": "oral",
+      "instructions": "After food"
+    }
+  ]
+}
+```
+
+Custom drug payload example:
+
+```json
+{
+  "items": [
+    {
+      "custom_drug_name": "Local brand not found",
+      "dosage": "1 tablet",
+      "frequency": "Twice daily",
+      "duration": "3 days",
+      "route": "oral",
+      "instructions": "After meals"
+    }
+  ]
+}
+```
+
+Backward-compatible payload example:
+
+```json
+{
+  "items": [
+    {
+      "medication_name": "Paracetamol",
+      "dosage": "500 mg",
+      "frequency": "Every 8 hours",
+      "duration": "5 days",
+      "route": "oral"
+    }
+  ]
+}
+```
+
+Compatibility note:
+- Backend also accepts `drug_name` as an alias for `medication_name`.
+
 Prescription create requirements:
 - Consultation must be assigned to the requesting approved doctor.
 - Consultation status must be `accepted` or `doctor_responded`.
 - `items` must be non-empty.
-- Required per item: `medication_name`, `dosage`, `frequency`, `duration`, `route`.
+- Required per item: at least one of `drug`, `custom_drug_name`, `medication_name`, or `drug_name`, plus `dosage`, `frequency`, `duration`, `route`.
 - Optional per item: `strength`, `quantity`, `instructions`.
 - Allowed `route` values: `oral`, `topical`, `inhalation`, `injection`, `eye`, `ear`, `nasal`, `rectal`, `other`.
+
+Validation notes:
+- Inactive catalog drugs cannot be selected.
+- If both `drug` and `custom_drug_name` are sent, selected `drug` is primary and `custom_drug_name` is retained as fallback text.
+- Prescription creation must not be blocked just because a catalog match is unavailable.
 
 Validation error example (missing route):
 ```json

@@ -42,6 +42,7 @@ All responses follow the standard envelope:
   - [Doctor Queue and Assignment](#consultations)
   - [Doctor Responses and Close](#consultations)
 - [Messaging](#messaging)
+- [Drug Catalog and Prescription Drug Selection](#drug-catalog-and-prescription-drug-selection)
 - [Prescriptions](#prescriptions)
 - [Notifications](#notifications)
 - [Patient Records](#patient-records)
@@ -1207,6 +1208,168 @@ Mark all unread messages in this consultation as read (for the requesting user).
 
 ---
 
+## Drug Catalog and Prescription Drug Selection
+
+This section documents the local-database-first medication workflow used by doctor prescription screens on web/mobile.
+
+### A. Drug Search Endpoint
+
+### `GET /api/catalog/drugs/?search=para`
+
+Purpose:
+- Autocomplete source when doctor types a drug name.
+
+Authentication:
+- Authenticated users only.
+
+Example response:
+```json
+{
+  "count": 1,
+  "results": [
+    {
+      "id": "uuid",
+      "display_name": "acetaminophen",
+      "name": "acetaminophen",
+      "generic_name": "acetaminophen",
+      "brand_name": null,
+      "form": null,
+      "strength": null,
+      "route": null,
+      "rxnorm_rxcui": "161",
+      "is_verified": false
+    }
+  ]
+}
+```
+
+Search behavior:
+- Matches against `name`, `generic_name`, `brand_name`, `rxnorm_rxcui`, and aliases.
+- Frontend/mobile should debounce user input (recommended around 300ms).
+- If no match is found, prescription creation should continue via `custom_drug_name`.
+
+### B. Prescription Creation With Catalog Drug
+
+Endpoint:
+- `POST /api/consultations/{consultation_id}/prescriptions/`
+
+Example payload:
+```json
+{
+  "diagnosis": "Upper respiratory tract infection",
+  "notes": "Patient advised to rest and hydrate.",
+  "items": [
+    {
+      "drug": "drug_uuid_here",
+      "dosage": "500 mg",
+      "frequency": "Every 8 hours",
+      "duration": "5 days",
+      "route": "oral",
+      "instructions": "After food"
+    }
+  ]
+}
+```
+
+### C. Prescription Creation With Custom Drug
+
+Example payload:
+```json
+{
+  "diagnosis": "Upper respiratory tract infection",
+  "notes": "Drug not found in catalog, entered manually.",
+  "items": [
+    {
+      "custom_drug_name": "Local brand not found",
+      "dosage": "1 tablet",
+      "frequency": "Twice daily",
+      "duration": "3 days",
+      "route": "oral",
+      "instructions": "After meals"
+    }
+  ]
+}
+```
+
+### D. Backward-Compatible Prescription Creation
+
+Legacy clients can still send:
+```json
+{
+  "medication_name": "Paracetamol",
+  "dosage": "500 mg",
+  "frequency": "Every 8 hours",
+  "duration": "5 days",
+  "route": "oral"
+}
+```
+
+Compatibility note:
+- Incoming `drug_name` is accepted as a compatibility alias and mapped internally to `medication_name`.
+
+### E. Prescription Item Response Fields
+
+Prescription item responses include:
+- `drug`
+- `drug_detail`
+- `custom_drug_name`
+- `display_drug_name`
+- `drug_name`
+- `medication_name`
+- `dosage`
+- `frequency`
+- `duration`
+- `route`
+- `instructions`
+
+Example response item:
+```json
+{
+  "id": "item_uuid",
+  "drug": "drug_uuid",
+  "drug_detail": {
+    "id": "drug_uuid",
+    "display_name": "acetaminophen",
+    "name": "acetaminophen",
+    "generic_name": "acetaminophen",
+    "brand_name": null,
+    "form": null,
+    "strength": null,
+    "route": null,
+    "rxnorm_rxcui": "161"
+  },
+  "custom_drug_name": null,
+  "display_drug_name": "acetaminophen",
+  "drug_name": "acetaminophen",
+  "medication_name": "acetaminophen",
+  "dosage": "500 mg",
+  "frequency": "Every 8 hours",
+  "duration": "5 days",
+  "route": "oral",
+  "instructions": "After food"
+}
+```
+
+### F. Frontend/Mobile Workflow
+
+1. Doctor opens prescription form.
+2. Doctor starts typing in the drug field.
+3. Frontend calls `GET /api/catalog/drugs/?search={typed_value}`.
+4. Frontend shows returned `display_name` values.
+5. If doctor selects a drug, frontend stores selected `drug` UUID.
+6. Frontend submits item with `drug` UUID.
+7. If no match is found, frontend allows manual input and submits `custom_drug_name`.
+8. Prescription creation must not be blocked only because a drug is missing from catalog.
+
+### G. Validation Rules
+
+- At least one of `drug`, `custom_drug_name`, `medication_name`, or `drug_name` is required.
+- Inactive drugs cannot be selected.
+- If `drug` and `custom_drug_name` are both provided, selected `drug` is primary and `custom_drug_name` is retained as entered fallback text.
+- `medication_name` remains supported for backward compatibility.
+
+---
+
 ## Prescriptions
 
 ### `POST /api/consultations/<consultation_id>/prescriptions/`
@@ -1217,7 +1380,7 @@ Create a new prescription for a consultation.
 - **Allowed roles**: Doctor (approved, assigned to consultation)
 - **Consultation status required**: `accepted` or `doctor_responded`
 - `items` must be a non-empty array.
-- Unknown top-level fields (for example `notes`) are not part of the create contract and should not be sent.
+- Unknown top-level fields are ignored by backend serializers and should not be relied on for persistence in this phase.
 
 **Request body:**
 ```json
@@ -1239,8 +1402,8 @@ Create a new prescription for a consultation.
 
 **Item field contract:**
 
-- Required per item: `medication_name`, `dosage`, `frequency`, `duration`, `route`
-- Optional per item: `strength`, `quantity`, `instructions`
+- Required per item: at least one of `drug`, `custom_drug_name`, `medication_name`, or `drug_name`, plus `dosage`, `frequency`, `duration`, `route`
+- Optional per item: `strength`, `quantity`, `instructions`, `drug`, `custom_drug_name`, `medication_name`, `drug_name`
 - Allowed `route` values: `oral`, `topical`, `inhalation`, `injection`, `eye`, `ear`, `nasal`, `rectal`, `other`
 
 **Validation error examples:**
