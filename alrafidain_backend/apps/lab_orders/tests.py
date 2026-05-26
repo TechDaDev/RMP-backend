@@ -47,6 +47,8 @@ from .models import (
     LabTestCatalog,
 )
 
+from apps.lab_catalog.models import LabTest, LabTestAlias
+
 User = get_user_model()
 
 
@@ -1197,6 +1199,7 @@ class LabResultVisibilityAndWorkflowTests(TestCase):
             bg_record.verification_status, MedicalRecordVerificationStatus.LABORATORY_CONFIRMED
         )
 
+
     def test_role_restrictions_for_result_endpoints(self):
         self.assertEqual(
             auth_client(self.pharmacist)
@@ -1214,3 +1217,192 @@ class LabResultVisibilityAndWorkflowTests(TestCase):
             .status_code,
             status.HTTP_400_BAD_REQUEST,
         )
+
+
+def create_lab_catalog_test(name="CBC", short_name="CBC", category="Hematology", is_active=True):
+    return LabTest.objects.create(
+        name=name,
+        short_name=short_name,
+        category=category,
+        sample_type="Blood",
+        is_active=is_active,
+        is_verified=True,
+    )
+
+
+class LabCatalogIntegrationTests(TestCase):
+    """Tests for connecting lab_catalog.LabTest to lab order items."""
+
+    def setUp(self):
+        self.patient = create_patient("catlab-patient@example.com")
+        self.doctor = create_doctor("catlab-doctor@example.com")
+        self.consultation = create_consultation(
+            self.patient, self.doctor, ConsultationStatus.ACCEPTED
+        )
+        self.lab_test = create_lab_catalog_test("Complete Blood Count", "CBC", "Hematology")
+        self.inactive_lab_test = create_lab_catalog_test(
+            "Inactive Test", "IT", "Other", is_active=False
+        )
+
+    def _url(self):
+        return f"/api/consultations/{self.consultation.id}/lab-orders/"
+
+    def test_doctor_can_create_item_with_catalog_lab_test(self):
+        payload = {"items": [{"lab_test": str(self.lab_test.id)}]}
+        response = auth_client(self.doctor).post(self._url(), payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        item = LabOrderItem.objects.filter(lab_test=self.lab_test).first()
+        self.assertIsNotNone(item)
+        self.assertEqual(item.lab_test_id, self.lab_test.id)
+
+    def test_doctor_can_create_item_with_custom_test_name(self):
+        payload = {
+            "items": [
+                {
+                    "custom_test_name": "Local special test not in catalog",
+                    "category": LabTestCategory.OTHER,
+                }
+            ]
+        }
+        response = auth_client(self.doctor).post(self._url(), payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        item = LabOrderItem.objects.filter(
+            custom_test_name="Local special test not in catalog"
+        ).first()
+        self.assertIsNotNone(item)
+        self.assertIsNone(item.lab_test)
+
+    def test_legacy_test_name_behavior_still_works(self):
+        payload = {
+            "items": [
+                {
+                    "test_name": "HbA1c",
+                    "category": LabTestCategory.BIOCHEMISTRY,
+                    "sample_type": "Whole blood",
+                    "instructions": "Fasting preferred",
+                }
+            ]
+        }
+        response = auth_client(self.doctor).post(self._url(), payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        item = LabOrderItem.objects.filter(test_name="HbA1c").first()
+        self.assertIsNotNone(item)
+        self.assertIsNone(item.lab_test)
+        self.assertIsNone(item.custom_test_name)
+
+    def test_create_item_without_any_test_identifier_fails(self):
+        payload = {
+            "items": [
+                {
+                    "category": LabTestCategory.HEMATOLOGY,
+                    "sample_type": "Blood",
+                }
+            ]
+        }
+        response = auth_client(self.doctor).post(self._url(), payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_inactive_catalog_lab_test_cannot_be_selected(self):
+        payload = {
+            "items": [
+                {
+                    "lab_test": str(self.inactive_lab_test.id),
+                    "category": LabTestCategory.OTHER,
+                }
+            ]
+        }
+        response = auth_client(self.doctor).post(self._url(), payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_response_includes_lab_test_detail_and_display_test_name(self):
+        payload = {"items": [{"lab_test": str(self.lab_test.id)}]}
+        create_resp = auth_client(self.doctor).post(self._url(), payload, format="json")
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED)
+        lab_order_id = create_resp.data["data"]["id"]
+
+        detail_resp = auth_client(self.doctor).get(f"/api/lab-orders/doctor/{lab_order_id}/")
+        self.assertEqual(detail_resp.status_code, status.HTTP_200_OK)
+        items = detail_resp.data["data"]["items"]
+        self.assertEqual(len(items), 1)
+        item = items[0]
+        self.assertIn("lab_test_detail", item)
+        self.assertIn("display_test_name", item)
+        self.assertIsNotNone(item["lab_test_detail"])
+        self.assertEqual(item["lab_test_detail"]["id"], str(self.lab_test.id))
+        self.assertIn("display_name", item["lab_test_detail"])
+        self.assertIn("CBC", item["display_test_name"])
+
+    def test_lab_catalog_search_works_without_external_apis(self):
+        LabTestAlias.objects.create(
+            lab_test=self.lab_test,
+            alias="\u062f\u0645 \u0643\u0627\u0645\u0644",
+            alias_type=LabTestAlias.AliasType.ARABIC,
+        )
+        response = auth_client(self.doctor).get("/api/catalog/lab-tests/?search=CBC")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        payload = response.data
+        if isinstance(payload, dict):
+            if "data" in payload:
+                payload = payload["data"]
+            elif "results" in payload:
+                payload = payload["results"]
+        ids = [str(it["id"]) for it in payload]
+        self.assertIn(str(self.lab_test.id), ids)
+
+    def test_display_test_name_returns_catalog_display_name_when_lab_test_set(self):
+        lab_order = LabOrder.objects.create(
+            consultation=self.consultation,
+            doctor=self.doctor,
+            patient=self.patient,
+        )
+        item = LabOrderItem.objects.create(
+            lab_order=lab_order,
+            lab_test=self.lab_test,
+            test_name=self.lab_test.display_name,
+            category=LabTestCategory.HEMATOLOGY,
+        )
+        self.assertEqual(item.display_test_name, self.lab_test.display_name)
+
+    def test_display_test_name_falls_back_to_custom_test_name(self):
+        lab_order = LabOrder.objects.create(
+            consultation=self.consultation,
+            doctor=self.doctor,
+            patient=self.patient,
+        )
+        item = LabOrderItem.objects.create(
+            lab_order=lab_order,
+            custom_test_name="My Custom Test",
+            test_name="My Custom Test",
+            category=LabTestCategory.OTHER,
+        )
+        self.assertEqual(item.display_test_name, "My Custom Test")
+
+    def test_display_test_name_falls_back_to_legacy_test_name(self):
+        lab_order = LabOrder.objects.create(
+            consultation=self.consultation,
+            doctor=self.doctor,
+            patient=self.patient,
+        )
+        item = LabOrderItem.objects.create(
+            lab_order=lab_order,
+            test_name="Legacy Test",
+            category=LabTestCategory.HEMATOLOGY,
+        )
+        self.assertIsNone(item.lab_test)
+        self.assertIsNone(item.custom_test_name)
+        self.assertEqual(item.display_test_name, "Legacy Test")
+
+    def test_lab_test_and_custom_test_name_both_provided_is_allowed(self):
+        payload = {
+            "items": [
+                {
+                    "lab_test": str(self.lab_test.id),
+                    "custom_test_name": "Doctor's local label",
+                }
+            ]
+        }
+        response = auth_client(self.doctor).post(self._url(), payload, format="json")
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        item = LabOrderItem.objects.filter(lab_test=self.lab_test).first()
+        self.assertIsNotNone(item)
+        self.assertEqual(item.custom_test_name, "Doctor's local label")

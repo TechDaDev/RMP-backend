@@ -1777,6 +1777,89 @@ Create payload example (custom drug):
 }
 ```
 
+## Lab Test Catalog
+
+A local, searchable catalog of common lab tests. All data is stored locally — no external LOINC API is called. This catalog supports autocomplete/search for lab order workflows. LOINC codes can be imported in the future via a dedicated import command.
+
+Clinical summaries (preparation notes, significance, interpretation) belong in `LabTestClinicalInfo` and are entered only as reviewed summaries from internal sources. No reference ranges are stored here. McGraw-Hill/RAG enrichment is added to `LabTestClinicalInfo` as reviewed summaries only, not raw paragraphs.
+
+### `GET /api/catalog/lab-tests/`
+
+List and search active lab tests.
+
+- **Auth required**: Yes (any authenticated user)
+- **Anonymous**: Blocked (401)
+- **Query params**:
+  - `search` — full-text search across name, short_name, loinc_code, category, component, system, sample_type, and aliases
+  - `category` — filter by category (case-insensitive contains)
+  - `sample_type` — filter by sample type (case-insensitive contains)
+  - `verified=true|false` — filter by verification status
+
+**Example request:**
+```
+GET /api/catalog/lab-tests/?search=cbc
+```
+
+**Example response:**
+```json
+{
+  "count": 1,
+  "results": [
+    {
+      "id": "uuid",
+      "display_name": "CBC - Complete Blood Count",
+      "name": "Complete Blood Count",
+      "short_name": "CBC",
+      "loinc_code": null,
+      "category": "Hematology",
+      "sample_type": "Blood",
+      "units": null,
+      "is_verified": false
+    }
+  ]
+}
+```
+
+### `GET /api/catalog/lab-tests/{id}/`
+
+Retrieve a single lab test with aliases and clinical info (if available).
+
+- **Auth required**: Yes
+
+**Response includes:**
+- All list fields plus: `component`, `system`, `source_name`, `source_code`, `source_version`, `is_active`, `aliases[]`, `clinical_info` (or `null`)
+
+### `POST /api/catalog/lab-tests/`
+
+Create a new lab test entry.
+
+- **Auth required**: Yes, admin/staff only
+
+### `PATCH /api/catalog/lab-tests/{id}/`
+
+Update a lab test.
+
+- **Auth required**: Yes, admin/staff only
+
+### `DELETE /api/catalog/lab-tests/{id}/`
+
+Soft-delete a lab test (sets `is_active=False`). The test no longer appears in list/search results.
+
+- **Auth required**: Yes, admin/staff only
+
+### Seed Command
+
+To seed the curated MVP lab test list (18 tests, ~48 aliases):
+
+```
+python manage.py seed_lab_tests
+python manage.py seed_lab_tests --source-version "mvp-1"
+```
+
+Idempotent — safe to run multiple times. All seeded tests are unverified by default (`is_verified=False`).
+
+---
+
 ## Pharmacy Prescription Requests and Quotes
 
 This workflow links prescriptions to pharmacy inventory for quote-based pre-payment review.
@@ -2555,6 +2638,49 @@ Create a new lab order linked to a consultation.
 }
 ```
 
+### Lab Order Catalog Selection
+
+Use the local lab catalog for autocomplete, while still allowing manual custom entries.
+
+Doctor flow:
+1. Doctor opens lab order form.
+2. Doctor types part of a test name.
+3. Frontend calls `GET /api/catalog/lab-tests/?search=<typed_value>`.
+4. Frontend displays returned `display_name` values.
+5. If doctor selects a catalog test, submit `lab_test` UUID.
+6. If no suitable catalog result exists, submit `custom_test_name`.
+
+This flow is local-only. No external LOINC API call is required for order creation.
+
+Catalog selection request example:
+```json
+{
+  "items": [
+    {
+      "lab_test": "8df9fd5e-2a71-4f10-a063-03c9e3111f0f"
+    }
+  ]
+}
+```
+
+Custom/manual request example:
+```json
+{
+  "items": [
+    {
+      "custom_test_name": "Local special test not in catalog",
+      "category": "other"
+    }
+  ]
+}
+```
+
+Validation and compatibility rules:
+- At least one identifier is required per item: `test` (legacy), `lab_test`, `test_name` (legacy), or `custom_test_name`.
+- Inactive `lab_test` values are rejected.
+- Legacy `test` and `test_name` behavior is preserved for backward compatibility.
+- Doctors are never blocked from creating an order if a test is missing from catalog; they can always use `custom_test_name`.
+
 > **Privacy note**: Lab order item details (test names) are not included in patient-facing responses.
 
 **Response `201`:**
@@ -2569,6 +2695,19 @@ Create a new lab order linked to a consultation.
       {
         "id": "uuid",
         "test_name": "CBC",
+        "lab_test": "8df9fd5e-2a71-4f10-a063-03c9e3111f0f",
+        "custom_test_name": null,
+        "display_test_name": "CBC - Complete Blood Count",
+        "lab_test_detail": {
+          "id": "8df9fd5e-2a71-4f10-a063-03c9e3111f0f",
+          "display_name": "CBC - Complete Blood Count",
+          "name": "Complete Blood Count",
+          "short_name": "CBC",
+          "loinc_code": null,
+          "category": "Hematology",
+          "sample_type": "Blood",
+          "units": null
+        },
         "category": "hematology",
         "sample_type": "Blood",
         "status": "pending"

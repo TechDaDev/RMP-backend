@@ -18,6 +18,8 @@ from .models import (
     LabTestCatalog,
 )
 
+from apps.lab_catalog.models import LabTest
+
 PATIENT_LAB_GUIDANCE = (
     "Show this QR code to any verified laboratory/laboratorian registered in the platform. "
     "The laboratory will scan it and view only the pending requested tests."
@@ -48,11 +50,35 @@ class LabTestCatalogSerializer(serializers.ModelSerializer):
         ]
 
 
+class LabTestCatalogDetailSerializer(serializers.ModelSerializer):
+    """Lightweight read-only detail of a lab_catalog.LabTest for embedding in order items."""
+    display_name = serializers.CharField(read_only=True)
+
+    class Meta:
+        model = LabTest
+        fields = [
+            "id",
+            "display_name",
+            "name",
+            "short_name",
+            "loinc_code",
+            "category",
+            "sample_type",
+            "units",
+        ]
+
+
 class LabOrderItemCreateSerializer(serializers.Serializer):
     test = serializers.PrimaryKeyRelatedField(
         queryset=LabTestCatalog.objects.filter(is_active=True), required=False
     )
+    lab_test = serializers.PrimaryKeyRelatedField(
+        queryset=LabTest.objects.all(), required=False, allow_null=True
+    )
     test_name = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    custom_test_name = serializers.CharField(
+        max_length=255, required=False, allow_blank=True, allow_null=True
+    )
     category = serializers.ChoiceField(
         choices=LabOrderItem._meta.get_field("category").choices, required=False
     )
@@ -61,9 +87,29 @@ class LabOrderItemCreateSerializer(serializers.Serializer):
     )
     instructions = serializers.CharField(required=False, allow_blank=True, default="")
 
+    def validate_lab_test(self, value):
+        if value is not None and not value.is_active:
+            raise serializers.ValidationError("Selected lab test is inactive.")
+        return value
+
     def validate(self, attrs):
         test = attrs.get("test")
-        if test is None and (not attrs.get("test_name") or not attrs.get("category")):
+        lab_test = attrs.get("lab_test")
+        test_name = attrs.get("test_name")
+        custom_test_name = attrs.get("custom_test_name")
+        # Must have at least one way to identify the test
+        has_identifier = test or lab_test or test_name or custom_test_name
+        if not has_identifier:
+            raise serializers.ValidationError(
+                "A catalog lab test or custom test name is required."
+            )
+        # Legacy validation: if using old LabTestCatalog with no test_name, infer it
+        if (
+            test is None
+            and lab_test is None
+            and not custom_test_name
+            and (not test_name or not attrs.get("category"))
+        ):
             raise serializers.ValidationError("Provide test or both test_name and category.")
         return attrs
 
@@ -81,10 +127,24 @@ class LabOrderCreateSerializer(serializers.Serializer):
             category = item.get("category") or (test.category if test else None)
             sample_type = item.get("sample_type") or (test.default_sample_type if test else "")
             instructions = item.get("instructions") or (test.default_instructions if test else "")
+            lab_test = item.get("lab_test")
+            custom_test_name = item.get("custom_test_name") or None
+            # Derive test_name from new catalog if not provided
+            if not test_name and lab_test:
+                test_name = lab_test.display_name
+            # Derive category from new catalog if not provided
+            if not category and lab_test and lab_test.category:
+                category = lab_test.category
+            # Fallback category for custom test names
+            if not category:
+                from apps.common.choices import LabTestCategory
+                category = LabTestCategory.OTHER
             normalized.append(
                 {
                     "test": test,
                     "test_name": test_name,
+                    "lab_test": lab_test,
+                    "custom_test_name": custom_test_name,
                     "category": category,
                     "sample_type": sample_type,
                     "instructions": instructions,
@@ -139,12 +199,19 @@ class LabCompletionRecordSerializer(serializers.ModelSerializer):
 
 
 class LabOrderItemSerializer(serializers.ModelSerializer):
+    lab_test_detail = serializers.SerializerMethodField()
+    display_test_name = serializers.CharField(read_only=True)
+
     class Meta:
         model = LabOrderItem
         fields = [
             "id",
             "test",
             "test_name",
+            "lab_test",
+            "lab_test_detail",
+            "custom_test_name",
+            "display_test_name",
             "category",
             "sample_type",
             "instructions",
@@ -153,6 +220,14 @@ class LabOrderItemSerializer(serializers.ModelSerializer):
             "cancelled_at",
             "created_at",
         ]
+
+    def get_lab_test_detail(self, obj):
+        if obj.lab_test_id:
+            try:
+                return LabTestCatalogDetailSerializer(obj.lab_test).data
+            except Exception:
+                return None
+        return None
 
 
 class _LabOrderPatientBaseSerializer(serializers.ModelSerializer):

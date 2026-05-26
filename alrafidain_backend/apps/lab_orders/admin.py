@@ -43,10 +43,33 @@ class LabOrderAdmin(admin.ModelAdmin):
 
 @admin.register(LabOrderItem)
 class LabOrderItemAdmin(admin.ModelAdmin):
-    list_display = ("id", "lab_order", "test_name", "category", "status", "created_at")
+    list_display = (
+        "id",
+        "lab_order",
+        "get_display_test_name",
+        "test_name",
+        "lab_test",
+        "custom_test_name",
+        "category",
+        "status",
+        "created_at",
+    )
     list_filter = ("status", "category", "created_at")
-    search_fields = ("test_name", "lab_order__doctor__email", "lab_order__patient__email")
-    readonly_fields = ("id", "created_at", "updated_at")
+    search_fields = (
+        "test_name",
+        "custom_test_name",
+        "lab_test__name",
+        "lab_test__short_name",
+        "lab_test__loinc_code",
+        "lab_order__doctor__email",
+        "lab_order__patient__email",
+    )
+    readonly_fields = ("id", "get_display_test_name", "created_at", "updated_at")
+    raw_id_fields = ("lab_test",)
+
+    @admin.display(description="Display Test Name")
+    def get_display_test_name(self, obj):
+        return obj.display_test_name
 
 
 @admin.register(LabCompletionRecord)

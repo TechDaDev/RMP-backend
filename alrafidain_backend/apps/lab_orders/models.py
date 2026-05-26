@@ -186,6 +186,14 @@ class LabOrderItem(BaseModel):
         related_name="lab_order_items",
     )
     test_name = models.CharField(max_length=200)
+    lab_test = models.ForeignKey(
+        "lab_catalog.LabTest",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="lab_order_items",
+    )
+    custom_test_name = models.CharField(max_length=255, blank=True, null=True)
     category = models.CharField(max_length=30, choices=LabTestCategory.choices)
     sample_type = models.CharField(max_length=100, blank=True)
     instructions = models.TextField(blank=True)
@@ -205,6 +213,19 @@ class LabOrderItem(BaseModel):
 
     def __str__(self):
         return f"{self.test_name} [{self.status}]"
+
+    @property
+    def display_test_name(self):
+        if self.lab_test_id:
+            try:
+                return self.lab_test.display_name
+            except Exception:
+                pass
+        if self.custom_test_name:
+            return self.custom_test_name
+        if self.test_name:
+            return self.test_name
+        return ""
 
 
 class LabCompletionRecord(BaseModel):
