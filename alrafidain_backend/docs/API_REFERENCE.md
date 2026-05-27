@@ -2139,8 +2139,26 @@ Resolver behavior in this phase:
   - Amount source: `PharmacyPrescriptionRequest.total_price`.
   - Provider source: `PharmacyPrescriptionRequest.pharmacy.user` (`provider_type=pharmacy`).
 - `consultation`:
-  - Ownership validation is applied.
-  - Payment amount is not configured yet and intent creation returns validation error.
+  - Allowed payer: consultation patient owner, or admin/staff.
+  - Required status: `accepted`.
+  - Amount source: `Consultation.consultation_fee` snapshot.
+  - Provider source: `Consultation.assigned_doctor` (`provider_type=doctor`).
+
+Consultation payment request:
+```json
+{
+  "service_type": "consultation",
+  "reference_id": "consultation_uuid",
+  "payment_method": "wallet"
+}
+```
+
+Consultation pricing notes:
+- Frontend must not send `amount` for consultation payments.
+- Backend resolves amount from `Consultation.consultation_fee` snapshot.
+- `DoctorProfile.consultation_fee` is the doctor's current default price only.
+- Existing consultation snapshots do not auto-change if doctor profile fee changes later.
+- If consultation snapshot fee is missing or zero, payment is rejected.
 
 ### `POST /api/payments/intents/{id}/pay-wallet/`
 
@@ -2154,6 +2172,7 @@ Behavior:
 - Creates confirmed debit `WalletTransaction`.
 - Marks intent as `succeeded` and sets `paid_at`.
 - Creates `ProviderEarning` for successful service payments when provider metadata is resolved.
+- For consultation payments, earning is created for the doctor from snapshot fee and active consultation platform fee rule.
 
 Status lifecycle (PaymentIntent):
 - `created` -> `pending` -> `succeeded`

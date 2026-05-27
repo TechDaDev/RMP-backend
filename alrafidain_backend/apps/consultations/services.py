@@ -215,9 +215,20 @@ def recommend_specialty_from_symptoms(symptom_ids):
 @transaction.atomic
 def accept_consultation(*, consultation, doctor, request=None):
     consultation.assigned_doctor = doctor
+    consultation.set_fee_snapshot_from_doctor()
     consultation.status = ConsultationStatus.ACCEPTED
     consultation.accepted_at = timezone.now()
-    consultation.save(update_fields=["assigned_doctor", "status", "accepted_at", "updated_at"])
+    consultation.save(
+        update_fields=[
+            "assigned_doctor",
+            "consultation_fee",
+            "consultation_currency",
+            "fee_snapshot_at",
+            "status",
+            "accepted_at",
+            "updated_at",
+        ]
+    )
 
     create_audit_log(
         actor=doctor,

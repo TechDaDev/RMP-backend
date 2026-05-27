@@ -109,6 +109,8 @@ class DoctorProfileSerializer(serializers.ModelSerializer):
             "subspecialty",
             "professional_title",
             "years_of_experience",
+            "consultation_fee",
+            "consultation_currency",
             "bio",
             "work_address",
             "verification_status",

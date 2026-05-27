@@ -4,6 +4,7 @@ from uuid import uuid4
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -64,6 +65,8 @@ def create_doctor(email=None):
     DoctorProfile.objects.create(
         user=user,
         specialty=MedicalSpecialty.GENERAL_MEDICINE,
+        consultation_fee=Decimal("18000.00"),
+        consultation_currency="IQD",
         verification_status=VerificationStatus.APPROVED,
     )
     return user
@@ -91,15 +94,21 @@ def create_pharmacist(email=None):
     return user, profile
 
 
-def create_consultation(patient, doctor):
-    return Consultation.objects.create(
+def create_consultation(patient, doctor, *, status=ConsultationStatus.ACCEPTED, consultation_fee=None):
+    consultation = Consultation.objects.create(
         patient=patient,
         assigned_doctor=doctor,
-        status=ConsultationStatus.ACCEPTED,
+        status=status,
         selected_specialty=MedicalSpecialty.GENERAL_MEDICINE,
         duration="less_than_24_hours",
         severity="mild",
     )
+    if consultation_fee is not None:
+        consultation.consultation_fee = Decimal(consultation_fee)
+        consultation.consultation_currency = "IQD"
+        consultation.fee_snapshot_at = timezone.now()
+        consultation.save(update_fields=["consultation_fee", "consultation_currency", "fee_snapshot_at", "updated_at"])
+    return consultation
 
 
 def create_lab_request(patient, doctor, lab_profile, total_price="25000.00"):
@@ -369,6 +378,12 @@ class ServicePaymentResolutionTests(TestCase):
         self.doctor = create_doctor(email=unique_email("doctor"))
         self.lab_user, self.lab_profile = create_laboratorian(email=unique_email("lab"))
         self.pharmacy_user, self.pharmacy_profile = create_pharmacist(email=unique_email("pharmacy"))
+        self.consultation = create_consultation(
+            self.patient,
+            self.doctor,
+            status=ConsultationStatus.ACCEPTED,
+            consultation_fee="18000.00",
+        )
 
         self.lab_request = create_lab_request(self.patient, self.doctor, self.lab_profile, total_price="25000.00")
         self.pharmacy_request = create_pharmacy_request(
@@ -457,7 +472,12 @@ class ServicePaymentResolutionTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_consultation_payment_returns_not_configured(self):
-        consultation = create_consultation(self.patient, self.doctor)
+        consultation = create_consultation(
+            self.patient,
+            self.doctor,
+            status=ConsultationStatus.ACCEPTED,
+            consultation_fee=None,
+        )
         response = auth_client(self.patient).post(
             "/api/payments/intents/",
             {
@@ -469,6 +489,154 @@ class ServicePaymentResolutionTests(TestCase):
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("not configured", str(response.data["detail"]).lower())
+
+    def test_consultation_intent_without_amount_uses_snapshot_fee(self):
+        response = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.CONSULTATION,
+                "reference_id": str(self.consultation.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Decimal(response.data["amount"]), Decimal("18000.00"))
+        self.assertEqual(response.data["metadata"]["resolved_amount_source"], "consultation.consultation_fee")
+        self.assertEqual(response.data["metadata"]["provider_type"], ProviderEarning.ProviderType.DOCTOR)
+
+    def test_consultation_intent_rejects_client_amount(self):
+        response = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.CONSULTATION,
+                "reference_id": str(self.consultation.id),
+                "amount": "10.00",
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_non_owner_patient_cannot_create_consultation_payment_intent(self):
+        response = auth_client(self.other_patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.CONSULTATION,
+                "reference_id": str(self.consultation.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_consultation_payment_fails_for_non_payable_status(self):
+        non_payable = create_consultation(
+            self.patient,
+            self.doctor,
+            status=ConsultationStatus.SUBMITTED,
+            consultation_fee="18000.00",
+        )
+        response = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.CONSULTATION,
+                "reference_id": str(non_payable.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("accepted", str(response.data["detail"]).lower())
+
+    def test_consultation_payment_fails_if_fee_zero(self):
+        consultation = create_consultation(
+            self.patient,
+            self.doctor,
+            status=ConsultationStatus.ACCEPTED,
+            consultation_fee="0.00",
+        )
+        response = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.CONSULTATION,
+                "reference_id": str(consultation.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("not configured", str(response.data["detail"]).lower())
+
+    def test_consultation_wallet_payment_creates_debit_and_doctor_earning(self):
+        PlatformFeeRule.objects.create(
+            service_type=PlatformFeeRule.ServiceType.CONSULTATION,
+            fee_type=PlatformFeeRule.FeeType.PERCENTAGE,
+            value=Decimal("10.00"),
+            is_active=True,
+        )
+        create_resp = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.CONSULTATION,
+                "reference_id": str(self.consultation.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED)
+
+        pay_resp = auth_client(self.patient).post(
+            f"/api/payments/intents/{create_resp.data['id']}/pay-wallet/", {}, format="json"
+        )
+        self.assertEqual(pay_resp.status_code, status.HTTP_200_OK)
+
+        self.assertTrue(
+            WalletTransaction.objects.filter(
+                transaction_type=WalletTransaction.TransactionType.PAYMENT,
+                direction=WalletTransaction.Direction.DEBIT,
+                reference_type=PaymentIntent.ServiceType.CONSULTATION,
+                reference_id=self.consultation.id,
+            ).exists()
+        )
+
+        earning = ProviderEarning.objects.get(
+            service_type=PaymentIntent.ServiceType.CONSULTATION,
+            reference_id=self.consultation.id,
+            provider_user=self.doctor,
+        )
+        self.assertEqual(earning.provider_type, ProviderEarning.ProviderType.DOCTOR)
+        self.assertEqual(earning.gross_amount, Decimal("18000.00"))
+        self.assertEqual(earning.platform_fee_amount, Decimal("1800.00"))
+        self.assertEqual(earning.net_amount, Decimal("16200.00"))
+
+    def test_duplicate_succeeded_payment_for_same_consultation_blocked(self):
+        create_resp = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.CONSULTATION,
+                "reference_id": str(self.consultation.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED)
+
+        pay_resp = auth_client(self.patient).post(
+            f"/api/payments/intents/{create_resp.data['id']}/pay-wallet/", {}, format="json"
+        )
+        self.assertEqual(pay_resp.status_code, status.HTTP_200_OK)
+
+        duplicate = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.CONSULTATION,
+                "reference_id": str(self.consultation.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(duplicate.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_duplicate_succeeded_payment_for_same_service_reference_blocked(self):
         create_resp = auth_client(self.patient).post(

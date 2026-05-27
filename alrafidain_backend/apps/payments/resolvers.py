@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from apps.common.choices import ConsultationStatus
 from apps.common.policies import RoleAccessPolicy
 from apps.consultations.models import Consultation
 from apps.lab_requests.models import LabOrderRequest
@@ -116,4 +117,23 @@ def _resolve_consultation(*, reference_id, user) -> PaymentTarget:
     if not (RoleAccessPolicy.is_admin_or_staff(user) or consultation.patient_id == user.id):
         raise ValueError("You do not have permission to pay this consultation.")
 
-    raise ValueError("Consultation payment is not configured yet.")
+    if consultation.status != ConsultationStatus.ACCEPTED:
+        raise ValueError("Consultation must be accepted before payment.")
+
+    if consultation.consultation_fee is None or consultation.consultation_fee <= 0:
+        raise ValueError("Consultation fee is not configured for this consultation.")
+
+    provider_user = consultation.assigned_doctor
+    if not provider_user:
+        raise ValueError("Consultation doctor is not configured for payment.")
+
+    return PaymentTarget(
+        service_type=PaymentIntent.ServiceType.CONSULTATION,
+        reference_id=consultation.id,
+        amount=consultation.consultation_fee,
+        currency=consultation.consultation_currency or "IQD",
+        provider_user=provider_user,
+        provider_type="doctor",
+        description=f"Payment for consultation {consultation.id}",
+        amount_source="consultation.consultation_fee",
+    )

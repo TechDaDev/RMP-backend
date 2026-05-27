@@ -28,7 +28,15 @@ class PatientProfileAdmin(admin.ModelAdmin):
 
 @admin.register(DoctorProfile)
 class DoctorProfileAdmin(admin.ModelAdmin):
-    list_display = ["user", "specialty", "verification_status", "verified_at", "created_at"]
+    list_display = [
+        "user",
+        "specialty",
+        "consultation_fee",
+        "consultation_currency",
+        "verification_status",
+        "verified_at",
+        "created_at",
+    ]
     list_filter = ["verification_status", "created_at"]
     search_fields = ["user__email", "medical_license_number", "specialty", "specialty_other"]
     readonly_fields = ["created_at", "updated_at"]
@@ -41,6 +49,8 @@ class DoctorProfileAdmin(admin.ModelAdmin):
         "subspecialty",
         "professional_title",
         "years_of_experience",
+        "consultation_fee",
+        "consultation_currency",
         "bio",
         "work_address",
         "verification_status",

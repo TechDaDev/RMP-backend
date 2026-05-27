@@ -117,6 +117,26 @@ class DoctorProfileCompletionTests(TestCase):
         self.assertIn("specialty", missing)
 
 
+class DoctorConsultationPricingTests(TestCase):
+    def setUp(self):
+        self.user = _create_active_user(UserType.DOCTOR, email="doctor-pricing@example.com")
+        self.client = _auth_client(self.user)
+
+    def test_doctor_profile_has_consultation_fee_and_currency(self):
+        profile_data = self.client.get("/api/profiles/me/doctor/").data["data"]
+        self.assertIn("consultation_fee", profile_data)
+        self.assertIn("consultation_currency", profile_data)
+
+    def test_negative_consultation_fee_is_rejected(self):
+        response = self.client.patch(
+            "/api/profiles/me/doctor/",
+            {"consultation_fee": "-1.00"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("consultation_fee", response.data["error"]["details"])
+
+
 class PharmacistProfileCompletionTests(TestCase):
     def setUp(self):
         self.user = _create_active_user(UserType.PHARMACIST, email="pharm@example.com")

@@ -4,6 +4,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.utils import timezone
 
 from apps.common.choices import (
     ConsultationDuration,
@@ -156,6 +157,10 @@ class Consultation(BaseModel):
     current_medications_related = models.TextField(blank=True)
     additional_notes = models.TextField(blank=True)
 
+    consultation_fee = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    consultation_currency = models.CharField(max_length=10, default="IQD")
+    fee_snapshot_at = models.DateTimeField(null=True, blank=True)
+
     accepted_at = models.DateTimeField(blank=True, null=True)
     closed_at = models.DateTimeField(blank=True, null=True)
 
@@ -293,6 +298,23 @@ class Consultation(BaseModel):
                 raise ValidationError(
                     {"assigned_doctor": "Doctor specialty does not match consultation specialty."}
                 )
+
+        if self.consultation_fee is not None and self.consultation_fee < 0:
+            raise ValidationError({"consultation_fee": "Consultation fee cannot be negative."})
+
+    def set_fee_snapshot_from_doctor(self):
+        if self.consultation_fee is not None:
+            return
+        if not self.assigned_doctor_id:
+            return
+        try:
+            doctor_profile = self.assigned_doctor.doctor_profile
+        except Exception:
+            return
+
+        self.consultation_fee = doctor_profile.consultation_fee
+        self.consultation_currency = doctor_profile.consultation_currency or "IQD"
+        self.fee_snapshot_at = timezone.now()
 
     def __str__(self):
         return f"Consultation {self.id} ({self.status})"

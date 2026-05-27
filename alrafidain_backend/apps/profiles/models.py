@@ -108,6 +108,13 @@ class DoctorProfile(BaseModel):
     years_of_experience = models.PositiveIntegerField(
         blank=True, null=True, validators=[MinValueValidator(0)]
     )
+    consultation_fee = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0,
+        validators=[MinValueValidator(0)],
+    )
+    consultation_currency = models.CharField(max_length=10, default="IQD")
     bio = models.TextField(blank=True)
     work_address = models.TextField(blank=True)
     verification_status = models.CharField(

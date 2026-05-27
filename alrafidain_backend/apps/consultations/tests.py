@@ -213,12 +213,19 @@ class ConsultationFlowTests(TestCase):
         self.pharmacist = create_user("ph@example.com", UserType.PHARMACIST)
         self.laboratorian = create_user("lab@example.com", UserType.LABORATORIAN)
         self.doctor = create_user("doc@example.com", UserType.DOCTOR)
+        self.doctor.doctor_profile.consultation_fee = 20000
+        self.doctor.doctor_profile.consultation_currency = "IQD"
+        self.doctor.doctor_profile.save(update_fields=["consultation_fee", "consultation_currency", "updated_at"])
         self.internal_doctor = create_user("doc-internal@example.com", UserType.DOCTOR)
         self.internal_doctor.doctor_profile.specialty = MedicalSpecialty.INTERNAL_MEDICINE
+        self.internal_doctor.doctor_profile.consultation_fee = 18000
+        self.internal_doctor.doctor_profile.consultation_currency = "IQD"
         self.internal_doctor.doctor_profile.save()
         self.other_doctor = create_user("doc-other@example.com", UserType.DOCTOR)
         self.other_doctor.doctor_profile.specialty = MedicalSpecialty.OTHER
         self.other_doctor.doctor_profile.specialty_other = "Integrative"
+        self.other_doctor.doctor_profile.consultation_fee = 15000
+        self.other_doctor.doctor_profile.consultation_currency = "IQD"
         self.other_doctor.doctor_profile.save()
 
         self.unapproved_doctor = create_user("doc-pending@example.com", UserType.DOCTOR)
@@ -426,6 +433,28 @@ class ConsultationFlowTests(TestCase):
         self.assertEqual(c.assigned_doctor_id, self.doctor.id)
         self.assertEqual(c.status, ConsultationStatus.ACCEPTED)
         self.assertIsNotNone(c.accepted_at)
+        self.assertEqual(str(c.consultation_fee), "20000.00")
+        self.assertEqual(c.consultation_currency, "IQD")
+        self.assertIsNotNone(c.fee_snapshot_at)
+
+    def test_consultation_fee_snapshot_does_not_change_after_doctor_fee_update(self):
+        self.create_consultation()
+        consultation = Consultation.objects.first()
+        accept_resp = self.doctor_client.post(
+            f"/api/consultations/{consultation.id}/accept/", {}, format="json"
+        )
+        self.assertEqual(accept_resp.status_code, status.HTTP_200_OK)
+
+        consultation.refresh_from_db()
+        original_fee = consultation.consultation_fee
+        original_snapshot_at = consultation.fee_snapshot_at
+
+        self.doctor.doctor_profile.consultation_fee = 35000
+        self.doctor.doctor_profile.save(update_fields=["consultation_fee", "updated_at"])
+
+        consultation.refresh_from_db()
+        self.assertEqual(consultation.consultation_fee, original_fee)
+        self.assertEqual(consultation.fee_snapshot_at, original_snapshot_at)
 
     def test_doctor_cannot_accept_already_accepted(self):
         self.create_consultation()
