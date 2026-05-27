@@ -1935,6 +1935,122 @@ Idempotent — safe to run multiple times. All seeded tests are unverified by de
 
 ---
 
+## Lab Requests and Quotes
+
+This workflow links lab orders to lab test offerings for quote-based pre-payment review.
+No payment is processed in these endpoints.
+
+### `POST /api/lab/requests/`
+
+Create a lab request from a lab order.
+
+- **Auth required**: Yes
+- **Allowed roles**: Patient (own lab order), Doctor (related lab order), Admin/Staff
+
+Example payload:
+```json
+{
+  "lab_order": "lab_order_uuid",
+  "lab": "laboratorian_profile_uuid",
+  "patient_notes": "Please check availability and turnaround"
+}
+```
+
+Behavior:
+- Creates request with `status=pending`.
+- Automatically snapshots lab order items into request items.
+- Initializes quote amounts to zero until the lab submits quote lines.
+
+### `POST /api/lab/requests/{id}/quote/`
+
+Lab creates or updates quote lines.
+
+- **Auth required**: Yes
+- **Allowed roles**: Owning lab user, Admin/Staff
+
+Example payload:
+```json
+{
+  "lab_notes": "One substitution needed due to platform differences.",
+  "items": [
+    {
+      "lab_order_item": "lab_order_item_uuid",
+      "offering": "lab_test_offering_uuid",
+      "availability_status": "available",
+      "quoted_name": "CBC - Complete Blood Count",
+      "quantity": 1,
+      "unit_price": "10000.00",
+      "lab_note": "Same-day processing"
+    },
+    {
+      "lab_order_item": "lab_order_item_uuid",
+      "offering": "replacement_offering_uuid",
+      "availability_status": "substituted",
+      "quoted_name": "Equivalent panel",
+      "quantity": 1,
+      "unit_price": "15000.00",
+      "substitution_note": "Equivalent marker set"
+    }
+  ]
+}
+```
+
+Quote rules:
+- Request must be `pending` or `quoted`.
+- Offering must belong to same lab as the request target.
+- Unavailable lines are quoted at zero.
+- Request `total_price` is recalculated from request items.
+- No stock deduction and no payment handling yet.
+
+### `POST /api/lab/requests/{id}/accept/`
+
+Patient accepts quoted request.
+
+- **Auth required**: Yes
+- **Allowed roles**: Patient owner, Admin/Staff
+- **Status required**: `quoted`
+
+### `POST /api/lab/requests/{id}/reject/`
+
+Patient rejects quoted request.
+
+- **Auth required**: Yes
+- **Allowed roles**: Patient owner, Admin/Staff
+- **Status required**: `quoted`
+
+Example payload:
+```json
+{
+  "rejection_reason": "Too expensive"
+}
+```
+
+### `POST /api/lab/requests/{id}/cancel/`
+
+Cancel a pending or quoted request.
+
+- **Auth required**: Yes
+- **Allowed roles**: Patient owner, Doctor owner, Owning lab user, Admin/Staff
+
+### `POST /api/lab/requests/{id}/complete/`
+
+Mark accepted request as completed (fulfillment checkpoint before future payment workflow).
+
+- **Auth required**: Yes
+- **Allowed roles**: Owning lab user, Admin/Staff
+- **Status required**: `accepted`
+
+Status lifecycle:
+- `pending` -> `quoted` -> `accepted` -> `completed`
+- `quoted` -> `rejected`
+- `pending|quoted` -> `cancelled`
+
+Note:
+- Accepted quotes prepare future payment workflow only.
+- No wallet/payment transaction is executed here.
+
+---
+
 ## Pharmacy Prescription Requests and Quotes
 
 This workflow links prescriptions to pharmacy inventory for quote-based pre-payment review.

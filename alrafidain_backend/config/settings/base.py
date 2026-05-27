@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     "apps.medical_catalog.apps.MedicalCatalogConfig",
     "apps.lab_catalog.apps.LabCatalogConfig",
     "apps.lab_inventory.apps.LabInventoryConfig",
+    "apps.lab_requests.apps.LabRequestsConfig",
     "apps.pharmacy_inventory.apps.PharmacyInventoryConfig",
     "apps.pharmacy_requests.apps.PharmacyRequestsConfig",
     "apps.knowledge_base.apps.KnowledgeBaseConfig",
