@@ -9,6 +9,13 @@ from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.common.choices import UserType
+from apps.common.choices import ConsultationStatus, MedicalSpecialty, VerificationStatus
+from apps.consultations.models import Consultation
+from apps.lab_orders.models import LabOrder
+from apps.lab_requests.models import LabOrderRequest
+from apps.pharmacy_requests.models import PharmacyPrescriptionRequest
+from apps.prescriptions.models import Prescription
+from apps.profiles.models import DoctorProfile, LaboratorianProfile, PharmacistProfile, PatientProfile, UserProfile
 
 from .models import PaymentIntent, PlatformFeeRule, ProviderEarning, Wallet, WalletTransaction
 from .services import (
@@ -41,6 +48,85 @@ def create_user(user_type=UserType.PATIENT, is_staff=False, email=None):
         user_type=user_type,
         is_active=True,
         is_staff=is_staff,
+    )
+
+
+def create_patient(email=None):
+    user = create_user(user_type=UserType.PATIENT, email=email or unique_email("patient"))
+    UserProfile.objects.create(user=user)
+    PatientProfile.objects.create(user=user)
+    return user
+
+
+def create_doctor(email=None):
+    user = create_user(user_type=UserType.DOCTOR, email=email or unique_email("doctor"))
+    UserProfile.objects.create(user=user)
+    DoctorProfile.objects.create(
+        user=user,
+        specialty=MedicalSpecialty.GENERAL_MEDICINE,
+        verification_status=VerificationStatus.APPROVED,
+    )
+    return user
+
+
+def create_laboratorian(email=None):
+    user = create_user(user_type=UserType.LABORATORIAN, email=email or unique_email("lab"))
+    UserProfile.objects.create(user=user)
+    profile = LaboratorianProfile.objects.create(
+        user=user,
+        laboratory_name="Resolver Lab",
+        verification_status=VerificationStatus.APPROVED,
+    )
+    return user, profile
+
+
+def create_pharmacist(email=None):
+    user = create_user(user_type=UserType.PHARMACIST, email=email or unique_email("pharmacy"))
+    UserProfile.objects.create(user=user)
+    profile = PharmacistProfile.objects.create(
+        user=user,
+        pharmacy_name="Resolver Pharmacy",
+        verification_status=VerificationStatus.APPROVED,
+    )
+    return user, profile
+
+
+def create_consultation(patient, doctor):
+    return Consultation.objects.create(
+        patient=patient,
+        assigned_doctor=doctor,
+        status=ConsultationStatus.ACCEPTED,
+        selected_specialty=MedicalSpecialty.GENERAL_MEDICINE,
+        duration="less_than_24_hours",
+        severity="mild",
+    )
+
+
+def create_lab_request(patient, doctor, lab_profile, total_price="25000.00"):
+    consultation = create_consultation(patient, doctor)
+    lab_order = LabOrder.objects.create(consultation=consultation, doctor=doctor, patient=patient)
+    return LabOrderRequest.objects.create(
+        lab_order=lab_order,
+        patient=patient,
+        lab=lab_profile,
+        requested_by=patient,
+        status=LabOrderRequest.Status.ACCEPTED,
+        total_price=Decimal(total_price),
+        currency="IQD",
+    )
+
+
+def create_pharmacy_request(patient, doctor, pharmacy_profile, total_price="16000.00"):
+    consultation = create_consultation(patient, doctor)
+    prescription = Prescription.objects.create(consultation=consultation, doctor=doctor, patient=patient)
+    return PharmacyPrescriptionRequest.objects.create(
+        prescription=prescription,
+        patient=patient,
+        pharmacy=pharmacy_profile,
+        requested_by=patient,
+        status=PharmacyPrescriptionRequest.Status.ACCEPTED,
+        total_price=Decimal(total_price),
+        currency="IQD",
     )
 
 
@@ -186,11 +272,10 @@ class TransactionVisibilityTests(TestCase):
 
 class PaymentIntentTests(TestCase):
     def setUp(self):
-        self.user = create_user(email=unique_email("patient"))
-        self.other = create_user(email=unique_email("other"))
+        self.user = create_patient(email=unique_email("patient"))
+        self.other = create_patient(email=unique_email("other"))
         self.admin = create_user(user_type=UserType.STAFF, is_staff=True, email=unique_email("admin"))
         self.wallet = get_or_create_wallet(self.user)
-        self.reference_id = uuid4()
 
         auth_client(self.admin).post(
             "/api/payments/admin/manual-recharge/",
@@ -198,36 +283,24 @@ class PaymentIntentTests(TestCase):
             format="json",
         )
 
-    def _create_intent(self, actor, amount="25000.00", ref_id=None):
+    def _create_wallet_recharge_intent(self, actor, amount="25000.00"):
         return auth_client(actor).post(
             "/api/payments/intents/",
             {
-                "service_type": PaymentIntent.ServiceType.LAB_REQUEST,
-                "reference_id": str(ref_id or self.reference_id),
+                "service_type": PaymentIntent.ServiceType.WALLET_RECHARGE,
                 "amount": amount,
                 "payment_method": PaymentIntent.PaymentMethod.WALLET,
             },
             format="json",
         )
 
-    def test_user_can_create_wallet_payment_intent(self):
-        response = self._create_intent(self.user)
+    def test_user_can_create_wallet_recharge_intent(self):
+        response = self._create_wallet_recharge_intent(self.user)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data["status"], PaymentIntent.Status.CREATED)
 
-    def test_duplicate_succeeded_payment_for_same_service_reference_blocked(self):
-        first = self._create_intent(self.user)
-        intent_id = first.data["id"]
-        pay_resp = auth_client(self.user).post(
-            f"/api/payments/intents/{intent_id}/pay-wallet/", {}, format="json"
-        )
-        self.assertEqual(pay_resp.status_code, status.HTTP_200_OK)
-
-        second = self._create_intent(self.user)
-        self.assertEqual(second.status_code, status.HTTP_400_BAD_REQUEST)
-
     def test_user_can_pay_wallet_intent_if_balance_is_enough(self):
-        create_resp = self._create_intent(self.user)
+        create_resp = self._create_wallet_recharge_intent(self.user)
         pay_resp = auth_client(self.user).post(
             f"/api/payments/intents/{create_resp.data['id']}/pay-wallet/", {}, format="json"
         )
@@ -235,39 +308,38 @@ class PaymentIntentTests(TestCase):
         self.assertEqual(pay_resp.data["status"], PaymentIntent.Status.SUCCEEDED)
 
     def test_wallet_payment_creates_debit_transaction(self):
-        create_resp = self._create_intent(self.user)
+        create_resp = self._create_wallet_recharge_intent(self.user)
         auth_client(self.user).post(f"/api/payments/intents/{create_resp.data['id']}/pay-wallet/", {}, format="json")
         self.assertTrue(
             WalletTransaction.objects.filter(
                 transaction_type=WalletTransaction.TransactionType.PAYMENT,
                 direction=WalletTransaction.Direction.DEBIT,
-                reference_id=self.reference_id,
+                reference_type=PaymentIntent.ServiceType.WALLET_RECHARGE,
             ).exists()
         )
 
     def test_wallet_payment_updates_cached_balance(self):
-        create_resp = self._create_intent(self.user, amount="25000.00")
+        create_resp = self._create_wallet_recharge_intent(self.user, amount="25000.00")
         auth_client(self.user).post(f"/api/payments/intents/{create_resp.data['id']}/pay-wallet/", {}, format="json")
         wallet = Wallet.objects.get(user=self.user)
         self.assertEqual(wallet.cached_balance, Decimal("25000.00"))
 
     def test_wallet_payment_fails_if_insufficient_balance(self):
-        create_resp = self._create_intent(self.user, amount="9999999.00", ref_id=uuid4())
+        create_resp = self._create_wallet_recharge_intent(self.user, amount="9999999.00")
         pay_resp = auth_client(self.user).post(
             f"/api/payments/intents/{create_resp.data['id']}/pay-wallet/", {}, format="json"
         )
         self.assertEqual(pay_resp.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_user_cannot_pay_another_users_intent(self):
-        other_ref = uuid4()
-        create_resp = self._create_intent(self.other, amount="1000.00", ref_id=other_ref)
+        create_resp = self._create_wallet_recharge_intent(self.other, amount="1000.00")
         pay_resp = auth_client(self.user).post(
             f"/api/payments/intents/{create_resp.data['id']}/pay-wallet/", {}, format="json"
         )
         self.assertEqual(pay_resp.status_code, status.HTTP_404_NOT_FOUND)
 
     def test_paying_same_intent_twice_is_blocked(self):
-        create_resp = self._create_intent(self.user, ref_id=uuid4())
+        create_resp = self._create_wallet_recharge_intent(self.user)
         first_pay = auth_client(self.user).post(
             f"/api/payments/intents/{create_resp.data['id']}/pay-wallet/", {}, format="json"
         )
@@ -276,6 +348,197 @@ class PaymentIntentTests(TestCase):
         )
         self.assertEqual(first_pay.status_code, status.HTTP_200_OK)
         self.assertEqual(second_pay.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_wallet_recharge_intent_requires_amount(self):
+        response = auth_client(self.user).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.WALLET_RECHARGE,
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class ServicePaymentResolutionTests(TestCase):
+    def setUp(self):
+        self.admin = create_user(user_type=UserType.STAFF, is_staff=True, email=unique_email("admin"))
+        self.patient = create_patient(email=unique_email("patient"))
+        self.other_patient = create_patient(email=unique_email("other-patient"))
+        self.doctor = create_doctor(email=unique_email("doctor"))
+        self.lab_user, self.lab_profile = create_laboratorian(email=unique_email("lab"))
+        self.pharmacy_user, self.pharmacy_profile = create_pharmacist(email=unique_email("pharmacy"))
+
+        self.lab_request = create_lab_request(self.patient, self.doctor, self.lab_profile, total_price="25000.00")
+        self.pharmacy_request = create_pharmacy_request(
+            self.patient,
+            self.doctor,
+            self.pharmacy_profile,
+            total_price="16000.00",
+        )
+
+        auth_client(self.admin).post(
+            "/api/payments/admin/manual-recharge/",
+            {"user": str(self.patient.id), "amount": "50000.00"},
+            format="json",
+        )
+
+    def test_lab_intent_rejects_client_amount(self):
+        response = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.LAB_REQUEST,
+                "reference_id": str(self.lab_request.id),
+                "amount": "1.00",
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_lab_intent_without_amount_uses_authoritative_total(self):
+        response = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.LAB_REQUEST,
+                "reference_id": str(self.lab_request.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Decimal(response.data["amount"]), self.lab_request.total_price)
+        self.assertEqual(
+            str(response.data["metadata"]["provider_user_id"]),
+            str(self.lab_user.id),
+        )
+        self.assertEqual(response.data["metadata"]["provider_type"], ProviderEarning.ProviderType.LAB)
+
+    def test_pharmacy_intent_without_amount_uses_authoritative_total(self):
+        response = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.PHARMACY_REQUEST,
+                "reference_id": str(self.pharmacy_request.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Decimal(response.data["amount"]), self.pharmacy_request.total_price)
+        self.assertEqual(response.data["metadata"]["provider_type"], ProviderEarning.ProviderType.PHARMACY)
+
+    def test_non_owner_patient_cannot_create_service_payment_intent(self):
+        response = auth_client(self.other_patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.LAB_REQUEST,
+                "reference_id": str(self.lab_request.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_lab_request_must_be_accepted_for_payment(self):
+        self.lab_request.status = LabOrderRequest.Status.QUOTED
+        self.lab_request.save(update_fields=["status", "updated_at"])
+
+        response = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.LAB_REQUEST,
+                "reference_id": str(self.lab_request.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_consultation_payment_returns_not_configured(self):
+        consultation = create_consultation(self.patient, self.doctor)
+        response = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.CONSULTATION,
+                "reference_id": str(consultation.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("not configured", str(response.data["detail"]).lower())
+
+    def test_duplicate_succeeded_payment_for_same_service_reference_blocked(self):
+        create_resp = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.LAB_REQUEST,
+                "reference_id": str(self.lab_request.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED)
+
+        pay_resp = auth_client(self.patient).post(
+            f"/api/payments/intents/{create_resp.data['id']}/pay-wallet/", {}, format="json"
+        )
+        self.assertEqual(pay_resp.status_code, status.HTTP_200_OK)
+
+        duplicate = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.LAB_REQUEST,
+                "reference_id": str(self.lab_request.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(duplicate.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_successful_service_wallet_payment_creates_provider_earning(self):
+        create_resp = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.LAB_REQUEST,
+                "reference_id": str(self.lab_request.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED)
+
+        pay_resp = auth_client(self.patient).post(
+            f"/api/payments/intents/{create_resp.data['id']}/pay-wallet/", {}, format="json"
+        )
+        self.assertEqual(pay_resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(
+            ProviderEarning.objects.filter(
+                service_type=PaymentIntent.ServiceType.LAB_REQUEST,
+                reference_id=self.lab_request.id,
+                provider_user=self.lab_user,
+            ).exists()
+        )
+
+    def test_wallet_recharge_payment_does_not_create_provider_earning(self):
+        create_resp = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.WALLET_RECHARGE,
+                "amount": "1000.00",
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED)
+
+        pay_resp = auth_client(self.patient).post(
+            f"/api/payments/intents/{create_resp.data['id']}/pay-wallet/", {}, format="json"
+        )
+        self.assertEqual(pay_resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(ProviderEarning.objects.count(), 0)
 
 
 class PlatformFeeTests(TestCase):

@@ -2104,6 +2104,14 @@ Example payload:
 {
   "service_type": "lab_request",
   "reference_id": "lab_request_uuid",
+  "payment_method": "wallet"
+}
+```
+
+Wallet recharge payload:
+```json
+{
+  "service_type": "wallet_recharge",
   "amount": "25000.00",
   "payment_method": "wallet"
 }
@@ -2111,7 +2119,28 @@ Example payload:
 
 Rules:
 - Duplicate succeeded payment intent for same `service_type + reference_id` is rejected.
-- Service ownership and authoritative amount checks are planned as next-step hardening.
+
+#### Service Payment Resolution
+
+For service payments (`lab_request`, `pharmacy_request`, `consultation`):
+- Client must provide `reference_id`.
+- Client must not provide `amount`.
+- Amount/currency/provider are resolved from authoritative service objects.
+
+Resolver behavior in this phase:
+- `lab_request`:
+  - Allowed payer: request patient owner, or admin/staff.
+  - Required status: `accepted`.
+  - Amount source: `LabOrderRequest.total_price`.
+  - Provider source: `LabOrderRequest.lab.user` (`provider_type=lab`).
+- `pharmacy_request`:
+  - Allowed payer: request patient owner, or admin/staff.
+  - Required status: `accepted`.
+  - Amount source: `PharmacyPrescriptionRequest.total_price`.
+  - Provider source: `PharmacyPrescriptionRequest.pharmacy.user` (`provider_type=pharmacy`).
+- `consultation`:
+  - Ownership validation is applied.
+  - Payment amount is not configured yet and intent creation returns validation error.
 
 ### `POST /api/payments/intents/{id}/pay-wallet/`
 
@@ -2124,6 +2153,7 @@ Behavior:
 - Validates wallet is active and funded.
 - Creates confirmed debit `WalletTransaction`.
 - Marks intent as `succeeded` and sets `paid_at`.
+- Creates `ProviderEarning` for successful service payments when provider metadata is resolved.
 
 Status lifecycle (PaymentIntent):
 - `created` -> `pending` -> `succeeded`

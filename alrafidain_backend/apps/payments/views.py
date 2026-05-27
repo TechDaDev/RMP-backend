@@ -122,16 +122,19 @@ class PaymentIntentViewSet(
         serializer.is_valid(raise_exception=True)
         payload = serializer.validated_data
 
-        # TODO: validate service ownership and authoritative amount from domain objects.
-        intent = create_payment_intent(
-            user=request.user,
-            service_type=payload["service_type"],
-            reference_id=payload.get("reference_id"),
-            amount=payload["amount"],
-            payment_method=payload["payment_method"],
-            idempotency_key=payload.get("idempotency_key"),
-            metadata=payload.get("metadata") or {},
-        )
+        try:
+            intent = create_payment_intent(
+                user=request.user,
+                service_type=payload["service_type"],
+                reference_id=payload.get("reference_id"),
+                amount=payload.get("amount"),
+                payment_method=payload["payment_method"],
+                idempotency_key=payload.get("idempotency_key"),
+                metadata=payload.get("metadata") or {},
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
         return Response(PaymentIntentSerializer(intent).data, status=status.HTTP_201_CREATED)
 
     @action(detail=True, methods=["post"], url_path="pay-wallet")
@@ -146,5 +149,4 @@ class PaymentIntentViewSet(
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
-        # TODO: optionally create provider earnings here once provider-resolution mapping is finalized.
         return Response(PaymentIntentSerializer(paid_intent).data, status=status.HTTP_200_OK)

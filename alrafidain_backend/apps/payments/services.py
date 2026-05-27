@@ -3,6 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from uuid import uuid4
 
+from django.contrib.auth import get_user_model
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
@@ -14,6 +15,9 @@ from .models import (
     WalletTransaction,
     confirmed_wallet_balance,
 )
+from .resolvers import has_succeeded_payment, resolve_payment_target
+
+User = get_user_model()
 
 
 def get_or_create_wallet(user) -> Wallet:
@@ -134,40 +138,57 @@ def create_payment_intent(
     user,
     service_type: str,
     reference_id,
-    amount: Decimal,
+    amount: Decimal | None = None,
     payment_method: str = PaymentIntent.PaymentMethod.WALLET,
     idempotency_key: str | None = None,
     metadata: dict | None = None,
 ) -> PaymentIntent:
-    if amount <= 0:
-        raise ValueError("Amount must be positive.")
-
     if payment_method not in {
         PaymentIntent.PaymentMethod.WALLET,
         PaymentIntent.PaymentMethod.MANUAL,
     }:
         raise ValueError("Only wallet/manual payment methods are allowed in this phase.")
 
-    if reference_id and PaymentIntent.objects.filter(
-        service_type=service_type,
-        reference_id=reference_id,
-        status=PaymentIntent.Status.SUCCEEDED,
-    ).exists():
+    if has_succeeded_payment(service_type, reference_id):
         raise ValueError("This service object has already been paid.")
 
     wallet = get_or_create_wallet(user)
+
+    resolved_metadata = dict(metadata or {})
+    if service_type == PaymentIntent.ServiceType.WALLET_RECHARGE:
+        if amount is None or amount <= 0:
+            raise ValueError("Amount must be positive.")
+        final_amount = amount
+        final_currency = wallet.currency
+        final_reference_id = reference_id
+    else:
+        if not reference_id:
+            raise ValueError("reference_id is required for service payments.")
+        target = resolve_payment_target(service_type=service_type, reference_id=reference_id, user=user)
+        final_amount = target.amount
+        final_currency = target.currency or wallet.currency
+        final_reference_id = target.reference_id
+        resolved_metadata.update(
+            {
+                "resolved_amount_source": target.amount_source,
+                "provider_user_id": str(target.provider_user.id),
+                "provider_type": target.provider_type,
+                "description": target.description,
+            }
+        )
+
     return PaymentIntent.objects.create(
         user=user,
         wallet=wallet,
         service_type=service_type,
-        reference_id=reference_id,
-        amount=amount,
-        currency=wallet.currency,
+        reference_id=final_reference_id,
+        amount=final_amount,
+        currency=final_currency,
         status=PaymentIntent.Status.CREATED,
         payment_method=payment_method,
         provider="manual_admin" if payment_method == PaymentIntent.PaymentMethod.MANUAL else None,
         idempotency_key=idempotency_key or f"intent:{service_type}:{reference_id or 'none'}:{user.id}:{uuid4().hex}",
-        metadata=metadata or {},
+        metadata=resolved_metadata,
     )
 
 
@@ -185,6 +206,18 @@ def pay_with_wallet(payment_intent: PaymentIntent) -> PaymentIntent:
 
         if wallet.status != Wallet.Status.ACTIVE:
             raise ValueError("Wallet is not active.")
+
+        provider_user = None
+        provider_type = None
+        if intent.service_type != PaymentIntent.ServiceType.WALLET_RECHARGE:
+            provider_user_id = (intent.metadata or {}).get("provider_user_id")
+            provider_type = (intent.metadata or {}).get("provider_type")
+            if not provider_user_id or not provider_type:
+                raise ValueError("Provider metadata is missing for this service payment.")
+
+            provider_user = User.objects.filter(id=provider_user_id).first()
+            if not provider_user:
+                raise ValueError("Provider user could not be resolved for this service payment.")
 
         available_balance = confirmed_wallet_balance(wallet)
         if available_balance < intent.amount:
@@ -212,6 +245,14 @@ def pay_with_wallet(payment_intent: PaymentIntent) -> PaymentIntent:
         intent.status = PaymentIntent.Status.SUCCEEDED
         intent.paid_at = timezone.now()
         intent.save(update_fields=["status", "paid_at", "updated_at"])
+
+        if provider_user:
+            create_provider_earning(
+                payment_intent=intent,
+                provider_user=provider_user,
+                provider_type=provider_type,
+            )
+
         return intent
 
 

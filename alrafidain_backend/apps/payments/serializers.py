@@ -120,7 +120,7 @@ class PaymentIntentSerializer(serializers.ModelSerializer):
 class PaymentIntentCreateSerializer(serializers.Serializer):
     service_type = serializers.ChoiceField(choices=PaymentIntent.ServiceType.choices)
     reference_id = serializers.UUIDField(required=False, allow_null=True)
-    amount = serializers.DecimalField(max_digits=14, decimal_places=2)
+    amount = serializers.DecimalField(max_digits=14, decimal_places=2, required=False, allow_null=True)
     payment_method = serializers.ChoiceField(choices=PaymentIntent.PaymentMethod.choices)
     idempotency_key = serializers.CharField(max_length=255, required=False, allow_blank=True)
     metadata = serializers.JSONField(required=False)
@@ -141,6 +141,24 @@ class PaymentIntentCreateSerializer(serializers.Serializer):
     def validate(self, attrs):
         service_type = attrs["service_type"]
         reference_id = attrs.get("reference_id")
+        amount = attrs.get("amount")
+
+        if service_type == PaymentIntent.ServiceType.WALLET_RECHARGE:
+            if amount is None:
+                raise serializers.ValidationError({"amount": "This field is required for wallet recharge."})
+            if reference_id is not None:
+                raise serializers.ValidationError(
+                    {"reference_id": "Wallet recharge does not require a reference_id."}
+                )
+        else:
+            if reference_id is None:
+                raise serializers.ValidationError(
+                    {"reference_id": "This field is required for service payments."}
+                )
+            if amount is not None:
+                raise serializers.ValidationError(
+                    {"amount": "Amount is derived from the service object and must not be provided."}
+                )
 
         if reference_id and PaymentIntent.objects.filter(
             service_type=service_type,
