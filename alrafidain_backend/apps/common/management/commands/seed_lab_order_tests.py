@@ -1,5 +1,5 @@
 """
-Management command: seed_lab_tests
+Management command: seed_lab_order_tests
 
 Seeds LabTestCatalog records.
 Idempotent — safe to run multiple times.
@@ -44,7 +44,7 @@ LAB_TESTS = [
 
 
 class Command(BaseCommand):
-    help = "Seed lab test catalog entries."
+    help = "Seed lab-order test catalog entries used by lab_orders."
 
     def handle(self, *args, **options):
         created_count = 0
@@ -65,7 +65,7 @@ class Command(BaseCommand):
 
         self.stdout.write(
             self.style.SUCCESS(
-                "seed_lab_tests done: "
+                "seed_lab_order_tests done: "
                 f"{created_count} lab tests created "
                 f"(total in db: {LabTestCatalog.objects.count()})."
             )

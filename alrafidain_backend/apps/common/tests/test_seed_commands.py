@@ -77,11 +77,11 @@ class SeedSymptomsCommandTests(TestCase):
 
 class SeedLabTestsCommandTests(TestCase):
     def test_runs_without_error(self):
-        output = run_command("seed_lab_tests")
-        self.assertIn("seed_lab_tests done", output)
+        output = run_command("seed_lab_order_tests")
+        self.assertIn("seed_lab_order_tests done", output)
 
     def test_creates_expected_tests(self):
-        run_command("seed_lab_tests")
+        run_command("seed_lab_order_tests")
         expected = ["CBC", "Blood Group", "HbA1c", "Thyroid Function Test", "Urine Analysis"]
         for name in expected:
             self.assertTrue(
@@ -89,13 +89,13 @@ class SeedLabTestsCommandTests(TestCase):
             )
 
     def test_creates_at_least_16_tests(self):
-        run_command("seed_lab_tests")
+        run_command("seed_lab_order_tests")
         self.assertGreaterEqual(LabTestCatalog.objects.count(), 16)
 
     def test_idempotent(self):
-        run_command("seed_lab_tests")
+        run_command("seed_lab_order_tests")
         count = LabTestCatalog.objects.count()
-        run_command("seed_lab_tests")
+        run_command("seed_lab_order_tests")
         self.assertEqual(LabTestCatalog.objects.count(), count)
 
 
