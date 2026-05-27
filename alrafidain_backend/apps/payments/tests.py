@@ -10,13 +10,20 @@ from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.common.choices import UserType
-from apps.common.choices import ConsultationStatus, MedicalSpecialty, VerificationStatus
+from apps.common.choices import ConsultationStatus, MedicalSpecialty, StaffRole, VerificationStatus
 from apps.consultations.models import Consultation
 from apps.lab_orders.models import LabOrder
 from apps.lab_requests.models import LabOrderRequest
 from apps.pharmacy_requests.models import PharmacyPrescriptionRequest
 from apps.prescriptions.models import Prescription
-from apps.profiles.models import DoctorProfile, LaboratorianProfile, PharmacistProfile, PatientProfile, UserProfile
+from apps.profiles.models import (
+    DoctorProfile,
+    LaboratorianProfile,
+    PatientProfile,
+    PharmacistProfile,
+    StaffProfile,
+    UserProfile,
+)
 
 from .models import PaymentIntent, PlatformFeeRule, ProviderEarning, Wallet, WalletTransaction
 from .services import (
@@ -56,6 +63,22 @@ def create_patient(email=None):
     user = create_user(user_type=UserType.PATIENT, email=email or unique_email("patient"))
     UserProfile.objects.create(user=user)
     PatientProfile.objects.create(user=user)
+    return user
+
+
+def create_financial_staff(email=None):
+    user = create_user(
+        user_type=UserType.STAFF,
+        is_staff=False,
+        email=email or unique_email("financial"),
+    )
+    UserProfile.objects.create(user=user)
+    StaffProfile.objects.create(
+        user=user,
+        staff_role=StaffRole.FINANCIAL,
+        department="Finance",
+        is_active=True,
+    )
     return user
 
 
@@ -237,6 +260,128 @@ class ManualRechargeTests(TestCase):
         self.assertEqual(second.status_code, status.HTTP_200_OK)
         self.assertEqual(first.data["transaction"]["id"], second.data["transaction"]["id"])
         self.assertEqual(WalletTransaction.objects.filter(idempotency_key=key).count(), 1)
+
+
+class FinancialRolePaymentAccessTests(TestCase):
+    def setUp(self):
+        self.user = create_user(email=unique_email("target"))
+        self.financial = create_financial_staff(email=unique_email("financial"))
+        self.patient = create_user(user_type=UserType.PATIENT, email=unique_email("patient"))
+        self.doctor = create_user(user_type=UserType.DOCTOR, email=unique_email("doctor"))
+        self.pharmacist = create_user(user_type=UserType.PHARMACIST, email=unique_email("pharmacist"))
+        self.laboratorian = create_user(user_type=UserType.LABORATORIAN, email=unique_email("lab"))
+
+    def test_financial_role_exists_in_staff_role_choices(self):
+        self.assertIn((StaffRole.FINANCIAL, "Financial"), StaffRole.choices)
+
+    def test_financial_can_manual_recharge(self):
+        payload = {
+            "user": str(self.user.id),
+            "amount": "50000.00",
+            "description": "Manual recharge by financial",
+        }
+        response = auth_client(self.financial).post(
+            "/api/payments/admin/manual-recharge/",
+            payload,
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+        tx = WalletTransaction.objects.get(id=response.data["transaction"]["id"])
+        self.assertEqual(tx.status, WalletTransaction.Status.CONFIRMED)
+        self.assertEqual(tx.direction, WalletTransaction.Direction.CREDIT)
+
+        wallet = Wallet.objects.get(user=self.user)
+        self.assertEqual(wallet.cached_balance, Decimal("50000.00"))
+
+    def test_non_finance_clinical_roles_cannot_manual_recharge(self):
+        payload = {
+            "user": str(self.user.id),
+            "amount": "50000.00",
+            "description": "Should be forbidden",
+        }
+        for actor in [self.patient, self.doctor, self.pharmacist, self.laboratorian]:
+            response = auth_client(actor).post(
+                "/api/payments/admin/manual-recharge/",
+                payload,
+                format="json",
+            )
+            self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_financial_can_list_all_wallet_transactions(self):
+        wallet_target = get_or_create_wallet(self.user)
+        other_user = create_user(email=unique_email("other"))
+        wallet_other = get_or_create_wallet(other_user)
+
+        create_wallet_transaction(
+            wallet=wallet_target,
+            transaction_type=WalletTransaction.TransactionType.MANUAL_RECHARGE,
+            direction=WalletTransaction.Direction.CREDIT,
+            amount=Decimal("1000.00"),
+            status=WalletTransaction.Status.CONFIRMED,
+            idempotency_key=f"fin-tx-1-{uuid4().hex}",
+            created_by=self.financial,
+        )
+        create_wallet_transaction(
+            wallet=wallet_other,
+            transaction_type=WalletTransaction.TransactionType.MANUAL_RECHARGE,
+            direction=WalletTransaction.Direction.CREDIT,
+            amount=Decimal("2000.00"),
+            status=WalletTransaction.Status.CONFIRMED,
+            idempotency_key=f"fin-tx-2-{uuid4().hex}",
+            created_by=self.financial,
+        )
+
+        response = auth_client(self.financial).get("/api/payments/wallet/transactions/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(response.data["count"], 2)
+
+    def test_financial_can_list_payment_intents(self):
+        wallet = get_or_create_wallet(self.user)
+        PaymentIntent.objects.create(
+            user=self.user,
+            wallet=wallet,
+            service_type=PaymentIntent.ServiceType.WALLET_RECHARGE,
+            amount=Decimal("1000.00"),
+            currency="IQD",
+            status=PaymentIntent.Status.CREATED,
+            payment_method=PaymentIntent.PaymentMethod.WALLET,
+            idempotency_key=f"fin-intent-1-{uuid4().hex}",
+        )
+
+        other_user = create_user(email=unique_email("intent-owner"))
+        other_wallet = get_or_create_wallet(other_user)
+        PaymentIntent.objects.create(
+            user=other_user,
+            wallet=other_wallet,
+            service_type=PaymentIntent.ServiceType.WALLET_RECHARGE,
+            amount=Decimal("2000.00"),
+            currency="IQD",
+            status=PaymentIntent.Status.CREATED,
+            payment_method=PaymentIntent.PaymentMethod.WALLET,
+            idempotency_key=f"fin-intent-2-{uuid4().hex}",
+        )
+
+        response = auth_client(self.financial).get("/api/payments/intents/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(response.data["count"], 2)
+
+    def test_financial_cannot_accept_consultation(self):
+        patient = create_patient(email=unique_email("consult-patient"))
+        doctor = create_doctor(email=unique_email("consult-doctor"))
+        consultation = create_consultation(
+            patient,
+            doctor,
+            status=ConsultationStatus.SUBMITTED,
+            consultation_fee="18000.00",
+        )
+
+        response = auth_client(self.financial).post(
+            f"/api/consultations/{consultation.id}/accept/",
+            {},
+            format="json",
+        )
+        self.assertIn(response.status_code, {status.HTTP_400_BAD_REQUEST, status.HTTP_403_FORBIDDEN})
 
 
 class TransactionVisibilityTests(TestCase):

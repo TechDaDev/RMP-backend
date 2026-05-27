@@ -2057,6 +2057,29 @@ This is the internal payment foundation for ledger-based accounting.
 No external gateway API is integrated yet.
 No real money transfer or payout automation is executed in this phase.
 
+### Financial Role
+
+Role value:
+- `financial`
+
+Purpose:
+- Dedicated finance operations and payment administration without full super-admin power.
+
+Allowed scope (where endpoints exist):
+- View wallets, wallet transactions, payment intents, and provider earnings.
+- Perform manual wallet recharge.
+- Manage platform fee rules.
+
+Not allowed:
+- Clinical data modification.
+- Consultation/lab/pharmacy medical workflow editing.
+- Diagnosis/treatment/prescription/lab result changes.
+- Super-admin-only system configuration.
+
+Assignment rules:
+- `financial` is not a public registration role.
+- Financial role must be assigned by admin/superuser through staff role management.
+
 ### `GET /api/payments/wallet/`
 
 Return authenticated user's wallet.
@@ -2079,14 +2102,14 @@ Admin/staff-only internal recharge endpoint.
 Creates wallet if missing and records a confirmed credit `WalletTransaction`.
 
 - **Auth required**: Yes
-- **Allowed roles**: Admin/Staff only
+- **Allowed roles**: Admin/Staff, Financial
 
 Example payload:
 ```json
 {
   "user": "user_uuid",
   "amount": "50000.00",
-  "description": "Manual recharge for testing"
+  "description": "Manual recharge by financial staff"
 }
 ```
 

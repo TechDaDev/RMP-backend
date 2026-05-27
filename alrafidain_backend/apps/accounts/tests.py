@@ -98,6 +98,21 @@ class RegistrationTests(TestCase):
         )
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_public_registration_cannot_create_financial_role(self):
+        resp = self.client.post(
+            REGISTER_URL,
+            {
+                "email": "finance@example.com",
+                "password": "StrongPass1!",
+                "password_confirm": "StrongPass1!",
+                "first_name": "Finance",
+                "last_name": "User",
+                "user_type": "financial",
+            },
+            format="json",
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_password_mismatch_fails(self):
         resp = self.client.post(
             REGISTER_URL,

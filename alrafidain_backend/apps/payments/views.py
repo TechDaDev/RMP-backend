@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from apps.common.policies import RoleAccessPolicy
 
 from .models import PaymentIntent, WalletTransaction
-from .permissions import IsAdminOrStaff
+from .permissions import IsFinancialOrAdmin, is_financial_or_admin
 from .serializers import (
     ManualRechargeSerializer,
     PaymentIntentCreateSerializer,
@@ -43,7 +43,7 @@ class WalletTransactionViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
         qs = WalletTransaction.objects.select_related("wallet", "wallet__user", "created_by")
         user = self.request.user
 
-        if RoleAccessPolicy.is_admin_or_staff(user):
+        if is_financial_or_admin(user):
             wallet_id = self.request.query_params.get("wallet")
             user_id = self.request.query_params.get("user")
             if wallet_id:
@@ -57,7 +57,7 @@ class WalletTransactionViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
 
 
 class ManualRechargeAdminView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminOrStaff]
+    permission_classes = [IsAuthenticated, IsFinancialOrAdmin]
 
     def post(self, request):
         serializer = ManualRechargeSerializer(data=request.data)
@@ -108,7 +108,7 @@ class PaymentIntentViewSet(
     def get_queryset(self):
         qs = PaymentIntent.objects.select_related("user", "wallet")
         user = self.request.user
-        if RoleAccessPolicy.is_admin_or_staff(user):
+        if is_financial_or_admin(user):
             return qs.order_by("-created_at")
         return qs.filter(user=user).order_by("-created_at")
 
@@ -141,7 +141,7 @@ class PaymentIntentViewSet(
     def pay_wallet(self, request, pk=None):
         intent = self.get_object()
 
-        if not RoleAccessPolicy.is_admin_or_staff(request.user) and intent.user_id != request.user.id:
+        if not is_financial_or_admin(request.user) and intent.user_id != request.user.id:
             return Response({"detail": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
 
         try:

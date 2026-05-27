@@ -11,6 +11,7 @@ class UserType(models.TextChoices):
 
 class StaffRole(models.TextChoices):
     SYSTEM_ADMIN = "system_admin", "System Administrator"
+    FINANCIAL = "financial", "Financial"
     VERIFICATION_OFFICER = "verification_officer", "Verification Officer"
     KNOWLEDGE_BASE_MANAGER = "knowledge_base_manager", "Knowledge Base Manager"
     ANALYTICS_OFFICER = "analytics_officer", "Analytics Officer"
