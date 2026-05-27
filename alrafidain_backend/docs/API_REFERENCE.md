@@ -2051,6 +2051,91 @@ Note:
 
 ---
 
+## Internal Payment Foundation
+
+This is the internal payment foundation for ledger-based accounting.
+No external gateway API is integrated yet.
+No real money transfer or payout automation is executed in this phase.
+
+### `GET /api/payments/wallet/`
+
+Return authenticated user's wallet.
+
+- **Auth required**: Yes
+- **Allowed roles**: All authenticated users
+
+### `GET /api/payments/wallet/transactions/`
+
+List wallet ledger transactions.
+
+- **Auth required**: Yes
+- **Allowed roles**:
+  - User: own wallet transactions only
+  - Admin/Staff: all transactions (with optional `wallet`/`user` filters)
+
+### `POST /api/payments/admin/manual-recharge/`
+
+Admin/staff-only internal recharge endpoint.
+Creates wallet if missing and records a confirmed credit `WalletTransaction`.
+
+- **Auth required**: Yes
+- **Allowed roles**: Admin/Staff only
+
+Example payload:
+```json
+{
+  "user": "user_uuid",
+  "amount": "50000.00",
+  "description": "Manual recharge for testing"
+}
+```
+
+### `POST /api/payments/intents/`
+
+Create internal payment intent.
+
+- **Auth required**: Yes
+- **Allowed roles**: Authenticated users
+- **Current methods**: `wallet`, `manual`
+- **Not enabled yet**: external gateways
+
+Example payload:
+```json
+{
+  "service_type": "lab_request",
+  "reference_id": "lab_request_uuid",
+  "amount": "25000.00",
+  "payment_method": "wallet"
+}
+```
+
+Rules:
+- Duplicate succeeded payment intent for same `service_type + reference_id` is rejected.
+- Service ownership and authoritative amount checks are planned as next-step hardening.
+
+### `POST /api/payments/intents/{id}/pay-wallet/`
+
+Pay intent using wallet balance.
+
+- **Auth required**: Yes
+- **Allowed roles**: Intent owner, Admin/Staff
+
+Behavior:
+- Validates wallet is active and funded.
+- Creates confirmed debit `WalletTransaction`.
+- Marks intent as `succeeded` and sets `paid_at`.
+
+Status lifecycle (PaymentIntent):
+- `created` -> `pending` -> `succeeded`
+- `created|pending` -> `failed|cancelled`
+- `succeeded` -> `refunded` (future flow)
+
+Notes:
+- External gateway integration (e.g., ZainCash/FastPay/Stripe) is intentionally deferred.
+- Provider payout automation is intentionally deferred.
+
+---
+
 ## Pharmacy Prescription Requests and Quotes
 
 This workflow links prescriptions to pharmacy inventory for quote-based pre-payment review.
