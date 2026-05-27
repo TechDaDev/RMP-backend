@@ -11,6 +11,9 @@ class LabOrderRequestAdmin(admin.ModelAdmin):
         "patient",
         "lab",
         "status",
+        "payment_status",
+        "payment_intent",
+        "paid_at",
         "total_price",
         "currency",
         "created_at",
@@ -24,6 +27,7 @@ class LabOrderRequestAdmin(admin.ModelAdmin):
         "lab__user__email",
         "lab__laboratory_name",
     ]
+    readonly_fields = ["payment_intent", "paid_at", "payment_failed_at", "refunded_at"]
 
 
 @admin.register(LabOrderRequestItem)

@@ -11,6 +11,9 @@ class PharmacyPrescriptionRequestAdmin(admin.ModelAdmin):
         "patient",
         "pharmacy",
         "status",
+        "payment_status",
+        "payment_intent",
+        "paid_at",
         "total_price",
         "currency",
         "created_at",
@@ -24,6 +27,7 @@ class PharmacyPrescriptionRequestAdmin(admin.ModelAdmin):
         "pharmacy__user__email",
         "pharmacy__pharmacy_name",
     ]
+    readonly_fields = ["payment_intent", "paid_at", "payment_failed_at", "refunded_at"]
 
 
 @admin.register(PharmacyPrescriptionRequestItem)

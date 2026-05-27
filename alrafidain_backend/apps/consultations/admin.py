@@ -54,6 +54,9 @@ class ConsultationAdmin(admin.ModelAdmin):
         "patient",
         "assigned_doctor",
         "status",
+        "payment_status",
+        "payment_intent",
+        "paid_at",
         "recommended_specialty",
         "selected_specialty",
         "severity",
@@ -77,7 +80,16 @@ class ConsultationAdmin(admin.ModelAdmin):
         "recommended_specialty",
     ]
     inlines = [ConsultationSymptomInline, ConsultationAttachmentInline, ConsultationResponseInline]
-    readonly_fields = ["created_at", "updated_at", "accepted_at", "closed_at"]
+    readonly_fields = [
+        "created_at",
+        "updated_at",
+        "accepted_at",
+        "closed_at",
+        "payment_intent",
+        "paid_at",
+        "payment_failed_at",
+        "refunded_at",
+    ]
 
 
 @admin.register(ConsultationSymptom)

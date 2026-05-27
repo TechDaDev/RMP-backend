@@ -106,6 +106,13 @@ class SymptomSpecialtyRule(BaseModel):
 
 
 class Consultation(BaseModel):
+    class PaymentStatus(models.TextChoices):
+        UNPAID = "unpaid", "Unpaid"
+        PAYMENT_PENDING = "payment_pending", "Payment Pending"
+        PAID = "paid", "Paid"
+        REFUNDED = "refunded", "Refunded"
+        FAILED = "failed", "Failed"
+
     patient = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -160,6 +167,21 @@ class Consultation(BaseModel):
     consultation_fee = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     consultation_currency = models.CharField(max_length=10, default="IQD")
     fee_snapshot_at = models.DateTimeField(null=True, blank=True)
+    payment_status = models.CharField(
+        max_length=20,
+        choices=PaymentStatus.choices,
+        default=PaymentStatus.UNPAID,
+    )
+    payment_intent = models.ForeignKey(
+        "payments.PaymentIntent",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    paid_at = models.DateTimeField(null=True, blank=True)
+    payment_failed_at = models.DateTimeField(null=True, blank=True)
+    refunded_at = models.DateTimeField(null=True, blank=True)
 
     accepted_at = models.DateTimeField(blank=True, null=True)
     closed_at = models.DateTimeField(blank=True, null=True)
@@ -171,6 +193,7 @@ class Consultation(BaseModel):
             models.Index(fields=["assigned_doctor", "-created_at"]),
             models.Index(fields=["status", "-created_at"]),
             models.Index(fields=["selected_specialty", "status", "-created_at"]),
+            models.Index(fields=["payment_status", "-created_at"]),
         ]
 
     def get_recommended_specialties(self):

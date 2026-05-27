@@ -2160,6 +2160,36 @@ Consultation pricing notes:
 - Existing consultation snapshots do not auto-change if doctor profile fee changes later.
 - If consultation snapshot fee is missing or zero, payment is rejected.
 
+#### Payment Status on Service Objects
+
+Service objects now expose payment state fields for internal tracking:
+- `payment_status`: `unpaid | payment_pending | paid | refunded | failed`
+- `payment_intent`: latest linked payment intent UUID (nullable)
+- `paid_at`: timestamp when payment is completed (nullable)
+- `payment_failed_at`: reserved timestamp for failed payment transitions
+- `refunded_at`: reserved timestamp for future refund workflow
+
+Current status behavior:
+- Creating a service `PaymentIntent` sets the service object to `payment_pending` and links `payment_intent` when current payment status is `unpaid` or `failed`.
+- Successful wallet payment sets service `payment_status=paid`, links `payment_intent`, and stores `paid_at`.
+- Paid service objects cannot create another payment intent.
+- Payment status is independent from clinical/service lifecycle status.
+
+Important separation of concerns:
+- Payment does **not** auto-complete consultations.
+- Payment does **not** auto-complete lab requests.
+- Payment does **not** auto-complete pharmacy requests.
+- `refunded` is status-ready only in this phase; refund money movement is future work.
+
+Example service object payment fields:
+```json
+{
+  "payment_status": "paid",
+  "payment_intent": "payment_intent_uuid",
+  "paid_at": "2026-05-27T12:00:00Z"
+}
+```
+
 ### `POST /api/payments/intents/{id}/pay-wallet/`
 
 Pay intent using wallet balance.

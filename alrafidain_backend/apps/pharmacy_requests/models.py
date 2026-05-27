@@ -17,6 +17,13 @@ class PharmacyPrescriptionRequest(BaseModel):
         CANCELLED = "cancelled", "Cancelled"
         COMPLETED = "completed", "Completed"
 
+    class PaymentStatus(models.TextChoices):
+        UNPAID = "unpaid", "Unpaid"
+        PAYMENT_PENDING = "payment_pending", "Payment Pending"
+        PAID = "paid", "Paid"
+        REFUNDED = "refunded", "Refunded"
+        FAILED = "failed", "Failed"
+
     prescription = models.ForeignKey(
         "prescriptions.Prescription",
         on_delete=models.PROTECT,
@@ -42,6 +49,21 @@ class PharmacyPrescriptionRequest(BaseModel):
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     total_price = models.DecimalField(max_digits=12, decimal_places=2, default=Decimal("0.00"))
     currency = models.CharField(max_length=10, default="IQD")
+    payment_status = models.CharField(
+        max_length=20,
+        choices=PaymentStatus.choices,
+        default=PaymentStatus.UNPAID,
+    )
+    payment_intent = models.ForeignKey(
+        "payments.PaymentIntent",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    paid_at = models.DateTimeField(null=True, blank=True)
+    payment_failed_at = models.DateTimeField(null=True, blank=True)
+    refunded_at = models.DateTimeField(null=True, blank=True)
     pharmacy_notes = models.TextField(blank=True, null=True)
     patient_notes = models.TextField(blank=True, null=True)
     rejection_reason = models.TextField(blank=True, null=True)
@@ -56,6 +78,7 @@ class PharmacyPrescriptionRequest(BaseModel):
             models.Index(fields=["status", "created_at"]),
             models.Index(fields=["prescription", "pharmacy"]),
             models.Index(fields=["patient", "created_at"]),
+            models.Index(fields=["payment_status", "created_at"]),
         ]
         constraints = [
             models.UniqueConstraint(

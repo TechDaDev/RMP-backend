@@ -16,6 +16,7 @@ from .models import (
     confirmed_wallet_balance,
 )
 from .resolvers import has_succeeded_payment, resolve_payment_target
+from .status_updates import mark_service_paid, mark_service_payment_pending
 
 User = get_user_model()
 
@@ -149,9 +150,6 @@ def create_payment_intent(
     }:
         raise ValueError("Only wallet/manual payment methods are allowed in this phase.")
 
-    if has_succeeded_payment(service_type, reference_id):
-        raise ValueError("This service object has already been paid.")
-
     wallet = get_or_create_wallet(user)
 
     resolved_metadata = dict(metadata or {})
@@ -165,6 +163,8 @@ def create_payment_intent(
         if not reference_id:
             raise ValueError("reference_id is required for service payments.")
         target = resolve_payment_target(service_type=service_type, reference_id=reference_id, user=user)
+        if has_succeeded_payment(service_type, target.reference_id):
+            raise ValueError("This service object has already been paid.")
         final_amount = target.amount
         final_currency = target.currency or wallet.currency
         final_reference_id = target.reference_id
@@ -177,7 +177,7 @@ def create_payment_intent(
             }
         )
 
-    return PaymentIntent.objects.create(
+    intent = PaymentIntent.objects.create(
         user=user,
         wallet=wallet,
         service_type=service_type,
@@ -190,6 +190,9 @@ def create_payment_intent(
         idempotency_key=idempotency_key or f"intent:{service_type}:{reference_id or 'none'}:{user.id}:{uuid4().hex}",
         metadata=resolved_metadata,
     )
+    if service_type != PaymentIntent.ServiceType.WALLET_RECHARGE:
+        mark_service_payment_pending(intent)
+    return intent
 
 
 def pay_with_wallet(payment_intent: PaymentIntent) -> PaymentIntent:
@@ -252,6 +255,9 @@ def pay_with_wallet(payment_intent: PaymentIntent) -> PaymentIntent:
                 provider_user=provider_user,
                 provider_type=provider_type,
             )
+
+        if intent.service_type != PaymentIntent.ServiceType.WALLET_RECHARGE:
+            mark_service_paid(intent)
 
         return intent
 

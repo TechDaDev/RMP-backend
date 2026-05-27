@@ -53,6 +53,9 @@ def _resolve_lab_request(*, reference_id, user) -> PaymentTarget:
     if not (RoleAccessPolicy.is_admin_or_staff(user) or request_obj.patient_id == user.id):
         raise ValueError("You do not have permission to pay this lab request.")
 
+    if request_obj.payment_status == request_obj.PaymentStatus.PAID:
+        raise ValueError("Service object is already paid.")
+
     if request_obj.status != LabOrderRequest.Status.ACCEPTED:
         raise ValueError("Lab request must be accepted before payment.")
 
@@ -86,6 +89,9 @@ def _resolve_pharmacy_request(*, reference_id, user) -> PaymentTarget:
     if not (RoleAccessPolicy.is_admin_or_staff(user) or request_obj.patient_id == user.id):
         raise ValueError("You do not have permission to pay this pharmacy request.")
 
+    if request_obj.payment_status == request_obj.PaymentStatus.PAID:
+        raise ValueError("Service object is already paid.")
+
     if request_obj.status != PharmacyPrescriptionRequest.Status.ACCEPTED:
         raise ValueError("Pharmacy request must be accepted before payment.")
 
@@ -116,6 +122,9 @@ def _resolve_consultation(*, reference_id, user) -> PaymentTarget:
 
     if not (RoleAccessPolicy.is_admin_or_staff(user) or consultation.patient_id == user.id):
         raise ValueError("You do not have permission to pay this consultation.")
+
+    if consultation.payment_status == consultation.PaymentStatus.PAID:
+        raise ValueError("Service object is already paid.")
 
     if consultation.status != ConsultationStatus.ACCEPTED:
         raise ValueError("Consultation must be accepted before payment.")

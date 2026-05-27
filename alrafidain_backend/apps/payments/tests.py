@@ -708,6 +708,298 @@ class ServicePaymentResolutionTests(TestCase):
         self.assertEqual(pay_resp.status_code, status.HTTP_200_OK)
         self.assertEqual(ProviderEarning.objects.count(), 0)
 
+    def test_creating_consultation_intent_sets_payment_pending(self):
+        response = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.CONSULTATION,
+                "reference_id": str(self.consultation.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.consultation.refresh_from_db()
+        self.assertEqual(self.consultation.payment_status, Consultation.PaymentStatus.PAYMENT_PENDING)
+        self.assertEqual(str(self.consultation.payment_intent_id), response.data["id"])
+
+    def test_paying_consultation_intent_marks_paid_and_sets_paid_at(self):
+        create_resp = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.CONSULTATION,
+                "reference_id": str(self.consultation.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED)
+
+        pay_resp = auth_client(self.patient).post(
+            f"/api/payments/intents/{create_resp.data['id']}/pay-wallet/", {}, format="json"
+        )
+        self.assertEqual(pay_resp.status_code, status.HTTP_200_OK)
+
+        self.consultation.refresh_from_db()
+        self.assertEqual(self.consultation.payment_status, Consultation.PaymentStatus.PAID)
+        self.assertEqual(str(self.consultation.payment_intent_id), create_resp.data["id"])
+        self.assertIsNotNone(self.consultation.paid_at)
+
+    def test_creating_lab_intent_sets_payment_pending(self):
+        response = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.LAB_REQUEST,
+                "reference_id": str(self.lab_request.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.lab_request.refresh_from_db()
+        self.assertEqual(self.lab_request.payment_status, LabOrderRequest.PaymentStatus.PAYMENT_PENDING)
+        self.assertEqual(str(self.lab_request.payment_intent_id), response.data["id"])
+
+    def test_paying_lab_intent_marks_paid(self):
+        create_resp = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.LAB_REQUEST,
+                "reference_id": str(self.lab_request.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED)
+
+        pay_resp = auth_client(self.patient).post(
+            f"/api/payments/intents/{create_resp.data['id']}/pay-wallet/", {}, format="json"
+        )
+        self.assertEqual(pay_resp.status_code, status.HTTP_200_OK)
+
+        self.lab_request.refresh_from_db()
+        self.assertEqual(self.lab_request.payment_status, LabOrderRequest.PaymentStatus.PAID)
+        self.assertIsNotNone(self.lab_request.paid_at)
+
+    def test_creating_pharmacy_intent_sets_payment_pending(self):
+        response = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.PHARMACY_REQUEST,
+                "reference_id": str(self.pharmacy_request.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.pharmacy_request.refresh_from_db()
+        self.assertEqual(
+            self.pharmacy_request.payment_status,
+            PharmacyPrescriptionRequest.PaymentStatus.PAYMENT_PENDING,
+        )
+        self.assertEqual(str(self.pharmacy_request.payment_intent_id), response.data["id"])
+
+    def test_paying_pharmacy_intent_marks_paid(self):
+        create_resp = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.PHARMACY_REQUEST,
+                "reference_id": str(self.pharmacy_request.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED)
+
+        pay_resp = auth_client(self.patient).post(
+            f"/api/payments/intents/{create_resp.data['id']}/pay-wallet/", {}, format="json"
+        )
+        self.assertEqual(pay_resp.status_code, status.HTTP_200_OK)
+
+        self.pharmacy_request.refresh_from_db()
+        self.assertEqual(
+            self.pharmacy_request.payment_status,
+            PharmacyPrescriptionRequest.PaymentStatus.PAID,
+        )
+        self.assertIsNotNone(self.pharmacy_request.paid_at)
+
+    def test_wallet_recharge_does_not_modify_service_payment_status(self):
+        consultation_status_before = self.consultation.payment_status
+        lab_status_before = self.lab_request.payment_status
+        pharmacy_status_before = self.pharmacy_request.payment_status
+
+        create_resp = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.WALLET_RECHARGE,
+                "amount": "1000.00",
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED)
+
+        pay_resp = auth_client(self.patient).post(
+            f"/api/payments/intents/{create_resp.data['id']}/pay-wallet/", {}, format="json"
+        )
+        self.assertEqual(pay_resp.status_code, status.HTTP_200_OK)
+
+        self.consultation.refresh_from_db()
+        self.lab_request.refresh_from_db()
+        self.pharmacy_request.refresh_from_db()
+
+        self.assertEqual(self.consultation.payment_status, consultation_status_before)
+        self.assertEqual(self.lab_request.payment_status, lab_status_before)
+        self.assertEqual(self.pharmacy_request.payment_status, pharmacy_status_before)
+
+    def test_insufficient_balance_does_not_mark_service_as_paid(self):
+        self.lab_request.total_price = Decimal("9999999.00")
+        self.lab_request.save(update_fields=["total_price", "updated_at"])
+
+        create_resp = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.LAB_REQUEST,
+                "reference_id": str(self.lab_request.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED)
+
+        pay_resp = auth_client(self.patient).post(
+            f"/api/payments/intents/{create_resp.data['id']}/pay-wallet/", {}, format="json"
+        )
+        self.assertEqual(pay_resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.lab_request.refresh_from_db()
+        self.assertNotEqual(self.lab_request.payment_status, LabOrderRequest.PaymentStatus.PAID)
+
+    def test_paid_service_object_rejects_new_intent(self):
+        self.consultation.payment_status = Consultation.PaymentStatus.PAID
+        self.consultation.paid_at = timezone.now()
+        self.consultation.save(update_fields=["payment_status", "paid_at", "updated_at"])
+
+        response = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.CONSULTATION,
+                "reference_id": str(self.consultation.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["detail"], "Service object is already paid.")
+
+    def test_service_lifecycle_status_does_not_change_after_payment(self):
+        self.assertEqual(self.consultation.status, ConsultationStatus.ACCEPTED)
+        self.assertEqual(self.lab_request.status, LabOrderRequest.Status.ACCEPTED)
+        self.assertEqual(self.pharmacy_request.status, PharmacyPrescriptionRequest.Status.ACCEPTED)
+
+        create_resp = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.CONSULTATION,
+                "reference_id": str(self.consultation.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED)
+
+        pay_resp = auth_client(self.patient).post(
+            f"/api/payments/intents/{create_resp.data['id']}/pay-wallet/", {}, format="json"
+        )
+        self.assertEqual(pay_resp.status_code, status.HTTP_200_OK)
+
+        self.consultation.refresh_from_db()
+        self.lab_request.refresh_from_db()
+        self.pharmacy_request.refresh_from_db()
+
+        self.assertEqual(self.consultation.status, ConsultationStatus.ACCEPTED)
+        self.assertEqual(self.lab_request.status, LabOrderRequest.Status.ACCEPTED)
+        self.assertEqual(self.pharmacy_request.status, PharmacyPrescriptionRequest.Status.ACCEPTED)
+
+    def test_paid_lab_request_cannot_get_another_payment_intent(self):
+        create_resp = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.LAB_REQUEST,
+                "reference_id": str(self.lab_request.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED)
+
+        pay_resp = auth_client(self.patient).post(
+            f"/api/payments/intents/{create_resp.data['id']}/pay-wallet/", {}, format="json"
+        )
+        self.assertEqual(pay_resp.status_code, status.HTTP_200_OK)
+
+        duplicate = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.LAB_REQUEST,
+                "reference_id": str(self.lab_request.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(duplicate.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_paid_pharmacy_request_cannot_get_another_payment_intent(self):
+        create_resp = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.PHARMACY_REQUEST,
+                "reference_id": str(self.pharmacy_request.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(create_resp.status_code, status.HTTP_201_CREATED)
+
+        pay_resp = auth_client(self.patient).post(
+            f"/api/payments/intents/{create_resp.data['id']}/pay-wallet/", {}, format="json"
+        )
+        self.assertEqual(pay_resp.status_code, status.HTTP_200_OK)
+
+        duplicate = auth_client(self.patient).post(
+            "/api/payments/intents/",
+            {
+                "service_type": PaymentIntent.ServiceType.PHARMACY_REQUEST,
+                "reference_id": str(self.pharmacy_request.id),
+                "payment_method": PaymentIntent.PaymentMethod.WALLET,
+            },
+            format="json",
+        )
+        self.assertEqual(duplicate.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_service_detail_serializers_include_payment_fields(self):
+        consultation_response = auth_client(self.patient).get(f"/api/consultations/{self.consultation.id}/")
+        self.assertEqual(consultation_response.status_code, status.HTTP_200_OK)
+        self.assertIn("payment_status", consultation_response.data["data"])
+        self.assertIn("payment_intent", consultation_response.data["data"])
+        self.assertIn("paid_at", consultation_response.data["data"])
+
+        lab_response = auth_client(self.patient).get(f"/api/lab/requests/{self.lab_request.id}/")
+        self.assertEqual(lab_response.status_code, status.HTTP_200_OK)
+        lab_payload = lab_response.data.get("data", lab_response.data)
+        self.assertIn("payment_status", lab_payload)
+        self.assertIn("payment_intent", lab_payload)
+        self.assertIn("paid_at", lab_payload)
+
+        pharmacy_response = auth_client(self.patient).get(
+            f"/api/pharmacy/requests/{self.pharmacy_request.id}/"
+        )
+        self.assertEqual(pharmacy_response.status_code, status.HTTP_200_OK)
+        pharmacy_payload = pharmacy_response.data.get("data", pharmacy_response.data)
+        self.assertIn("payment_status", pharmacy_payload)
+        self.assertIn("payment_intent", pharmacy_payload)
+        self.assertIn("paid_at", pharmacy_payload)
+
 
 class PlatformFeeTests(TestCase):
     def test_platform_fee_rule_validates_percentage_between_zero_and_hundred(self):
