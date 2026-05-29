@@ -183,6 +183,35 @@ if (user.user_type === 'staff' && role_profile?.staff_role === 'financial') {
 }
 ```
 
+**Frontend wallet lookup flow for Financial users:**
+```typescript
+// 1. Search wallets before showing recharge/ledger actions
+GET /api/payments/admin/wallets/?search=<email-or-name>
+
+// 2. Render wallet result rows with:
+//    id, user, user_email, user_full_name, cached_balance, status
+
+// 3. When finance chooses a wallet:
+//    - use wallet.id for transaction drill-down
+//    - use wallet.user for manual recharge payloads
+
+GET /api/payments/wallet/transactions/?wallet=<wallet.id>
+
+POST /api/payments/admin/manual-recharge/
+{
+  "user": wallet.user,
+  "amount": "50000.00",
+  "description": "Manual recharge"
+}
+```
+
+Recommended frontend behavior:
+- Do not ask finance staff to type raw UUIDs manually.
+- Add a wallet search box by email / name on the finance dashboard.
+- Show wallet ID in the result details panel or copy action for audit/debug use.
+- Disable recharge action when wallet status is `frozen` or `closed` unless your UI intentionally supports exception handling.
+- Keep the selected wallet in page state and reuse it for wallet transactions, payment intents, and manual recharge actions.
+
 **Audit Logs (requires `can_view_audit_logs`):**
 ```typescript
 if (user.user_type === 'staff' && role_profile?.can_view_audit_logs) {

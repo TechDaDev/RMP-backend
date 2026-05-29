@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
@@ -8,9 +9,10 @@ from rest_framework.views import APIView
 
 from apps.common.policies import RoleAccessPolicy
 
-from .models import PaymentIntent, WalletTransaction
+from .models import PaymentIntent, Wallet, WalletTransaction
 from .permissions import IsFinancialOrAdmin, is_financial_or_admin
 from .serializers import (
+    AdminWalletSerializer,
     ManualRechargeSerializer,
     PaymentIntentCreateSerializer,
     PaymentIntentSerializer,
@@ -33,6 +35,39 @@ class WalletMeView(APIView):
     def get(self, request):
         wallet = get_or_create_wallet(request.user)
         return Response(WalletSerializer(wallet).data)
+
+
+class AdminWalletViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    serializer_class = AdminWalletSerializer
+    permission_classes = [IsAuthenticated, IsFinancialOrAdmin]
+
+    def get_queryset(self):
+        qs = Wallet.objects.select_related("user").all().order_by("-created_at")
+        params = self.request.query_params
+
+        wallet_id = params.get("wallet_id") or params.get("id")
+        user_id = params.get("user") or params.get("user_id")
+        email = params.get("email")
+        search = params.get("search")
+        status_value = params.get("status")
+
+        if wallet_id:
+            qs = qs.filter(id=wallet_id)
+        if user_id:
+            qs = qs.filter(user_id=user_id)
+        if email:
+            qs = qs.filter(user__email__icontains=email.strip())
+        if status_value:
+            qs = qs.filter(status=status_value)
+        if search:
+            term = search.strip()
+            qs = qs.filter(
+                Q(user__email__icontains=term)
+                | Q(user__first_name__icontains=term)
+                | Q(user__last_name__icontains=term)
+            )
+
+        return qs.distinct().order_by("-created_at")
 
 
 class WalletTransactionViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):

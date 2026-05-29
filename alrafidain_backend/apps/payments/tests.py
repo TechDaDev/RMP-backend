@@ -366,6 +366,43 @@ class FinancialRolePaymentAccessTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertGreaterEqual(response.data["count"], 2)
 
+    def test_financial_can_list_wallets_for_lookup(self):
+        wallet = get_or_create_wallet(self.user)
+
+        response = auth_client(self.financial).get("/api/payments/admin/wallets/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(response.data["count"], 1)
+
+        wallet_payload = next(item for item in response.data["results"] if item["id"] == str(wallet.id))
+        self.assertEqual(wallet_payload["user_email"], self.user.email)
+        self.assertEqual(wallet_payload["user_type"], self.user.user_type)
+
+    def test_financial_can_filter_wallets_by_email(self):
+        get_or_create_wallet(self.user)
+        other = create_user(email=unique_email("wallet-other"))
+        get_or_create_wallet(other)
+
+        response = auth_client(self.financial).get(
+            f"/api/payments/admin/wallets/?email={self.user.email}",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["user_email"], self.user.email)
+
+    def test_financial_can_retrieve_wallet_by_id(self):
+        wallet = get_or_create_wallet(self.user)
+
+        response = auth_client(self.financial).get(f"/api/payments/admin/wallets/{wallet.id}/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["id"], str(wallet.id))
+        self.assertEqual(response.data["user_email"], self.user.email)
+
+    def test_non_financial_user_cannot_access_wallet_lookup(self):
+        wallet = get_or_create_wallet(self.user)
+
+        response = auth_client(self.patient).get(f"/api/payments/admin/wallets/{wallet.id}/")
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_financial_cannot_accept_consultation(self):
         patient = create_patient(email=unique_email("consult-patient"))
         doctor = create_doctor(email=unique_email("consult-doctor"))

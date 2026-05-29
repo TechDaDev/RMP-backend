@@ -13,6 +13,28 @@ class WalletSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class AdminWalletSerializer(serializers.ModelSerializer):
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+    user_full_name = serializers.CharField(source="user.full_name", read_only=True)
+    user_type = serializers.CharField(source="user.user_type", read_only=True)
+
+    class Meta:
+        model = Wallet
+        fields = [
+            "id",
+            "user",
+            "user_email",
+            "user_full_name",
+            "user_type",
+            "currency",
+            "cached_balance",
+            "status",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
+
+
 class WalletTransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = WalletTransaction

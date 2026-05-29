@@ -2,6 +2,7 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    AdminWalletViewSet,
     ManualRechargeAdminView,
     PaymentIntentViewSet,
     WalletMeView,
@@ -9,6 +10,7 @@ from .views import (
 )
 
 router = DefaultRouter()
+router.register(r"admin/wallets", AdminWalletViewSet, basename="admin-wallets")
 router.register(r"wallet/transactions", WalletTransactionViewSet, basename="wallet-transactions")
 router.register(r"intents", PaymentIntentViewSet, basename="payment-intents")
 

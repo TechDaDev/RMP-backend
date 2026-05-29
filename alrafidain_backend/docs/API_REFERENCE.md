@@ -2096,6 +2096,41 @@ List wallet ledger transactions.
   - User: own wallet transactions only
   - Admin/Staff: all transactions (with optional `wallet`/`user` filters)
 
+### `GET /api/payments/admin/wallets/`
+
+List wallets for finance/admin lookup.
+
+- **Auth required**: Yes
+- **Allowed roles**: Admin/Staff, Financial
+- **Supports filters**:
+  - `wallet_id` or `id`
+  - `user` or `user_id`
+  - `email`
+  - `search` (matches email / first name / last name)
+  - `status`
+
+Response includes:
+- `id` (wallet UUID)
+- `user` (user UUID)
+- `user_email`
+- `user_full_name`
+- `user_type`
+- `currency`
+- `cached_balance`
+- `status`
+
+Example:
+```http
+GET /api/payments/admin/wallets/?search=patient@rmp.local
+```
+
+### `GET /api/payments/admin/wallets/<wallet_id>/`
+
+Retrieve a single wallet by wallet UUID.
+
+- **Auth required**: Yes
+- **Allowed roles**: Admin/Staff, Financial
+
 ### `POST /api/payments/admin/manual-recharge/`
 
 Admin/staff-only internal recharge endpoint.
@@ -2112,6 +2147,11 @@ Example payload:
   "description": "Manual recharge by financial staff"
 }
 ```
+
+Finance workflow note:
+- Frontend should first search/select the target wallet using `GET /api/payments/admin/wallets/`.
+- Use the selected wallet's `user` field as the `user` value for manual recharge.
+- Use the selected wallet `id` for wallet-specific transaction filtering via `GET /api/payments/wallet/transactions/?wallet=<wallet_id>`.
 
 ### `POST /api/payments/intents/`
 
