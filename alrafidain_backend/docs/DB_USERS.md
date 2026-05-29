@@ -1,6 +1,6 @@
 # Live DB Users
 
-Generated from the live Postgres database on 2026-05-21.
+Generated from the live Postgres database on 2026-05-29.
 
 ## Notes
 
@@ -99,6 +99,7 @@ Generated from the live Postgres database on 2026-05-21.
 | admin@rmp.local | staff | Yes | system_admin | Admin1234! |
 | analytics@rmp.local | staff | Yes | analytics_officer | Analytics1234! |
 | compliance@rmp.local | staff | Yes | compliance_officer | Compliance1234! |
+| financial@rmp.local | staff | Yes | financial | Financial1234! |
 | kbmanager@rmp.local | staff | Yes | knowledge_base_manager | KBManager1234! |
 | support@rmp.local | staff | Yes | support_specialist | Support1234! |
 | verifier@rmp.local | staff | Yes | verification_officer | Verifier1234! |
