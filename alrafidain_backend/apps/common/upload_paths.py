@@ -57,3 +57,9 @@ def knowledge_document_upload_path(instance, filename: str) -> str:
 def medical_report_upload_path(instance, filename: str) -> str:
     ext = os.path.splitext(filename)[1].lower()
     return f"medical_reports/{instance.patient_id}/{uuid.uuid4()}{ext}"
+
+
+def wallet_recharge_receipt_upload_path(instance, filename: str) -> str:
+    ext = os.path.splitext(filename)[1].lower()
+    request_id = str(instance.pk) if instance.pk else str(uuid.uuid4())
+    return f"payments/recharge-receipts/{request_id}/{uuid.uuid4()}{ext}"

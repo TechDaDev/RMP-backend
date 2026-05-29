@@ -2153,6 +2153,91 @@ Finance workflow note:
 - Use the selected wallet's `user` field as the `user` value for manual recharge.
 - Use the selected wallet `id` for wallet-specific transaction filtering via `GET /api/payments/wallet/transactions/?wallet=<wallet_id>`.
 
+### `POST /api/payments/wallet/recharge-requests/`
+
+Create a user recharge request for finance review.
+
+- **Auth required**: Yes
+- **Allowed roles**: Authenticated user (creates only for self)
+- **Content type**: `multipart/form-data`
+- **Rules**:
+  - `receipt_file` is required.
+  - Only one open request (`pending_review`) per user is allowed.
+
+Form fields:
+- `amount` (decimal, required, > 0)
+- `note` (string, optional)
+- `receipt_file` (file, required)
+
+Receipt validation:
+- Max size: `MAX_TRANSFER_RECEIPT_UPLOAD_MB` (default 10 MB)
+- Allowed extensions: `.pdf`, `.jpg`, `.jpeg`, `.png`, `.webp`
+- Allowed content types: `application/pdf`, `image/jpeg`, `image/png`, `image/webp`
+
+### `GET /api/payments/wallet/recharge-requests/`
+
+List recharge requests.
+
+- **Auth required**: Yes
+- **Allowed roles**:
+  - User: only their own requests
+  - Finance reviewer (Financial or System Admin): full review queue
+
+Reviewer queue filters:
+- `status` (`pending_review|approved|rejected`)
+- `user` or `user_id`
+- `email`
+
+### `GET /api/payments/wallet/recharge-requests/<request_id>/`
+
+Retrieve single recharge request.
+
+- **Auth required**: Yes
+- **Allowed roles**:
+  - Owner user (their own request)
+  - Finance reviewer (Financial or System Admin)
+
+### `POST /api/payments/wallet/recharge-requests/<request_id>/approve/`
+
+Approve a pending recharge request.
+
+- **Auth required**: Yes
+- **Allowed roles**: Finance reviewer (Financial or System Admin)
+- **Body**: `{ "review_note": "optional" }`
+
+Behavior:
+- Creates a confirmed manual recharge wallet transaction.
+- Marks request as `approved`.
+- Stores `reviewed_by`, `reviewed_at`, `review_note`, and `approved_transaction`.
+
+### `POST /api/payments/wallet/recharge-requests/<request_id>/reject/`
+
+Reject a pending recharge request.
+
+- **Auth required**: Yes
+- **Allowed roles**: Finance reviewer (Financial or System Admin)
+- **Body**: `{ "review_note": "optional" }`
+
+Behavior:
+- Marks request as `rejected`.
+- Stores `reviewed_by`, `reviewed_at`, and `review_note`.
+- No wallet transaction is created.
+
+### Recharge Request Response Fields
+
+Main response fields:
+- `id`, `user`, `user_email`, `wallet`, `amount`, `currency`, `note`, `status`
+- `receipt_file_url`
+- `original_filename`, `file_size`, `mime_type`
+- `reviewed_by`, `reviewer_email`, `reviewed_at`, `review_note`
+- `approved_transaction_id`
+- `created_at`, `updated_at`
+
+Receipt visibility policy:
+- Owner user sees `receipt_file_url` only while request status is `pending_review`.
+- Finance reviewer always sees `receipt_file_url`.
+- After review (`approved`/`rejected`), owner receives `receipt_file_url = null`.
+
 ### `POST /api/payments/intents/`
 
 Create internal payment intent.

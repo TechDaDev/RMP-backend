@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework import status
@@ -25,7 +26,14 @@ from apps.profiles.models import (
     UserProfile,
 )
 
-from .models import PaymentIntent, PlatformFeeRule, ProviderEarning, Wallet, WalletTransaction
+from .models import (
+    PaymentIntent,
+    PlatformFeeRule,
+    ProviderEarning,
+    Wallet,
+    WalletRechargeRequest,
+    WalletTransaction,
+)
 from .services import (
     calculate_platform_fee,
     create_provider_earning,
@@ -80,6 +88,10 @@ def create_financial_staff(email=None):
         is_active=True,
     )
     return user
+
+
+def make_receipt_file(name="receipt.jpg", content_type="image/jpeg"):
+    return SimpleUploadedFile(name=name, content=b"fake-image-content", content_type=content_type)
 
 
 def create_doctor(email=None):
@@ -260,6 +272,172 @@ class ManualRechargeTests(TestCase):
         self.assertEqual(second.status_code, status.HTTP_200_OK)
         self.assertEqual(first.data["transaction"]["id"], second.data["transaction"]["id"])
         self.assertEqual(WalletTransaction.objects.filter(idempotency_key=key).count(), 1)
+
+
+class WalletRechargeRequestAPITests(TestCase):
+    def setUp(self):
+        self.patient = create_patient(email=unique_email("patient"))
+        self.other_patient = create_patient(email=unique_email("other-patient"))
+        self.financial = create_financial_staff(email=unique_email("financial"))
+
+        self.support_staff = create_user(
+            user_type=UserType.STAFF,
+            is_staff=False,
+            email=unique_email("support"),
+        )
+        UserProfile.objects.create(user=self.support_staff)
+        StaffProfile.objects.create(
+            user=self.support_staff,
+            staff_role=StaffRole.SUPPORT_SPECIALIST,
+            department="Support",
+            is_active=True,
+        )
+
+    def _create_request(self, actor, amount="30000.00", note="need recharge", receipt_name="receipt.jpg"):
+        return auth_client(actor).post(
+            "/api/payments/wallet/recharge-requests/",
+            {
+                "amount": amount,
+                "note": note,
+                "receipt_file": make_receipt_file(name=receipt_name),
+            },
+            format="multipart",
+        )
+
+    def test_patient_can_create_wallet_recharge_request_with_receipt(self):
+        response = self._create_request(self.patient)
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(response.data["status"], WalletRechargeRequest.Status.PENDING_REVIEW)
+
+        request_obj = WalletRechargeRequest.objects.get(id=response.data["id"])
+        self.assertEqual(request_obj.user_id, self.patient.id)
+        self.assertEqual(request_obj.amount, Decimal("30000.00"))
+        self.assertTrue(response.data["receipt_file_url"])
+
+    def test_recharge_request_requires_receipt_file(self):
+        response = auth_client(self.patient).post(
+            "/api/payments/wallet/recharge-requests/",
+            {"amount": "30000.00", "note": "missing receipt"},
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_patient_can_have_only_one_open_recharge_request(self):
+        first = self._create_request(self.patient, amount="30000.00", receipt_name="first.jpg")
+        second = self._create_request(self.patient, amount="35000.00", receipt_name="second.jpg")
+
+        self.assertEqual(first.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(second.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            WalletRechargeRequest.objects.filter(
+                user=self.patient,
+                status=WalletRechargeRequest.Status.PENDING_REVIEW,
+            ).count(),
+            1,
+        )
+
+    def test_patient_list_only_shows_own_recharge_requests(self):
+        self._create_request(self.patient, receipt_name="patient.jpg")
+        self._create_request(self.other_patient, receipt_name="other.jpg")
+
+        response = auth_client(self.patient).get("/api/payments/wallet/recharge-requests/")
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(str(response.data["results"][0]["user"]), str(self.patient.id))
+
+    def test_patient_cannot_access_other_users_recharge_request(self):
+        created = self._create_request(self.other_patient)
+        detail = auth_client(self.patient).get(
+            f"/api/payments/wallet/recharge-requests/{created.data['id']}/"
+        )
+        self.assertEqual(detail.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_finance_reviewer_can_approve_request_and_credit_wallet(self):
+        created = self._create_request(self.patient)
+        request_id = created.data["id"]
+
+        approve = auth_client(self.financial).post(
+            f"/api/payments/wallet/recharge-requests/{request_id}/approve/",
+            {"review_note": "Receipt verified"},
+            format="json",
+        )
+        self.assertEqual(approve.status_code, status.HTTP_200_OK)
+        self.assertEqual(approve.data["status"], WalletRechargeRequest.Status.APPROVED)
+
+        request_obj = WalletRechargeRequest.objects.get(id=request_id)
+        self.assertEqual(request_obj.reviewed_by_id, self.financial.id)
+        self.assertIsNotNone(request_obj.approved_transaction_id)
+        self.assertEqual(request_obj.approved_transaction.status, WalletTransaction.Status.CONFIRMED)
+
+        wallet = Wallet.objects.get(user=self.patient)
+        self.assertEqual(wallet.cached_balance, Decimal("30000.00"))
+
+    def test_finance_reviewer_can_reject_request_without_crediting_wallet(self):
+        created = self._create_request(self.patient)
+        request_id = created.data["id"]
+
+        reject = auth_client(self.financial).post(
+            f"/api/payments/wallet/recharge-requests/{request_id}/reject/",
+            {"review_note": "Receipt does not match"},
+            format="json",
+        )
+        self.assertEqual(reject.status_code, status.HTTP_200_OK)
+        self.assertEqual(reject.data["status"], WalletRechargeRequest.Status.REJECTED)
+
+        request_obj = WalletRechargeRequest.objects.get(id=request_id)
+        self.assertIsNone(request_obj.approved_transaction_id)
+        wallet = Wallet.objects.get(user=self.patient)
+        self.assertEqual(wallet.cached_balance, Decimal("0.00"))
+
+    def test_non_finance_staff_cannot_review_recharge_requests(self):
+        created = self._create_request(self.patient)
+        request_id = created.data["id"]
+
+        approve = auth_client(self.support_staff).post(
+            f"/api/payments/wallet/recharge-requests/{request_id}/approve/",
+            {"review_note": "attempt"},
+            format="json",
+        )
+        self.assertEqual(approve.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_receipt_visibility_is_hidden_from_user_after_review(self):
+        created = self._create_request(self.patient)
+        request_id = created.data["id"]
+
+        owner_before = auth_client(self.patient).get(f"/api/payments/wallet/recharge-requests/{request_id}/")
+        self.assertEqual(owner_before.status_code, status.HTTP_200_OK)
+        self.assertTrue(owner_before.data["receipt_file_url"])
+
+        auth_client(self.financial).post(
+            f"/api/payments/wallet/recharge-requests/{request_id}/approve/",
+            {"review_note": "ok"},
+            format="json",
+        )
+
+        owner_after = auth_client(self.patient).get(f"/api/payments/wallet/recharge-requests/{request_id}/")
+        reviewer_after = auth_client(self.financial).get(
+            f"/api/payments/wallet/recharge-requests/{request_id}/"
+        )
+        self.assertEqual(owner_after.status_code, status.HTTP_200_OK)
+        self.assertIsNone(owner_after.data["receipt_file_url"])
+        self.assertTrue(reviewer_after.data["receipt_file_url"])
+
+    def test_finance_reviewer_can_filter_recharge_request_queue(self):
+        first = self._create_request(self.patient, receipt_name="patient-a.jpg")
+        second = self._create_request(self.other_patient, receipt_name="patient-b.jpg")
+
+        auth_client(self.financial).post(
+            f"/api/payments/wallet/recharge-requests/{second.data['id']}/reject/",
+            {"review_note": "invalid receipt"},
+            format="json",
+        )
+
+        pending_for_patient = auth_client(self.financial).get(
+            f"/api/payments/wallet/recharge-requests/?status={WalletRechargeRequest.Status.PENDING_REVIEW}&email={self.patient.email}"
+        )
+        self.assertEqual(pending_for_patient.status_code, status.HTTP_200_OK)
+        self.assertEqual(pending_for_patient.data["count"], 1)
+        self.assertEqual(pending_for_patient.data["results"][0]["id"], first.data["id"])
 
 
 class FinancialRolePaymentAccessTests(TestCase):

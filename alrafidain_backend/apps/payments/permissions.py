@@ -2,6 +2,7 @@ from rest_framework.permissions import BasePermission
 
 from apps.common.policies import RoleAccessPolicy
 from apps.common.choices import StaffRole
+from apps.common.staff_access import has_staff_capability
 
 
 def is_financial_user(user) -> bool:
@@ -28,3 +29,12 @@ class IsAdminOrStaff(BasePermission):
 class IsFinancialOrAdmin(BasePermission):
     def has_permission(self, request, view):
         return is_financial_or_admin(request.user)
+
+
+def is_finance_reviewer(user) -> bool:
+    return has_staff_capability(user, "manage_finance")
+
+
+class IsFinanceReviewer(BasePermission):
+    def has_permission(self, request, view):
+        return is_finance_reviewer(request.user)

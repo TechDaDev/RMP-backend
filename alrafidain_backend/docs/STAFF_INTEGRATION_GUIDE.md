@@ -83,7 +83,14 @@ Authorization: Bearer <access_token>
       "can_export_datasets": true,
       "can_view_audit_logs": true,
       "hire_date": "2025-01-01",
-      "has_completed_training": true
+      "has_completed_training": true,
+      "allowed_admin_sections": [
+        "finance_dashboard",
+        "wallet_transactions",
+        "payment_intents",
+        "manual_recharge",
+        "provider_earnings"
+      ]
     },
     "completion": {
       "shared_profile_complete": false,
@@ -104,6 +111,7 @@ Authorization: Bearer <access_token>
 **Key observations:**
 - `user_profile` is `null` for staff users.
 - `role_profile` contains `StaffProfile` data.
+- `role_profile.allowed_admin_sections` is the canonical backend list for rendering staff dashboard sections.
 - `verification` is not required for staff (always `required: false`).
 - `completion` shows overall_complete as false (staff are not completeness-tracked like other roles).
 
@@ -176,10 +184,23 @@ if (user.user_type === 'staff' && role_profile?.can_export_datasets) {
 }
 ```
 
-**Financial Operations (requires `staff_role === 'financial'`):**
+**Financial Operations (requires finance section access):**
 ```typescript
-if (user.user_type === 'staff' && role_profile?.staff_role === 'financial') {
-  // Show finance dashboard, wallet transactions, payment intents, manual recharge, provider earnings
+const sections = role_profile?.allowed_admin_sections ?? [];
+if (user.user_type === 'staff' && sections.includes('finance_dashboard')) {
+  // Show finance dashboard entry
+}
+if (sections.includes('wallet_transactions')) {
+  // Show wallet transactions section
+}
+if (sections.includes('payment_intents')) {
+  // Show payment intents section
+}
+if (sections.includes('manual_recharge')) {
+  // Show manual recharge section
+}
+if (sections.includes('provider_earnings')) {
+  // Show provider earnings section
 }
 ```
 
@@ -204,6 +225,38 @@ POST /api/payments/admin/manual-recharge/
   "description": "Manual recharge"
 }
 ```
+
+**Frontend recharge request flow (patient -> finance review):**
+```typescript
+// Patient submits request with transfer receipt (multipart/form-data)
+POST /api/payments/wallet/recharge-requests/
+FormData:
+  amount: "50000.00"
+  note: "Bank transfer reference 12345"
+  receipt_file: <File>
+
+// Patient tracks own requests
+GET /api/payments/wallet/recharge-requests/
+GET /api/payments/wallet/recharge-requests/<request_id>/
+
+// Finance queue (financial/system admin only)
+GET /api/payments/wallet/recharge-requests/?status=pending_review
+GET /api/payments/wallet/recharge-requests/?email=<patient-email>
+
+// Finance decision
+POST /api/payments/wallet/recharge-requests/<request_id>/approve/
+{ "review_note": "Receipt verified" }
+
+POST /api/payments/wallet/recharge-requests/<request_id>/reject/
+{ "review_note": "Receipt mismatch" }
+```
+
+Recharge request UI rules:
+- Patient can submit only one open request at a time.
+- Require receipt upload before submit.
+- Show `receipt_file_url` to patient only while status is `pending_review`.
+- Hide receipt link when patient request becomes `approved` or `rejected`.
+- Finance reviewers always receive `receipt_file_url` and can inspect/download.
 
 Recommended frontend behavior:
 - Do not ask finance staff to type raw UUIDs manually.

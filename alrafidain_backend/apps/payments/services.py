@@ -12,6 +12,7 @@ from .models import (
     PlatformFeeRule,
     ProviderEarning,
     Wallet,
+    WalletRechargeRequest,
     WalletTransaction,
     confirmed_wallet_balance,
 )
@@ -260,6 +261,93 @@ def pay_with_wallet(payment_intent: PaymentIntent) -> PaymentIntent:
             mark_service_paid(intent)
 
         return intent
+
+
+def create_wallet_recharge_request(*, user, amount: Decimal, note: str = "", receipt_file):
+    if amount <= 0:
+        raise ValueError("Amount must be positive.")
+
+    open_exists = WalletRechargeRequest.objects.filter(
+        user=user,
+        status=WalletRechargeRequest.Status.PENDING_REVIEW,
+    ).exists()
+    if open_exists:
+        raise ValueError("You already have an open recharge request under review.")
+
+    wallet = get_or_create_wallet(user)
+    file_content_type = getattr(receipt_file, "content_type", None)
+    request_obj = WalletRechargeRequest.objects.create(
+        user=user,
+        wallet=wallet,
+        amount=amount,
+        currency=wallet.currency,
+        note=(note or "").strip(),
+        receipt_file=receipt_file,
+        original_filename=getattr(receipt_file, "name", "") or "",
+        file_size=getattr(receipt_file, "size", None),
+        mime_type=file_content_type,
+    )
+    return request_obj
+
+
+def approve_wallet_recharge_request(*, request_obj: WalletRechargeRequest, reviewer, review_note: str = ""):
+    if request_obj.status != WalletRechargeRequest.Status.PENDING_REVIEW:
+        raise ValueError("Only pending recharge requests can be approved.")
+
+    with transaction.atomic():
+        locked_req = WalletRechargeRequest.objects.select_for_update().get(id=request_obj.id)
+        if locked_req.status != WalletRechargeRequest.Status.PENDING_REVIEW:
+            raise ValueError("Only pending recharge requests can be approved.")
+
+        tx = create_manual_recharge(
+            wallet=locked_req.wallet,
+            amount=locked_req.amount,
+            created_by=reviewer,
+            description=f"Recharge request {locked_req.id}",
+            idempotency_key=f"recharge_request:{locked_req.id}:approve",
+        )
+
+        locked_req.status = WalletRechargeRequest.Status.APPROVED
+        locked_req.reviewed_by = reviewer
+        locked_req.reviewed_at = timezone.now()
+        locked_req.review_note = (review_note or "").strip()
+        locked_req.approved_transaction = tx
+        locked_req.save(
+            update_fields=[
+                "status",
+                "reviewed_by",
+                "reviewed_at",
+                "review_note",
+                "approved_transaction",
+                "updated_at",
+            ]
+        )
+        return locked_req
+
+
+def reject_wallet_recharge_request(*, request_obj: WalletRechargeRequest, reviewer, review_note: str = ""):
+    if request_obj.status != WalletRechargeRequest.Status.PENDING_REVIEW:
+        raise ValueError("Only pending recharge requests can be rejected.")
+
+    with transaction.atomic():
+        locked_req = WalletRechargeRequest.objects.select_for_update().get(id=request_obj.id)
+        if locked_req.status != WalletRechargeRequest.Status.PENDING_REVIEW:
+            raise ValueError("Only pending recharge requests can be rejected.")
+
+        locked_req.status = WalletRechargeRequest.Status.REJECTED
+        locked_req.reviewed_by = reviewer
+        locked_req.reviewed_at = timezone.now()
+        locked_req.review_note = (review_note or "").strip()
+        locked_req.save(
+            update_fields=[
+                "status",
+                "reviewed_by",
+                "reviewed_at",
+                "review_note",
+                "updated_at",
+            ]
+        )
+        return locked_req
 
 
 def calculate_platform_fee(service_type: str, amount: Decimal) -> Decimal:

@@ -161,6 +161,7 @@ MAX_CLINICAL_ATTACHMENT_UPLOAD_MB = config(
     "MAX_CLINICAL_ATTACHMENT_UPLOAD_MB", default=15, cast=int
 )
 MAX_PROFILE_IMAGE_UPLOAD_MB = config("MAX_PROFILE_IMAGE_UPLOAD_MB", default=5, cast=int)
+MAX_TRANSFER_RECEIPT_UPLOAD_MB = config("MAX_TRANSFER_RECEIPT_UPLOAD_MB", default=10, cast=int)
 
 KNOWLEDGE_DOCUMENT_ALLOWED_EXTENSIONS = [".pdf", ".docx", ".txt"]
 KNOWLEDGE_DOCUMENT_ALLOWED_CONTENT_TYPES = [
@@ -189,6 +190,14 @@ CLINICAL_ATTACHMENT_ALLOWED_CONTENT_TYPES = [
 
 PROFILE_IMAGE_ALLOWED_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"]
 PROFILE_IMAGE_ALLOWED_CONTENT_TYPES = ["image/jpeg", "image/png", "image/webp"]
+
+TRANSFER_RECEIPT_ALLOWED_EXTENSIONS = [".pdf", ".jpg", ".jpeg", ".png", ".webp"]
+TRANSFER_RECEIPT_ALLOWED_CONTENT_TYPES = [
+    "application/pdf",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+]
 
 FILE_SCANNING_ENABLED = config("FILE_SCANNING_ENABLED", default=False, cast=bool)
 FILE_SCANNER_BACKEND = config("FILE_SCANNER_BACKEND", default="")

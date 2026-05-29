@@ -6,6 +6,7 @@ from django.db import models
 from django.db.models import Q, Sum
 
 from apps.common.models import BaseModel
+from apps.common.upload_paths import wallet_recharge_receipt_upload_path
 
 
 class Wallet(BaseModel):
@@ -257,6 +258,75 @@ class ProviderEarning(BaseModel):
 
     def __str__(self):
         return f"Earning {self.provider_type}:{self.net_amount}"
+
+
+class WalletRechargeRequest(BaseModel):
+    class Status(models.TextChoices):
+        PENDING_REVIEW = "pending_review", "Pending Review"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="wallet_recharge_requests",
+    )
+    wallet = models.ForeignKey(
+        Wallet,
+        on_delete=models.PROTECT,
+        related_name="recharge_requests",
+    )
+    amount = models.DecimalField(max_digits=14, decimal_places=2)
+    currency = models.CharField(max_length=10, default="IQD")
+    note = models.TextField(blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING_REVIEW,
+    )
+
+    receipt_file = models.FileField(upload_to=wallet_recharge_receipt_upload_path)
+    original_filename = models.CharField(max_length=500, blank=True)
+    file_size = models.PositiveBigIntegerField(blank=True, null=True)
+    mime_type = models.CharField(max_length=100, blank=True, null=True)
+
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="wallet_recharge_requests_reviewed",
+    )
+    reviewed_at = models.DateTimeField(blank=True, null=True)
+    review_note = models.TextField(blank=True)
+    approved_transaction = models.OneToOneField(
+        WalletTransaction,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="recharge_request",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user"],
+                condition=Q(status="pending_review"),
+                name="uniq_open_wallet_recharge_request_per_user",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["user", "status", "created_at"]),
+            models.Index(fields=["status", "created_at"]),
+        ]
+
+    def clean(self):
+        if self.amount is None or self.amount <= 0:
+            raise ValidationError({"amount": "Amount must be positive."})
+
+    def __str__(self):
+        return f"RechargeRequest {self.id} ({self.status})"
 
 
 def confirmed_wallet_balance(wallet: Wallet) -> Decimal:

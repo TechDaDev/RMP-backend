@@ -9,21 +9,27 @@ from rest_framework.views import APIView
 
 from apps.common.policies import RoleAccessPolicy
 
-from .models import PaymentIntent, Wallet, WalletTransaction
-from .permissions import IsFinancialOrAdmin, is_financial_or_admin
+from .models import PaymentIntent, Wallet, WalletRechargeRequest, WalletTransaction
+from .permissions import IsFinanceReviewer, IsFinancialOrAdmin, is_finance_reviewer, is_financial_or_admin
 from .serializers import (
     AdminWalletSerializer,
     ManualRechargeSerializer,
     PaymentIntentCreateSerializer,
     PaymentIntentSerializer,
+    WalletRechargeRequestCreateSerializer,
+    WalletRechargeRequestReviewSerializer,
+    WalletRechargeRequestSerializer,
     WalletSerializer,
     WalletTransactionSerializer,
 )
 from .services import (
+    approve_wallet_recharge_request,
     create_manual_recharge,
     create_payment_intent,
+    create_wallet_recharge_request,
     get_or_create_wallet,
     pay_with_wallet,
+    reject_wallet_recharge_request,
 )
 
 User = get_user_model()
@@ -185,3 +191,108 @@ class PaymentIntentViewSet(
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         return Response(PaymentIntentSerializer(paid_intent).data, status=status.HTTP_200_OK)
+
+
+class WalletRechargeRequestViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        qs = WalletRechargeRequest.objects.select_related(
+            "user", "wallet", "reviewed_by", "approved_transaction"
+        )
+        user = self.request.user
+        if is_finance_reviewer(user):
+            params = self.request.query_params
+            status_value = params.get("status")
+            user_id = params.get("user") or params.get("user_id")
+            email = params.get("email")
+
+            if status_value:
+                qs = qs.filter(status=status_value)
+            if user_id:
+                qs = qs.filter(user_id=user_id)
+            if email:
+                qs = qs.filter(user__email__icontains=email.strip())
+            return qs.order_by("-created_at")
+
+        return qs.filter(user=user).order_by("-created_at")
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return WalletRechargeRequestCreateSerializer
+        if self.action in {"approve", "reject"}:
+            return WalletRechargeRequestReviewSerializer
+        return WalletRechargeRequestSerializer
+
+    def get_permissions(self):
+        if self.action in {"approve", "reject"}:
+            return [IsAuthenticated(), IsFinanceReviewer()]
+        return [permission() for permission in self.permission_classes]
+
+    def get_object(self):
+        obj = super().get_object()
+        user = self.request.user
+        if is_finance_reviewer(user):
+            return obj
+        if obj.user_id != user.id:
+            self.permission_denied(self.request, message="Forbidden.")
+        return obj
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+
+        try:
+            created = create_wallet_recharge_request(
+                user=request.user,
+                amount=payload["amount"],
+                note=payload.get("note", ""),
+                receipt_file=payload["receipt_file"],
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        output = WalletRechargeRequestSerializer(created, context={"request": request})
+        return Response(output.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="approve")
+    def approve(self, request, pk=None):
+        obj = super().get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            reviewed = approve_wallet_recharge_request(
+                request_obj=obj,
+                reviewer=request.user,
+                review_note=serializer.validated_data.get("review_note", ""),
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        output = WalletRechargeRequestSerializer(reviewed, context={"request": request})
+        return Response(output.data, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=["post"], url_path="reject")
+    def reject(self, request, pk=None):
+        obj = super().get_object()
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            reviewed = reject_wallet_recharge_request(
+                request_obj=obj,
+                reviewer=request.user,
+                review_note=serializer.validated_data.get("review_note", ""),
+            )
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+        output = WalletRechargeRequestSerializer(reviewed, context={"request": request})
+        return Response(output.data, status=status.HTTP_200_OK)

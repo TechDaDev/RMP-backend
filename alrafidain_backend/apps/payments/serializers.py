@@ -1,9 +1,19 @@
 from decimal import Decimal
 from uuid import uuid4
 
+from django.conf import settings
 from rest_framework import serializers
 
-from .models import PaymentIntent, PlatformFeeRule, ProviderEarning, Wallet, WalletTransaction
+from apps.common.file_validation import validate_uploaded_file
+
+from .models import (
+    PaymentIntent,
+    PlatformFeeRule,
+    ProviderEarning,
+    Wallet,
+    WalletRechargeRequest,
+    WalletTransaction,
+)
 
 
 class WalletSerializer(serializers.ModelSerializer):
@@ -203,3 +213,89 @@ class ManualRechargeSerializer(serializers.Serializer):
         if value <= 0:
             raise serializers.ValidationError("Amount must be positive.")
         return value
+
+
+class WalletRechargeRequestCreateSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(max_digits=14, decimal_places=2)
+    note = serializers.CharField(required=False, allow_blank=True)
+    receipt_file = serializers.FileField(required=True)
+
+    def validate_amount(self, value: Decimal):
+        if value <= 0:
+            raise serializers.ValidationError("Amount must be positive.")
+        return value
+
+    def validate_receipt_file(self, value):
+        validate_uploaded_file(
+            value,
+            allowed_extensions=settings.TRANSFER_RECEIPT_ALLOWED_EXTENSIONS,
+            allowed_content_types=settings.TRANSFER_RECEIPT_ALLOWED_CONTENT_TYPES,
+            max_size_mb=settings.MAX_TRANSFER_RECEIPT_UPLOAD_MB,
+        )
+        return value
+
+
+class WalletRechargeRequestReviewSerializer(serializers.Serializer):
+    review_note = serializers.CharField(required=False, allow_blank=True)
+
+
+class WalletRechargeRequestSerializer(serializers.ModelSerializer):
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+    reviewer_email = serializers.EmailField(source="reviewed_by.email", read_only=True)
+    approved_transaction_id = serializers.UUIDField(source="approved_transaction.id", read_only=True)
+    receipt_file_url = serializers.SerializerMethodField()
+
+    def get_receipt_file_url(self, obj):
+        request = self.context.get("request")
+        actor = getattr(request, "user", None)
+        if not obj.receipt_file:
+            return None
+
+        is_reviewer = False
+        if actor and actor.is_authenticated:
+            try:
+                from .permissions import is_finance_reviewer
+
+                is_reviewer = is_finance_reviewer(actor)
+            except Exception:
+                is_reviewer = False
+
+        is_owner_with_pending_access = (
+            actor
+            and actor.is_authenticated
+            and actor.id == obj.user_id
+            and obj.status == WalletRechargeRequest.Status.PENDING_REVIEW
+        )
+
+        if not (is_reviewer or is_owner_with_pending_access):
+            return None
+
+        file_url = obj.receipt_file.url
+        if request is not None:
+            return request.build_absolute_uri(file_url)
+        return file_url
+
+    class Meta:
+        model = WalletRechargeRequest
+        fields = [
+            "id",
+            "user",
+            "user_email",
+            "wallet",
+            "amount",
+            "currency",
+            "note",
+            "status",
+            "receipt_file_url",
+            "original_filename",
+            "file_size",
+            "mime_type",
+            "reviewed_by",
+            "reviewer_email",
+            "reviewed_at",
+            "review_note",
+            "approved_transaction_id",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = fields
