@@ -10,6 +10,7 @@ from rest_framework.views import APIView
 
 from apps.audit.services import create_audit_log
 from apps.common.choices import NotificationType, VerificationStatus
+from apps.common.permissions import CanApproveProfessionals
 from apps.common.responses import error_response, success_response
 from apps.notifications.services import create_notification
 
@@ -19,7 +20,6 @@ from .admin_serializers import (
     AdminVerificationDetailSerializer,
     AdminVerificationListSerializer,
 )
-from .permissions import IsAdminUserTypeOrStaff
 
 
 class AdminVerificationListPagination(LimitOffsetPagination):
@@ -28,7 +28,7 @@ class AdminVerificationListPagination(LimitOffsetPagination):
 
 @extend_schema(tags=["Admin Verifications"])
 class AdminVerificationListView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUserTypeOrStaff]
+    permission_classes = [IsAuthenticated, CanApproveProfessionals]
 
     def _build_queryset(self, role, status_filter, search):
         model = ROLE_PROFILE_MODEL_MAP[role]
@@ -114,7 +114,7 @@ class AdminVerificationListView(APIView):
 
 @extend_schema(tags=["Admin Verifications"])
 class AdminVerificationDetailView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUserTypeOrStaff]
+    permission_classes = [IsAuthenticated, CanApproveProfessionals]
 
     @extend_schema(responses={200: AdminVerificationDetailSerializer})
     def get(self, request, role, pk):
@@ -131,7 +131,7 @@ class AdminVerificationDetailView(APIView):
 
 
 class _BaseAdminVerificationDecisionView(APIView):
-    permission_classes = [IsAuthenticated, IsAdminUserTypeOrStaff]
+    permission_classes = [IsAuthenticated, CanApproveProfessionals]
     next_status = None
     action_name = None
 

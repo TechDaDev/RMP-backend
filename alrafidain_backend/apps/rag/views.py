@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from apps.audit.services import create_audit_log, record_security_event
 from apps.common.choices import RAGServiceContext
 from apps.common.permissions import CanExportRagDataset
+from apps.common.staff_access import has_staff_capability
 from apps.consultations.models import Consultation
 from apps.patient_records.models import PatientMedicalReport
 
@@ -479,8 +480,8 @@ class AdminRAGFeedbackListView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if not (request.user.is_staff or request.user.is_superuser):
-            return Response({"detail": "Staff only."}, status=403)
+        if not has_staff_capability(request.user, "review_rag_feedback"):
+            return Response({"detail": "Permission denied for RAG feedback review."}, status=403)
 
         qs = (
             RAGResponseFeedback.objects.all()
@@ -507,8 +508,8 @@ class AdminRAGFeedbackReviewView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request, feedback_id):
-        if not (request.user.is_staff or request.user.is_superuser):
-            return Response({"detail": "Staff only."}, status=403)
+        if not has_staff_capability(request.user, "review_rag_feedback"):
+            return Response({"detail": "Permission denied for RAG feedback review."}, status=403)
 
         feedback = get_object_or_404(RAGResponseFeedback, pk=feedback_id)
 
@@ -543,14 +544,14 @@ class AdminRAGAnalyticsSummaryView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        if not (request.user.is_staff or request.user.is_superuser):
+        if not has_staff_capability(request.user, "view_rag_analytics"):
             record_security_event(
                 actor=request.user,
                 action="rag_analytics_access_denied",
                 request=request,
-                metadata={"reason_code": "staff_only"},
+                metadata={"reason_code": "policy_denied"},
             )
-            return Response({"detail": "Staff only."}, status=403)
+            return Response({"detail": "Permission denied for RAG analytics."}, status=403)
 
         from .analytics import get_rag_analytics_summary
 
@@ -572,14 +573,14 @@ class AdminRAGDatasetExportView(APIView):
     permission_classes = [IsAuthenticated, CanExportRagDataset]
 
     def post(self, request):
-        if not (request.user.is_staff or request.user.is_superuser):
+        if not has_staff_capability(request.user, "export_datasets"):
             record_security_event(
                 actor=request.user,
                 action="rag_dataset_export_access_denied",
                 request=request,
-                metadata={"reason_code": "staff_only"},
+                metadata={"reason_code": "policy_denied"},
             )
-            return Response({"detail": "Staff only."}, status=403)
+            return Response({"detail": "Permission denied for dataset export."}, status=403)
 
         serializer = RAGDatasetExportSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

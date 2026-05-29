@@ -4,6 +4,8 @@ Serializers for staff profile endpoints.
 
 from rest_framework import serializers
 
+from apps.common.staff_access import get_allowed_admin_sections
+
 from .models import StaffProfile
 
 
@@ -38,6 +40,10 @@ class StaffDetailSerializer(serializers.ModelSerializer):
         source="supervisor.email", read_only=True, allow_null=True
     )
     role_display = serializers.CharField(source="get_staff_role_display", read_only=True)
+    allowed_admin_sections = serializers.SerializerMethodField()
+
+    def get_allowed_admin_sections(self, obj):
+        return get_allowed_admin_sections(obj.user)
 
     class Meta:
         model = StaffProfile
@@ -53,6 +59,7 @@ class StaffDetailSerializer(serializers.ModelSerializer):
             "can_manage_knowledge_base",
             "can_export_datasets",
             "can_view_audit_logs",
+            "allowed_admin_sections",
             "hire_date",
             "last_active",
             "is_active",
@@ -96,6 +103,12 @@ class UserStaffProfileSerializer(serializers.Serializer):
     has_completed_training = serializers.BooleanField(
         source="staff_profile.has_completed_training", read_only=True
     )
+    allowed_admin_sections = serializers.SerializerMethodField()
+
+    def get_allowed_admin_sections(self, obj):
+        if not hasattr(obj, "staff_profile"):
+            return []
+        return get_allowed_admin_sections(obj)
 
     def to_representation(self, instance):
         if not hasattr(instance, "staff_profile"):

@@ -176,6 +176,13 @@ if (user.user_type === 'staff' && role_profile?.can_export_datasets) {
 }
 ```
 
+**Financial Operations (requires `staff_role === 'financial'`):**
+```typescript
+if (user.user_type === 'staff' && role_profile?.staff_role === 'financial') {
+  // Show finance dashboard, wallet transactions, payment intents, manual recharge, provider earnings
+}
+```
+
 **Audit Logs (requires `can_view_audit_logs`):**
 ```typescript
 if (user.user_type === 'staff' && role_profile?.can_view_audit_logs) {
@@ -219,6 +226,7 @@ Future endpoints (to be implemented):
 | Role | Purpose | Default Permissions |
 |---|---|---|
 | **System Administrator** | Full platform access, all features, staff management | All enabled |
+| **Financial** | Payment operations only (wallets/intents/recharge/earnings) | Finance sections only |
 | **Verification Officer** | Review and approve professional profiles | ✓ `can_approve_professionals` |
 | **Knowledge Base Manager** | Curate documents, approve for RAG | ✓ `can_manage_knowledge_base` |
 | **Analytics Officer** | Monitor RAG feedback, export datasets | ✓ `can_export_datasets` |
@@ -286,7 +294,7 @@ Expected: `user_type: "staff"`, `role_profile` with `staff_role: "system_admin"`
 
 1. **No user profile completion tracking for staff** — Unlike doctors/pharmacists, staff users don't have a `UserProfile` and aren't checked for completion.
 
-2. **Permission flags are the source of truth** — Always check the boolean flags (`can_approve_professionals`, etc.) to decide what features to show.
+2. **Permission flags + staff role are the source of truth** — Always check boolean flags (`can_approve_professionals`, etc.) and `staff_role` (for financial-only sections) to decide what features to show.
 
 3. **Role field is read-only** — The `staff_role` is assigned server-side; frontend cannot modify it.
 

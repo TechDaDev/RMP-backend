@@ -34,6 +34,7 @@ from apps.common.choices import (
     RAGResponseStatus,
     RAGSafetyLevel,
     RAGServiceContext,
+    StaffRole,
     UserType,
     VerificationStatus,
 )
@@ -44,7 +45,7 @@ from apps.patient_records.models import (
     PatientMedicalRecord,
     PatientMedicalReport,
 )
-from apps.profiles.models import DoctorProfile, PatientProfile, UserProfile
+from apps.profiles.models import DoctorProfile, PatientProfile, StaffProfile, UserProfile
 
 from .assistant_services import (
     build_doctor_ai_message_from_rag_response,
@@ -2097,16 +2098,15 @@ class MyRAGFeedbackListViewTest(TestCase):
 
 class AdminRAGFeedbackListViewTest(TestCase):
     def setUp(self):
-        self.staff = User.objects.create_user(
+        self.staff = _create_staff_with_role(
             email="admin_list@example.com",
-            password="StrongPass1!",
-            first_name="S",
-            last_name="T",
-            user_type=UserType.DOCTOR,
-            is_active=True,
-            is_staff=True,
+            role=StaffRole.ANALYTICS_OFFICER,
         )
         self.doctor = create_doctor(email="admin_doc@example.com")
+        self.financial = _create_staff_with_role(
+            email="admin_financial_list@example.com",
+            role=StaffRole.FINANCIAL,
+        )
         _, rag = _create_rag_response(self.doctor)
         self.fb = RAGResponseFeedback.objects.create(
             rag_response=rag, doctor=self.doctor, rating=RAGFeedbackRating.HELPFUL
@@ -2123,6 +2123,11 @@ class AdminRAGFeedbackListViewTest(TestCase):
 
     def test_non_staff_doctor_gets_403(self):
         client = auth_client(self.doctor)
+        resp = client.get(self.url())
+        self.assertEqual(resp.status_code, 403)
+
+    def test_financial_staff_gets_403(self):
+        client = auth_client(self.financial)
         resp = client.get(self.url())
         self.assertEqual(resp.status_code, 403)
 
@@ -2157,16 +2162,15 @@ class AdminRAGFeedbackListViewTest(TestCase):
 
 class AdminRAGFeedbackReviewViewTest(TestCase):
     def setUp(self):
-        self.staff = User.objects.create_user(
+        self.staff = _create_staff_with_role(
             email="admin_review@example.com",
-            password="StrongPass1!",
-            first_name="S",
-            last_name="T",
-            user_type=UserType.DOCTOR,
-            is_active=True,
-            is_staff=True,
+            role=StaffRole.ANALYTICS_OFFICER,
         )
         self.doctor = create_doctor(email="admin_rev_doc@example.com")
+        self.kb_manager = _create_staff_with_role(
+            email="admin_review_kb@example.com",
+            role=StaffRole.KNOWLEDGE_BASE_MANAGER,
+        )
         _, rag = _create_rag_response(self.doctor)
         self.feedback = RAGResponseFeedback.objects.create(
             rag_response=rag, doctor=self.doctor, rating=RAGFeedbackRating.NOT_HELPFUL
@@ -2225,6 +2229,15 @@ class AdminRAGFeedbackReviewViewTest(TestCase):
         )
         self.assertEqual(resp.status_code, 403)
 
+    def test_kb_manager_gets_403(self):
+        client = auth_client(self.kb_manager)
+        resp = client.post(
+            self.url(),
+            {"review_status": RAGFeedbackReviewStatus.REVIEWED},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 403)
+
     def test_unauthenticated_gets_401(self):
         resp = self.client.post(
             self.url(),
@@ -2273,15 +2286,54 @@ def _create_staff():
         password="StrongPass1!",
         first_name="Staff",
         last_name="User",
-        user_type=UserType.DOCTOR,
+        user_type=UserType.STAFF,
         is_active=True,
         is_staff=True,
     )
     UserProfile.objects.create(user=user)
-    DoctorProfile.objects.create(
+    StaffProfile.objects.create(
         user=user,
-        specialty=MedicalSpecialty.GENERAL_MEDICINE,
-        verification_status=VerificationStatus.APPROVED,
+        staff_role=StaffRole.SYSTEM_ADMIN,
+        can_approve_professionals=True,
+        can_manage_knowledge_base=True,
+        can_export_datasets=True,
+        can_view_audit_logs=True,
+        is_active=True,
+    )
+    return user
+
+
+def _create_staff_with_role(email: str, role: str):
+    user = User.objects.create_user(
+        email=email,
+        password="StrongPass1!",
+        first_name="Staff",
+        last_name="User",
+        user_type=UserType.STAFF,
+        is_active=True,
+        is_staff=True,
+    )
+    UserProfile.objects.create(user=user)
+    flags = {
+        "can_approve_professionals": False,
+        "can_manage_knowledge_base": False,
+        "can_export_datasets": False,
+        "can_view_audit_logs": False,
+    }
+    if role == StaffRole.VERIFICATION_OFFICER:
+        flags["can_approve_professionals"] = True
+    elif role == StaffRole.KNOWLEDGE_BASE_MANAGER:
+        flags["can_manage_knowledge_base"] = True
+    elif role == StaffRole.ANALYTICS_OFFICER:
+        flags["can_export_datasets"] = True
+    elif role == StaffRole.COMPLIANCE_OFFICER:
+        flags["can_view_audit_logs"] = True
+
+    StaffProfile.objects.create(
+        user=user,
+        staff_role=role,
+        is_active=True,
+        **flags,
     )
     return user
 
@@ -2435,8 +2487,15 @@ class RAGExporterTest(TestCase):
 
 class AdminRAGAnalyticsSummaryViewTest(TestCase):
     def setUp(self):
-        self.staff = _create_staff()
+        self.staff = _create_staff_with_role(
+            email="anl_staff@example.com",
+            role=StaffRole.ANALYTICS_OFFICER,
+        )
         self.regular = create_doctor(email="anl_reg_dr@example.com")
+        self.financial = _create_staff_with_role(
+            email="anl_financial@example.com",
+            role=StaffRole.FINANCIAL,
+        )
 
     def test_staff_can_view_analytics(self):
         client = auth_client(self.staff)
@@ -2448,6 +2507,11 @@ class AdminRAGAnalyticsSummaryViewTest(TestCase):
 
     def test_non_staff_gets_403(self):
         client = auth_client(self.regular)
+        resp = client.get("/api/rag/admin/analytics/summary/")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_financial_staff_gets_403(self):
+        client = auth_client(self.financial)
         resp = client.get("/api/rag/admin/analytics/summary/")
         self.assertEqual(resp.status_code, 403)
 
@@ -2468,8 +2532,15 @@ class AdminRAGAnalyticsSummaryViewTest(TestCase):
 
 class AdminRAGDatasetExportViewTest(TestCase):
     def setUp(self):
-        self.staff = _create_staff()
+        self.staff = _create_staff_with_role(
+            email="exp_staff@example.com",
+            role=StaffRole.ANALYTICS_OFFICER,
+        )
         self.regular = create_doctor(email="exp_reg_dr@example.com")
+        self.support = _create_staff_with_role(
+            email="exp_support@example.com",
+            role=StaffRole.SUPPORT_SPECIALIST,
+        )
         doctor = create_doctor(email="exp_data_dr@example.com")
         _create_rag_response(doctor)
 
@@ -2505,6 +2576,15 @@ class AdminRAGDatasetExportViewTest(TestCase):
         )
         self.assertEqual(resp.status_code, 403)
         self.assertTrue(AuditLog.objects.filter(action="rag_dataset_export_access_denied").exists())
+
+    def test_support_staff_gets_403(self):
+        client = auth_client(self.support)
+        resp = client.post(
+            "/api/rag/admin/exports/dataset/",
+            {"format": "json"},
+            format="json",
+        )
+        self.assertEqual(resp.status_code, 403)
 
     def test_unauthenticated_gets_401(self):
         resp = self.client.post(

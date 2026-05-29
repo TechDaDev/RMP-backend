@@ -2,6 +2,7 @@ from rest_framework.permissions import BasePermission
 
 from apps.audit.services import record_security_event
 from apps.common.policies import ClinicalAccessPolicy, RoleAccessPolicy
+from apps.common.staff_access import has_staff_capability
 
 
 class IsVerifiedDoctor(BasePermission):
@@ -72,12 +73,12 @@ class CanAccessPatientRecord(BasePermission):
 
 class CanAccessKnowledgeBase(BasePermission):
     def has_permission(self, request, view):
-        return RoleAccessPolicy.is_admin_or_staff(request.user)
+        return has_staff_capability(request.user, "manage_knowledge_base")
 
 
 class CanExportRagDataset(BasePermission):
     def has_permission(self, request, view):
-        allowed = RoleAccessPolicy.is_admin_or_staff(request.user)
+        allowed = has_staff_capability(request.user, "export_datasets")
         if not allowed and getattr(request, "user", None) and request.user.is_authenticated:
             record_security_event(
                 actor=request.user,
@@ -86,3 +87,8 @@ class CanExportRagDataset(BasePermission):
                 metadata={"reason_code": "policy_denied"},
             )
         return allowed
+
+
+class CanApproveProfessionals(BasePermission):
+    def has_permission(self, request, view):
+        return has_staff_capability(request.user, "approve_professionals")

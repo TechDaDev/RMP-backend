@@ -216,7 +216,39 @@ class FullProfileShapeTests(TestCase):
         self.assertIsNotNone(data["role_profile"])
         self.assertEqual(data["role_profile"]["staff_role"], StaffRole.SYSTEM_ADMIN)
         self.assertEqual(data["role_profile"]["role_display"], "System Administrator")
+        self.assertIn("allowed_admin_sections", data["role_profile"])
+        self.assertIn("verification", data["role_profile"]["allowed_admin_sections"])
+        self.assertIn("finance_dashboard", data["role_profile"]["allowed_admin_sections"])
         self.assertFalse(data["verification"]["required"])
+
+    def test_financial_profile_sections_are_finance_only(self):
+        user = User.objects.create_user(
+            email="financial-sections@example.com",
+            password="StrongPass1!",  # noqa: S106
+            first_name="Faris",
+            last_name="Finance",
+            user_type=UserType.STAFF,
+            is_active=True,
+            is_staff=True,
+        )
+        UserProfile.objects.create(user=user)
+        StaffProfile.objects.create(
+            user=user,
+            staff_role=StaffRole.FINANCIAL,
+            department="Finance",
+            is_active=True,
+        )
+
+        client = _auth_client(user)
+        resp = client.get(PROFILE_ME_URL)
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+        sections = set(resp.data["data"]["role_profile"]["allowed_admin_sections"])
+        self.assertIn("finance_dashboard", sections)
+        self.assertIn("wallet_transactions", sections)
+        self.assertNotIn("knowledge_base_documents", sections)
+        self.assertNotIn("rag_feedback", sections)
+        self.assertNotIn("verification", sections)
 
 
 class VerificationStatusNotWritableTests(TestCase):
@@ -270,13 +302,20 @@ class AdminVerificationAPITests(TestCase):
             password="StrongPass1!",  # noqa: S106
             first_name="Staff",
             last_name="Reviewer",
-            user_type=UserType.DOCTOR,
+            user_type=UserType.STAFF,
             is_active=True,
             is_staff=True,
         )
         UserProfile.objects.create(user=self.staff)
+        StaffProfile.objects.create(
+            user=self.staff,
+            staff_role=StaffRole.VERIFICATION_OFFICER,
+            can_approve_professionals=True,
+            is_active=True,
+        )
         DoctorProfile.objects.create(
             user=self.staff,
+            specialty="general_medicine",
             verification_status=VerificationStatus.APPROVED,
         )
         self.staff_client = _auth_client(self.staff)

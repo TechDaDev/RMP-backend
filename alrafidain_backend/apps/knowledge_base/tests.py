@@ -19,8 +19,11 @@ from apps.common.choices import (
     KnowledgeLanguage,
     KnowledgeProcessingStatus,
     KnowledgeSecurityStatus,
+    StaffRole,
+    UserType,
 )
 from apps.common.models import BackgroundJob
+from apps.profiles.models import StaffProfile
 
 from .models import KnowledgeChunk, KnowledgeDocument, KnowledgeDocumentText, KnowledgeProcessingLog
 from .services import (
@@ -58,10 +61,16 @@ def _make_docx_file() -> SimpleUploadedFile:
 
 
 def _make_staff_user(email="staff@example.com"):
-    user = User.objects.create_user(email=email, password="StrongPass1!", user_type="doctor")
+    user = User.objects.create_user(email=email, password="StrongPass1!", user_type=UserType.STAFF)
     user.is_staff = True
     user.is_active = True
     user.save()
+    StaffProfile.objects.create(
+        user=user,
+        staff_role=StaffRole.KNOWLEDGE_BASE_MANAGER,
+        can_manage_knowledge_base=True,
+        is_active=True,
+    )
     return user
 
 
@@ -69,6 +78,19 @@ def _make_regular_user(email="regular@example.com"):
     user = User.objects.create_user(email=email, password="StrongPass1!", user_type="patient")
     user.is_active = True
     user.save()
+    return user
+
+
+def _make_non_kb_staff_user(email="staff-no-kb@example.com"):
+    user = User.objects.create_user(email=email, password="StrongPass1!", user_type=UserType.STAFF)
+    user.is_staff = True
+    user.is_active = True
+    user.save()
+    StaffProfile.objects.create(
+        user=user,
+        staff_role=StaffRole.FINANCIAL,
+        is_active=True,
+    )
     return user
 
 
@@ -92,6 +114,7 @@ class UploadTests(TestCase):
     def setUp(self):
         self.client = APIClient()
         self.staff = _make_staff_user()
+        self.non_kb_staff = _make_non_kb_staff_user()
         self.regular = _make_regular_user()
 
     def test_staff_can_upload_txt(self):
@@ -120,6 +143,11 @@ class UploadTests(TestCase):
 
     def test_non_staff_cannot_upload(self):
         self.client.force_authenticate(self.regular)
+        response = _upload_document(self.client)
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_non_kb_staff_cannot_upload(self):
+        self.client.force_authenticate(self.non_kb_staff)
         response = _upload_document(self.client)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
