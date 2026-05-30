@@ -200,6 +200,7 @@ class WalletRechargeRequestViewSet(
     viewsets.GenericViewSet,
 ):
     permission_classes = [IsAuthenticated]
+    throttle_classes = []
 
     def get_queryset(self):
         qs = WalletRechargeRequest.objects.select_related(
