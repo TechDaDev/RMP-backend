@@ -62,6 +62,8 @@ class AdminVerificationListView(APIView):
                     | Q(laboratorian_license_number__icontains=search)
                     | Q(laboratory_name__icontains=search)
                     | Q(laboratory_address__icontains=search)
+                    | Q(laboratory_governorate__icontains=search)
+                    | Q(laboratory_phone_number__icontains=search)
                 )
             queryset = queryset.filter(base_q)
 

@@ -45,7 +45,13 @@ class AdminVerificationProfileSummarySerializer(serializers.Serializer):
             "license_number": profile.laboratorian_license_number,
             "laboratory_name": profile.laboratory_name,
             "laboratory_address": profile.laboratory_address,
+            "laboratory_governorate": profile.laboratory_governorate,
+            "laboratory_phone_number": profile.laboratory_phone_number,
             "specialization": profile.specialization,
+            "working_days": profile.working_days,
+            "opening_time": profile.opening_time,
+            "closing_time": profile.closing_time,
+            "is_open_now": profile.is_open_now,
             "phone_number": _resolve_phone_number(profile.user),
         }
 

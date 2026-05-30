@@ -14,7 +14,7 @@ from .models import (
 class UserProfileAdmin(admin.ModelAdmin):
     list_display = ["user", "gender", "governorate", "phone_number", "created_at"]
     list_filter = ["gender", "governorate", "created_at"]
-    search_fields = ["user__email", "phone_number", "national_id"]
+    search_fields = ["user__email", "phone_number"]
     readonly_fields = ["created_at", "updated_at"]
 
 
@@ -98,8 +98,12 @@ class LaboratorianProfileAdmin(admin.ModelAdmin):
         "laboratory_license_number",
         "laboratory_license_image",
         "laboratory_address",
+        "laboratory_governorate",
+        "laboratory_phone_number",
         "specialization",
-        "working_hours",
+        "working_days",
+        "opening_time",
+        "closing_time",
         "verification_status",
         "verified_at",
         "verification_notes",

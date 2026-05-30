@@ -42,6 +42,26 @@ class UserProfileSerializer(serializers.ModelSerializer):
         )
         return value
 
+    def validate_national_id_front_image(self, value):
+        value = _preserve_existing_file_for_partial_update(self, "national_id_front_image", value)
+        validate_uploaded_file(
+            value,
+            allowed_extensions=settings.PROFILE_IMAGE_ALLOWED_EXTENSIONS,
+            allowed_content_types=settings.PROFILE_IMAGE_ALLOWED_CONTENT_TYPES,
+            max_size_mb=settings.MAX_PROFILE_IMAGE_UPLOAD_MB,
+        )
+        return value
+
+    def validate_national_id_back_image(self, value):
+        value = _preserve_existing_file_for_partial_update(self, "national_id_back_image", value)
+        validate_uploaded_file(
+            value,
+            allowed_extensions=settings.PROFILE_IMAGE_ALLOWED_EXTENSIONS,
+            allowed_content_types=settings.PROFILE_IMAGE_ALLOWED_CONTENT_TYPES,
+            max_size_mb=settings.MAX_PROFILE_IMAGE_UPLOAD_MB,
+        )
+        return value
+
     class Meta:
         model = UserProfile
         fields = [
@@ -52,8 +72,8 @@ class UserProfileSerializer(serializers.ModelSerializer):
             "date_of_birth",
             "governorate",
             "district",
-            "address",
-            "national_id",
+            "national_id_front_image",
+            "national_id_back_image",
             "created_at",
             "updated_at",
         ]
@@ -168,6 +188,8 @@ class PharmacistProfileSerializer(serializers.ModelSerializer):
 
 
 class LaboratorianProfileSerializer(serializers.ModelSerializer):
+    is_open_now = serializers.BooleanField(read_only=True)
+
     def validate_laboratorian_license_image(self, value):
         value = _preserve_existing_file_for_partial_update(
             self,
@@ -181,6 +203,42 @@ class LaboratorianProfileSerializer(serializers.ModelSerializer):
             max_size_mb=settings.MAX_PROFILE_IMAGE_UPLOAD_MB,
         )
         return value
+
+    def validate_working_days(self, value):
+        if value in (None, ""):
+            return []
+        if not isinstance(value, list):
+            raise serializers.ValidationError("working_days must be an array of day values.")
+
+        normalized = []
+        for raw in value:
+            day = str(raw).strip().lower()
+            if day not in LaboratorianProfile.WORKING_DAY_CHOICES:
+                raise serializers.ValidationError(
+                    f"Invalid day '{raw}'. Allowed: {', '.join(LaboratorianProfile.WORKING_DAY_CHOICES)}."
+                )
+            if day not in normalized:
+                normalized.append(day)
+        return normalized
+
+    def validate(self, attrs):
+        opening = attrs.get("opening_time", getattr(self.instance, "opening_time", None))
+        closing = attrs.get("closing_time", getattr(self.instance, "closing_time", None))
+        has_days = attrs.get("working_days", getattr(self.instance, "working_days", []))
+
+        if (opening and not closing) or (closing and not opening):
+            raise serializers.ValidationError(
+                "opening_time and closing_time must be provided together."
+            )
+        if opening and closing and opening == closing:
+            raise serializers.ValidationError(
+                "opening_time and closing_time cannot be equal."
+            )
+        if has_days and not (opening and closing):
+            raise serializers.ValidationError(
+                "opening_time and closing_time are required when working_days is provided."
+            )
+        return attrs
 
     def validate_laboratory_license_image(self, value):
         value = _preserve_existing_file_for_partial_update(self, "laboratory_license_image", value)
@@ -202,8 +260,13 @@ class LaboratorianProfileSerializer(serializers.ModelSerializer):
             "laboratory_license_number",
             "laboratory_license_image",
             "laboratory_address",
+            "laboratory_governorate",
+            "laboratory_phone_number",
             "specialization",
-            "working_hours",
+            "working_days",
+            "opening_time",
+            "closing_time",
+            "is_open_now",
             "verification_status",
             "verified_at",
             "verification_notes",

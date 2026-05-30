@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from rest_framework import status
 from rest_framework.test import APIClient
@@ -61,6 +62,10 @@ def _auth_client(user):
     return client
 
 
+def _image_file(name="img.png"):
+    return SimpleUploadedFile(name, b"fake-image", content_type="image/png")
+
+
 class UserProfileCompletionTests(TestCase):
     def setUp(self):
         self.user = _create_active_user(UserType.PATIENT)
@@ -73,7 +78,8 @@ class UserProfileCompletionTests(TestCase):
         missing = self.profile.missing_fields
         self.assertIn("phone_number", missing)
         self.assertIn("gender", missing)
-        self.assertIn("national_id", missing)
+        self.assertIn("national_id_front_image", missing)
+        self.assertIn("national_id_back_image", missing)
 
     def test_complete_when_all_fields_filled(self):
         self.profile.phone_number = "07712345678"
@@ -81,8 +87,8 @@ class UserProfileCompletionTests(TestCase):
         self.profile.date_of_birth = "1990-01-01"
         self.profile.governorate = "baghdad"
         self.profile.district = "Karrada"
-        self.profile.address = "Some Street"
-        self.profile.national_id = "123456789"
+        self.profile.national_id_front_image = _image_file("nid-front.png")
+        self.profile.national_id_back_image = _image_file("nid-back.png")
         self.profile.save()
         self.assertTrue(self.profile.is_complete)
         self.assertEqual(self.profile.missing_fields, [])
@@ -163,6 +169,53 @@ class LaboratorianProfileCompletionTests(TestCase):
         missing = self.profile.missing_fields
         self.assertIn("laboratorian_license_number", missing)
         self.assertIn("laboratory_name", missing)
+
+
+class LaboratorianProfileScheduleTests(TestCase):
+    def setUp(self):
+        self.user = _create_active_user(UserType.LABORATORIAN, email="lab-schedule@example.com")
+        self.client = _auth_client(self.user)
+
+    def test_laboratorian_can_set_working_days_and_hours(self):
+        response = self.client.patch(
+            "/api/profiles/me/laboratorian/",
+            {
+                "working_days": ["saturday", "sunday"],
+                "opening_time": "08:00:00",
+                "closing_time": "16:00:00",
+                "laboratory_governorate": "baghdad",
+                "laboratory_phone_number": "07712345678",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.data
+        self.assertEqual(data["working_days"], ["saturday", "sunday"])
+        self.assertEqual(data["opening_time"], "08:00:00")
+        self.assertEqual(data["closing_time"], "16:00:00")
+        self.assertEqual(data["laboratory_governorate"], "baghdad")
+        self.assertEqual(data["laboratory_phone_number"], "07712345678")
+        self.assertIn("is_open_now", data)
+
+    def test_laboratorian_working_days_reject_invalid_day(self):
+        response = self.client.patch(
+            "/api/profiles/me/laboratorian/",
+            {
+                "working_days": ["noday"],
+                "opening_time": "08:00:00",
+                "closing_time": "16:00:00",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_laboratorian_working_days_require_both_times(self):
+        response = self.client.patch(
+            "/api/profiles/me/laboratorian/",
+            {"working_days": ["saturday"], "opening_time": "08:00:00"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
 
 class FullProfileShapeTests(TestCase):

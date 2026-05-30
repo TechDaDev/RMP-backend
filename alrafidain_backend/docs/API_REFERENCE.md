@@ -273,7 +273,7 @@ Returned shape includes:
 - Role-specific profile (`patient_profile`, `doctor_profile`, `pharmacist_profile`, or `laboratorian_profile`)
 
 Shared `UserProfile` fields:
-- `phone_number`, `profile_image`, `gender`, `date_of_birth`, `governorate`, `district`, `address`, `national_id`
+- `phone_number`, `profile_image`, `gender`, `date_of_birth`, `governorate`, `district`, `national_id_front_image`, `national_id_back_image`
 
 **Response `200`:**
 ```json
@@ -293,8 +293,8 @@ Shared `UserProfile` fields:
       "date_of_birth": "1995-03-10",
       "governorate": "Baghdad",
       "district": "Karkh",
-      "address": "Street 1",
-      "national_id": "12345678901"
+      "national_id_front_image": "https://.../profiles/<user_id>/national-id/front/<file>.png",
+      "national_id_back_image": "https://.../profiles/<user_id>/national-id/back/<file>.png"
     },
     "patient_profile": {
       "social_security_id": "SS-1001",
@@ -314,22 +314,23 @@ Shared `UserProfile` fields:
 
 ### `PUT/PATCH /api/profiles/me/user-profile/`
 
-Update UserProfile (phone, gender, DOB, address, etc.).
+Update UserProfile (phone, gender, DOB, and national ID images).
 
 - **Auth required**: Yes
 - **Allowed roles**: All
 
 **Request body:**
-```json
-{
-  "phone_number": "07712345678",
-  "gender": "female",
-  "date_of_birth": "1990-05-15",
-  "governorate": "Baghdad",
-  "district": "Rusafa",
-  "address": "Building 10, Apt 2",
-  "national_id": "12345678901"
-}
+```http
+PATCH /api/profiles/me/user-profile/
+Content-Type: multipart/form-data
+
+phone_number=07712345678
+gender=female
+date_of_birth=1990-05-15
+governorate=baghdad
+district=rusafa
+national_id_front_image=<file>
+national_id_back_image=<file>
 ```
 
 **Response `200`:**
@@ -343,8 +344,8 @@ Update UserProfile (phone, gender, DOB, address, etc.).
     "date_of_birth": "1990-05-15",
     "governorate": "Baghdad",
     "district": "Rusafa",
-    "address": "Building 10, Apt 2",
-    "national_id": "12345678901"
+    "national_id_front_image": "https://.../profiles/<user_id>/national-id/front/<file>.png",
+    "national_id_back_image": "https://.../profiles/<user_id>/national-id/back/<file>.png"
   }
 }
 ```
@@ -507,8 +508,13 @@ Laboratorian profile fields:
 - `laboratory_license_number`
 - `laboratory_license_image`
 - `laboratory_address`
+- `laboratory_governorate`
+- `laboratory_phone_number`
 - `specialization`
-- `working_hours`
+- `working_days` (array of day values)
+- `opening_time`
+- `closing_time`
+- `is_open_now` (read-only)
 - `verification_status` (read-only)
 - `verified_at` (read-only)
 - `verification_notes` (read-only)
@@ -520,8 +526,12 @@ Laboratorian profile fields:
   "laboratory_name": "Central Lab",
   "laboratory_license_number": "LABLIC-42",
   "laboratory_address": "Baghdad",
+  "laboratory_governorate": "baghdad",
+  "laboratory_phone_number": "07712345678",
   "specialization": "hematology",
-  "working_hours": "08:00-16:00"
+  "working_days": ["saturday", "sunday", "monday", "tuesday", "wednesday"],
+  "opening_time": "08:00:00",
+  "closing_time": "16:00:00"
 }
 ```
 
@@ -535,8 +545,13 @@ Laboratorian profile fields:
     "laboratory_name": "Central Lab",
     "laboratory_license_number": "LABLIC-42",
     "laboratory_address": "Baghdad",
+    "laboratory_governorate": "baghdad",
+    "laboratory_phone_number": "07712345678",
     "specialization": "hematology",
-    "working_hours": "08:00-16:00",
+    "working_days": ["saturday", "sunday", "monday", "tuesday", "wednesday"],
+    "opening_time": "08:00:00",
+    "closing_time": "16:00:00",
+    "is_open_now": true,
     "verification_status": "approved",
     "verified_at": "2026-05-01T09:00:00Z",
     "verification_notes": "Verified by staff"

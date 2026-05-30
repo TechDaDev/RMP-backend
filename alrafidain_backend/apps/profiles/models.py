@@ -2,6 +2,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.utils import timezone
 
 from apps.common.choices import Gender, Governorate, MedicalSpecialty, StaffRole, VerificationStatus
 from apps.common.models import BaseModel
@@ -9,6 +10,8 @@ from apps.common.upload_paths import (
     doctor_license_upload_path,
     laboratorian_license_upload_path,
     laboratory_license_upload_path,
+    national_id_back_upload_path,
+    national_id_front_upload_path,
     pharmacist_license_upload_path,
     pharmacy_license_upload_path,
     profile_image_upload_path,
@@ -30,6 +33,16 @@ class UserProfile(BaseModel):
     district = models.CharField(max_length=100, blank=True)
     address = models.TextField(blank=True)
     national_id = models.CharField(max_length=20, blank=True)
+    national_id_front_image = models.ImageField(
+        upload_to=national_id_front_upload_path,
+        blank=True,
+        null=True,
+    )
+    national_id_back_image = models.ImageField(
+        upload_to=national_id_back_upload_path,
+        blank=True,
+        null=True,
+    )
 
     class Meta:
         verbose_name = "User Profile"
@@ -41,8 +54,8 @@ class UserProfile(BaseModel):
         "date_of_birth",
         "governorate",
         "district",
-        "address",
-        "national_id",
+        "national_id_front_image",
+        "national_id_back_image",
     ]
 
     @property
@@ -228,6 +241,16 @@ class PharmacistProfile(BaseModel):
 
 
 class LaboratorianProfile(BaseModel):
+    WORKING_DAY_CHOICES = [
+        "saturday",
+        "sunday",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+    ]
+
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -243,8 +266,17 @@ class LaboratorianProfile(BaseModel):
         upload_to=laboratory_license_upload_path, blank=True, null=True
     )
     laboratory_address = models.TextField(blank=True)
+    laboratory_governorate = models.CharField(max_length=20, choices=Governorate.choices, blank=True)
+    laboratory_phone_number = models.CharField(
+        max_length=11,
+        blank=True,
+        validators=[iraqi_phone_validator],
+    )
     specialization = models.CharField(max_length=100, blank=True)
     working_hours = models.CharField(max_length=100, blank=True)
+    working_days = models.JSONField(default=list, blank=True)
+    opening_time = models.TimeField(blank=True, null=True)
+    closing_time = models.TimeField(blank=True, null=True)
     verification_status = models.CharField(
         max_length=20,
         choices=VerificationStatus.choices,
@@ -285,6 +317,23 @@ class LaboratorianProfile(BaseModel):
             if not getattr(self, field):
                 result.append(field)
         return result
+
+    @property
+    def is_open_now(self) -> bool:
+        if not self.working_days or not self.opening_time or not self.closing_time:
+            return False
+
+        now = timezone.localtime()
+        current_day = now.strftime("%A").lower()
+        if current_day not in self.working_days:
+            return False
+
+        current_time = now.time()
+        if self.opening_time <= self.closing_time:
+            return self.opening_time <= current_time <= self.closing_time
+
+        # Overnight shift (e.g. 20:00 -> 04:00)
+        return current_time >= self.opening_time or current_time <= self.closing_time
 
     def __str__(self):
         return f"Laboratorian: {self.user.email}"

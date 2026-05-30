@@ -11,6 +11,14 @@ def profile_image_upload_path(instance, filename: str) -> str:
     return f"profiles/{instance.user_id}/{_uuid_filename(filename)}"
 
 
+def national_id_front_upload_path(instance, filename: str) -> str:
+    return f"profiles/{instance.user_id}/national-id/front/{_uuid_filename(filename)}"
+
+
+def national_id_back_upload_path(instance, filename: str) -> str:
+    return f"profiles/{instance.user_id}/national-id/back/{_uuid_filename(filename)}"
+
+
 def doctor_license_upload_path(instance, filename: str) -> str:
     return f"licenses/doctors/{instance.user_id}/{_uuid_filename(filename)}"
 
