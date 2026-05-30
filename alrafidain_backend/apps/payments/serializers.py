@@ -270,7 +270,12 @@ class WalletRechargeRequestSerializer(serializers.ModelSerializer):
         if not (is_reviewer or is_owner_with_pending_access):
             return None
 
-        file_url = obj.receipt_file.url
+        # Some private/custom storage backends do not expose a direct URL.
+        # Avoid raising and return null so create/list endpoints stay stable.
+        try:
+            file_url = obj.receipt_file.url
+        except Exception:
+            return None
         if request is not None:
             return request.build_absolute_uri(file_url)
         return file_url

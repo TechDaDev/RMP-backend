@@ -29,6 +29,7 @@ from .serializers import (
 @extend_schema(tags=["Profiles"])
 class MyProfileView(APIView):
     permission_classes = [IsAuthenticated]
+    throttle_classes = []
 
     @extend_schema(
         summary="Get full profile",
